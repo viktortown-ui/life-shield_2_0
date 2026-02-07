@@ -1,9 +1,6 @@
 import ARIMAPromise from 'arima/async';
-import {
-  TimeseriesWorkerRequest,
-  TimeseriesWorkerResponse,
-  runTimeseriesAnalysis
-} from '../islands/timeseries';
+import { TimeseriesWorkerRequest, TimeseriesWorkerResponse } from '../islands/timeseries';
+import { runTimeseriesAnalysis } from './timeseriesAnalysis';
 
 const arimaPromise = ARIMAPromise.then((Arima) => Arima);
 
