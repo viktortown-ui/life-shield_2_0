@@ -2,6 +2,8 @@
 
 LifeShieldV2 is a mobile-first (Vite + TypeScript) single-page app with modular “islands” for different analytical approaches.
 
+Settings include JSON export/import to back up or restore user data (with migrations).
+
 ## Local development
 
 ```bash
