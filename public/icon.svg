@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="LifeShieldV2 icon">
+  <rect width="512" height="512" rx="96" fill="#0b1220"/>
+  <path
+    d="M256 92c52 40 104 52 156 58v126c0 94-66 168-156 206C166 444 100 370 100 276V150c52-6 104-18 156-58z"
+    fill="#e6f0ff"
+  />
+  <path
+    d="M256 152c-30 24-62 36-96 42v82c0 66 44 118 96 150 52-32 96-84 96-150v-82c-34-6-66-18-96-42z"
+    fill="#0b1220"
+  />
+  <text
+    x="256"
+    y="305"
+    font-family="'Segoe UI', 'Inter', 'Arial', sans-serif"
+    font-size="120"
+    font-weight="700"
+    text-anchor="middle"
+    fill="#e6f0ff"
+  >
+    LS
+  </text>
+</svg>

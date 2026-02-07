@@ -24,3 +24,11 @@ npm run preview
 
 Notes:
 - GitHub Pages has build limits for the legacy “Build from a branch” flow. This custom workflow uses **GitHub Actions**, so it does not count against the “10 builds per hour” Pages limit.
+
+## Replacing the SVG app icon later
+
+The PWA is currently configured to use a text-only `public/icon.svg`. If you want to swap in PNGs later:
+
+1. Create PNGs (for example `icon-192.png` and `icon-512.png`).
+2. Upload them via **GitHub Desktop** or **Upload files** in the GitHub web UI (no binary patches required here).
+3. Update `vite.config.ts` to point `includeAssets` and `manifest.icons` at the PNGs and adjust the `type` to `image/png`.
