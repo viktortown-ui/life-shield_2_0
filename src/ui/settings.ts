@@ -24,10 +24,12 @@ export const createSettingsScreen = () => {
   exportBlock.innerHTML = `
     <h2>Экспорт / Импорт</h2>
     <textarea class="settings-textarea" rows="8" placeholder="JSON появится здесь"></textarea>
+    <input class="settings-file" type="file" accept="application/json,.json" hidden />
     <div class="settings-actions">
       <button class="button" data-action="export">Экспортировать</button>
       <button class="button ghost" data-action="import">Импортировать</button>
     </div>
+    <p class="settings-warning">Импорт перезапишет текущие данные.</p>
     <p class="settings-hint"></p>
   `;
 
@@ -45,6 +47,9 @@ export const createSettingsScreen = () => {
   `;
 
   const textarea = exportBlock.querySelector('textarea') as HTMLTextAreaElement;
+  const fileInput = exportBlock.querySelector(
+    '.settings-file'
+  ) as HTMLInputElement;
   const hint = exportBlock.querySelector('.settings-hint') as HTMLParagraphElement;
   const updateButton = maintenance.querySelector(
     '[data-action="apply-update"]'
@@ -59,13 +64,34 @@ export const createSettingsScreen = () => {
     if (!action) return;
 
     if (action === 'export') {
-      textarea.value = exportState();
+      const payload = exportState();
+      textarea.value = payload;
+      const blob = new Blob([payload], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const dateStamp = new Date().toISOString().slice(0, 10);
+      link.href = url;
+      link.download = `life-shield-backup-${dateStamp}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
       hint.textContent = 'JSON готов. Сохраните его в надёжном месте.';
     }
 
     if (action === 'import') {
+      if (!textarea.value.trim()) {
+        fileInput.value = '';
+        fileInput.click();
+        return;
+      }
       try {
         const parsed = JSON.parse(textarea.value);
+        const confirmed = window.confirm(
+          'Импорт перезапишет текущие данные. Продолжить?'
+        );
+        if (!confirmed) {
+          hint.textContent = 'Импорт отменён.';
+          return;
+        }
         const result = importState(parsed);
         hint.textContent = result.ok
           ? 'Импорт завершён.'
@@ -73,6 +99,29 @@ export const createSettingsScreen = () => {
       } catch {
         hint.textContent = 'Введите корректный JSON перед импортом.';
       }
+    }
+  });
+
+  fileInput.addEventListener('change', async () => {
+    const file = fileInput.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      textarea.value = text;
+      const parsed = JSON.parse(text);
+      const confirmed = window.confirm(
+        'Импорт перезапишет текущие данные. Продолжить?'
+      );
+      if (!confirmed) {
+        hint.textContent = 'Импорт отменён.';
+        return;
+      }
+      const result = importState(parsed);
+      hint.textContent = result.ok
+        ? 'Импорт завершён.'
+        : `Ошибка импорта: ${result.errors.join(' ')}`;
+    } catch {
+      hint.textContent = 'Введите корректный JSON перед импортом.';
     }
   });
 
