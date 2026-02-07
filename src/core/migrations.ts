@@ -8,7 +8,7 @@ export const migrations: Migration[] = [
   (state) => ({ ...state, schemaVersion: 1 })
 ];
 
-export const migrateState = (state: AppState): AppState => {
+export const migrate = (state: AppState): AppState => {
   if (state.schemaVersion >= schemaVersion) {
     return state;
   }
