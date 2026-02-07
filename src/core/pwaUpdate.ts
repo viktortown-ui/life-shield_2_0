@@ -1,31 +1,54 @@
 import { registerSW } from 'virtual:pwa-register';
 
-type Listener = (ready: boolean) => void;
+type UpdateState = {
+  ready: boolean;
+  offlineReady: boolean;
+};
+
+type Listener = (state: UpdateState) => void;
 
 let updateReady = false;
-let updateAction: (() => void) | null = null;
+let offlineReady = false;
+let updateAction: ((reloadPage?: boolean) => void) | null = null;
 const listeners = new Set<Listener>();
+
+const notify = () => {
+  const state = getUpdateState();
+  listeners.forEach((listener) => listener(state));
+};
 
 export const initPwaUpdate = () => {
   updateAction = registerSW({
     onNeedRefresh() {
       updateReady = true;
-      listeners.forEach((listener) => listener(true));
+      notify();
     },
     onOfflineReady() {
-      listeners.forEach((listener) => listener(updateReady));
+      offlineReady = true;
+      notify();
     }
   });
 };
 
-export const onUpdateReady = (listener: Listener) => {
+export const onUpdateState = (listener: Listener) => {
   listeners.add(listener);
-  listener(updateReady);
+  listener(getUpdateState());
   return () => listeners.delete(listener);
 };
 
-export const triggerUpdate = () => {
+export const checkForUpdate = () => {
   if (updateAction) {
-    updateAction();
+    updateAction(false);
   }
 };
+
+export const applyUpdate = () => {
+  if (updateAction) {
+    updateAction(true);
+  }
+};
+
+export const getUpdateState = (): UpdateState => ({
+  ready: updateReady,
+  offlineReady
+});

@@ -1,5 +1,5 @@
 import { defineConfig } from 'vite';
-import { VitePWA } from 'vite-plugin-pwa';
+import { VitePWA, cachePreset } from 'vite-plugin-pwa';
 
 export default defineConfig({
   base: process.env.BASE ?? '/',
@@ -25,6 +25,9 @@ export default defineConfig({
             type: 'image/png'
           }
         ]
+      },
+      workbox: {
+        runtimeCaching: cachePreset
       }
     })
   ],
