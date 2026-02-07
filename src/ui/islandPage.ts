@@ -11,6 +11,20 @@ import {
   parseOptimizationInput,
   serializeOptimizationInput
 } from '../islands/optimization';
+import {
+  BayesInput,
+  BayesWorkerResponse,
+  buildBayesCancelledReport,
+  buildBayesErrorReport,
+  buildBayesPendingReport,
+  buildBayesReport,
+  defaultBayesInput,
+  parseBayesInput,
+  serializeBayesInput
+} from '../islands/bayes';
+
+const clamp = (value: number, min: number, max: number) =>
+  Math.min(max, Math.max(min, value));
 
 export const createIslandPage = (id: IslandId) => {
   const island = findIsland(id);
@@ -37,7 +51,220 @@ export const createIslandPage = (id: IslandId) => {
   const form = document.createElement('form');
   form.className = 'island-form';
 
-  if (id === 'optimization') {
+  if (id === 'bayes') {
+    const parsedInput = parseBayesInput(islandState.input);
+    const initialInput: BayesInput = { ...defaultBayesInput, ...parsedInput };
+
+    form.innerHTML = `
+      <div class="bayes-grid">
+        <label>
+          Горизонт, мес
+          <input name="months" type="number" min="1" step="1" value="${initialInput.months}" />
+        </label>
+        <label>
+          Резерв
+          <input name="reserve" type="number" min="0" step="1000" value="${initialInput.reserve}" />
+        </label>
+        <label>
+          Провал дохода, %
+          <input name="shockSeverity" type="number" min="0" max="1" step="0.05" value="${initialInput.shockSeverity}" />
+        </label>
+        <label>
+          Income mean
+          <input name="incomeMean" type="number" min="0" step="1000" value="${initialInput.incomeMean}" />
+        </label>
+        <label>
+          Income sd
+          <input name="incomeSd" type="number" min="0" step="1000" value="${initialInput.incomeSd}" />
+        </label>
+        <label>
+          Income distribution
+          <select name="incomeDistribution">
+            <option value="lognormal" ${
+              initialInput.incomeDistribution === 'lognormal' ? 'selected' : ''
+            }>lognormal</option>
+            <option value="normal" ${
+              initialInput.incomeDistribution === 'normal' ? 'selected' : ''
+            }>normal</option>
+          </select>
+        </label>
+        <label>
+          Expenses mean
+          <input name="expensesMean" type="number" min="0" step="1000" value="${initialInput.expensesMean}" />
+        </label>
+        <label>
+          Expenses sd
+          <input name="expensesSd" type="number" min="0" step="1000" value="${initialInput.expensesSd}" />
+        </label>
+        <label>
+          Expenses distribution
+          <select name="expensesDistribution">
+            <option value="lognormal" ${
+              initialInput.expensesDistribution === 'lognormal' ? 'selected' : ''
+            }>lognormal</option>
+            <option value="normal" ${
+              initialInput.expensesDistribution === 'normal' ? 'selected' : ''
+            }>normal</option>
+          </select>
+        </label>
+        <label>
+          Prior a
+          <input name="priorA" type="number" min="0.1" step="0.1" value="${initialInput.priorA}" />
+        </label>
+        <label>
+          Prior b
+          <input name="priorB" type="number" min="0.1" step="0.1" value="${initialInput.priorB}" />
+        </label>
+        <label>
+          Наблюдений, мес
+          <input name="observationMonths" type="number" min="1" step="1" value="${initialInput.observationMonths}" />
+        </label>
+        <label>
+          Провалов в данных
+          <input name="observationFailures" type="number" min="0" step="1" value="${initialInput.observationFailures}" />
+        </label>
+        <label>
+          MCMC samples
+          <input name="mcmcSamples" type="number" min="500" step="100" value="${initialInput.mcmcSamples}" />
+        </label>
+        <label>
+          Burn-in
+          <input name="mcmcBurnIn" type="number" min="100" step="50" value="${initialInput.mcmcBurnIn}" />
+        </label>
+        <label>
+          Step size
+          <input name="mcmcStep" type="number" min="0.1" step="0.05" value="${initialInput.mcmcStep}" />
+        </label>
+        <label>
+          Симуляций
+          <input name="simulationRuns" type="number" min="500" step="100" value="${initialInput.simulationRuns}" />
+        </label>
+      </div>
+      <div class="bayes-controls">
+        <button class="button" type="submit">Запустить</button>
+        <button class="button ghost" type="button" data-stop>Stop</button>
+        <span class="bayes-status" data-status></span>
+      </div>
+    `;
+
+    const statusLabel = form.querySelector<HTMLSpanElement>('[data-status]');
+    const stopButton = form.querySelector<HTMLButtonElement>('[data-stop]');
+
+    const worker = new Worker(
+      new URL('../workers/bayes.worker.ts', import.meta.url),
+      { type: 'module' }
+    );
+    let pendingRequestId = '';
+
+    const readNumber = (data: FormData, name: string, fallback: number) => {
+      const value = Number(data.get(name));
+      return Number.isFinite(value) ? value : fallback;
+    };
+
+    const collectInput = (): BayesInput => {
+      const data = new FormData(form);
+      return {
+        months: readNumber(data, 'months', defaultBayesInput.months),
+        reserve: readNumber(data, 'reserve', defaultBayesInput.reserve),
+        shockSeverity: clamp(
+          readNumber(data, 'shockSeverity', defaultBayesInput.shockSeverity),
+          0,
+          1
+        ),
+        incomeMean: readNumber(data, 'incomeMean', defaultBayesInput.incomeMean),
+        incomeSd: readNumber(data, 'incomeSd', defaultBayesInput.incomeSd),
+        incomeDistribution: (data.get('incomeDistribution') === 'normal'
+          ? 'normal'
+          : 'lognormal'),
+        expensesMean: readNumber(
+          data,
+          'expensesMean',
+          defaultBayesInput.expensesMean
+        ),
+        expensesSd: readNumber(
+          data,
+          'expensesSd',
+          defaultBayesInput.expensesSd
+        ),
+        expensesDistribution: (data.get('expensesDistribution') === 'normal'
+          ? 'normal'
+          : 'lognormal'),
+        priorA: readNumber(data, 'priorA', defaultBayesInput.priorA),
+        priorB: readNumber(data, 'priorB', defaultBayesInput.priorB),
+        observationMonths: readNumber(
+          data,
+          'observationMonths',
+          defaultBayesInput.observationMonths
+        ),
+        observationFailures: readNumber(
+          data,
+          'observationFailures',
+          defaultBayesInput.observationFailures
+        ),
+        mcmcSamples: readNumber(data, 'mcmcSamples', defaultBayesInput.mcmcSamples),
+        mcmcBurnIn: readNumber(data, 'mcmcBurnIn', defaultBayesInput.mcmcBurnIn),
+        mcmcStep: readNumber(data, 'mcmcStep', defaultBayesInput.mcmcStep),
+        simulationRuns: readNumber(
+          data,
+          'simulationRuns',
+          defaultBayesInput.simulationRuns
+        )
+      };
+    };
+
+    worker.addEventListener('message', (event) => {
+      const data = event.data as BayesWorkerResponse;
+      if (data.requestId !== pendingRequestId) return;
+      pendingRequestId = '';
+      if (statusLabel) statusLabel.textContent = '';
+      if (data.type === 'success' && data.result) {
+        const report = buildBayesReport(collectInput(), data.result);
+        updateIslandReport(id, report);
+        islandState.lastReport = report;
+      } else if (data.type === 'cancelled') {
+        const report = buildBayesCancelledReport();
+        updateIslandReport(id, report);
+        islandState.lastReport = report;
+      } else if (data.type === 'error') {
+        const report = buildBayesErrorReport(
+          data.error ?? 'Ошибка воркера при расчёте.'
+        );
+        updateIslandReport(id, report);
+        islandState.lastReport = report;
+      }
+      renderReport();
+    });
+
+    worker.addEventListener('error', () => {
+      const report = buildBayesErrorReport('Ошибка воркера при расчёте.');
+      updateIslandReport(id, report);
+      islandState.lastReport = report;
+      pendingRequestId = '';
+      if (statusLabel) statusLabel.textContent = '';
+      renderReport();
+    });
+
+    stopButton?.addEventListener('click', () => {
+      if (!pendingRequestId) return;
+      worker.postMessage({ type: 'stop', requestId: pendingRequestId });
+      if (statusLabel) statusLabel.textContent = 'Останавливаю…';
+    });
+
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const input = collectInput();
+      updateIslandInput(id, serializeBayesInput(input));
+      islandState.input = serializeBayesInput(input);
+      const pending = buildBayesPendingReport(input);
+      updateIslandReport(id, pending);
+      islandState.lastReport = pending;
+      renderReport();
+
+      pendingRequestId = `${Date.now()}-${Math.random()}`;
+      if (statusLabel) statusLabel.textContent = 'Считаю…';
+      worker.postMessage({ type: 'run', requestId: pendingRequestId, input });
+    });
+  } else if (id === 'optimization') {
     const parsedInput = parseOptimizationInput(islandState.input);
     const initialInput: OptimizationInput = {
       ...defaultOptimizationInput,
@@ -249,7 +476,7 @@ export const createIslandPage = (id: IslandId) => {
         <div><span>Confidence</span><strong>${report.confidence}%</strong></div>
       </div>
       <h2>${report.headline}</h2>
-      <p>${report.summary}</p>
+      <div class="result-summary">${report.summary}</div>
       <ul>${report.details.map((item) => `<li>${item}</li>`).join('')}</ul>
     `;
   };
