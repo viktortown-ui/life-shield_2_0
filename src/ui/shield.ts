@@ -1,7 +1,32 @@
 import { islandRegistry } from '../core/registry';
 import { getState } from '../core/store';
 import { buildGlobalVerdict } from '../core/verdict';
+import { IslandReport } from '../core/types';
 import { createAvatar } from './avatar';
+
+const XP_PER_LEVEL = 120;
+const STALE_AFTER_DAYS = 7;
+
+const pickTopAction = (report: IslandReport) => {
+  if (!report.actions?.length) return null;
+  return [...report.actions]
+    .map((action) => ({
+      action,
+      score: action.impact / Math.max(1, action.effort)
+    }))
+    .sort((a, b) => b.score - a.score)[0]?.action;
+};
+
+const getIslandStatus = (lastRunAt: string | null, hasReport: boolean) => {
+  if (!hasReport) return { label: 'not started', tone: 'status--new' };
+  if (!lastRunAt) return { label: 'computed', tone: 'status--fresh' };
+  const diffDays =
+    (Date.now() - new Date(lastRunAt).getTime()) / (1000 * 60 * 60 * 24);
+  if (diffDays >= STALE_AFTER_DAYS) {
+    return { label: 'stale', tone: 'status--stale' };
+  }
+  return { label: 'computed', tone: 'status--fresh' };
+};
 
 export const createShieldScreen = () => {
   const container = document.createElement('div');
@@ -35,6 +60,21 @@ export const createShieldScreen = () => {
     }
   });
   const verdict = buildGlobalVerdict(reports);
+  const dailyQuests = [...reports]
+    .sort((a, b) => a.score - b.score)
+    .slice(0, Math.min(2, Math.max(1, reports.length)))
+    .map((report) => {
+      const action = pickTopAction(report);
+      return {
+        title: action?.title ?? 'Собрать свежие данные',
+        why:
+          report.insights?.find((item) => item.severity !== 'info')?.title ??
+          report.headline,
+        action: action?.description ?? report.summary,
+        rewardXp: Math.max(12, Math.round((100 - report.score) / 2)),
+        sourceId: report.id
+      };
+    });
 
   header.appendChild(createAvatar(verdict, state.level));
 
@@ -55,12 +95,39 @@ export const createShieldScreen = () => {
     </div>
   `;
 
+  const xpBlock = document.createElement('section');
+  xpBlock.className = 'shield-xp';
+  const levelBase = (state.level - 1) * XP_PER_LEVEL;
+  const levelProgress = Math.max(0, state.xp - levelBase);
+  const levelPercent = Math.min(
+    100,
+    Math.round((levelProgress / XP_PER_LEVEL) * 100)
+  );
+  xpBlock.innerHTML = `
+    <h2>XP прогресс</h2>
+    <div class="xp-meta">
+      <span>Level ${state.level}</span>
+      <span>${levelProgress}/${XP_PER_LEVEL} XP</span>
+    </div>
+    <div class="xp-bar">
+      <div class="xp-bar-fill" style="width: ${levelPercent}%"></div>
+    </div>
+    <div class="xp-hints">
+      <span>+XP за:</span>
+      <ul>
+        <li>Запуск анализа острова.</li>
+        <li>Заполнение входных данных.</li>
+        <li>Рост confidence в отчёте.</li>
+      </ul>
+    </div>
+  `;
+
   const quests = document.createElement('section');
   quests.className = 'shield-quests';
   quests.innerHTML = `
-    <h2>Квесты</h2>
+    <h2>Daily quest</h2>
     <div class="quest-list">
-      ${verdict.quests
+      ${dailyQuests
         .map(
           (quest) => `
         <div class="quest-card">
@@ -94,8 +161,10 @@ export const createShieldScreen = () => {
     const progress = islandState.progress;
     const nextStep =
       report?.actions?.[0]?.title ?? 'Запустить расчёт и сохранить результат';
+    const status = getIslandStatus(progress.lastRunAt, Boolean(report));
 
     tile.innerHTML = `
+      <span class="tile-status ${status.tone}">${status.label}</span>
       <div class="tile-score">${score}</div>
       <div class="tile-confidence">${confidence}%</div>
       <div class="tile-headline">${headline}</div>
@@ -115,6 +184,14 @@ export const createShieldScreen = () => {
     <a class="button" href="#/settings">Настройки</a>
   `;
 
-  container.append(header, summary, quests, grid, actions);
+  const bottomNav = document.createElement('nav');
+  bottomNav.className = 'bottom-nav';
+  bottomNav.innerHTML = `
+    <a class="bottom-nav-link active" href="#/">Shield</a>
+    <a class="bottom-nav-link" href="#/island/bayes">Islands</a>
+    <a class="bottom-nav-link" href="#/settings">Settings</a>
+  `;
+
+  container.append(header, summary, xpBlock, quests, grid, actions, bottomNav);
   return container;
 };
