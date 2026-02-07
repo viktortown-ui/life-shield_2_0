@@ -1,5 +1,6 @@
 import { islandRegistry } from '../core/registry';
 import { getState } from '../core/store';
+import { buildGlobalVerdict } from '../core/verdict';
 import { createAvatar } from './avatar';
 
 export const createShieldScreen = () => {
@@ -8,16 +9,39 @@ export const createShieldScreen = () => {
 
   const header = document.createElement('header');
   header.className = 'screen-header';
-  header.appendChild(createAvatar());
 
   const title = document.createElement('div');
   title.innerHTML = '<h1>Щит</h1><p>Обзор островов и ключевых сигналов.</p>';
   header.appendChild(title);
 
+  const state = getState();
+  const reports = islandRegistry.map((island) => {
+    const islandState = state.islands[island.id];
+    return islandState.lastReport ?? island.getReport(islandState.input);
+  });
+  const verdict = buildGlobalVerdict(reports);
+
+  header.appendChild(createAvatar(verdict));
+
+  const summary = document.createElement('section');
+  summary.className = 'shield-summary';
+  summary.innerHTML = `
+    <div>
+      <span>Rank</span>
+      <strong>${verdict.rank}</strong>
+    </div>
+    <div>
+      <span>Настрой</span>
+      <strong>${verdict.mood}</strong>
+    </div>
+    <div>
+      <span>Хаос</span>
+      <strong>${Math.round(verdict.chaos * 100)}%</strong>
+    </div>
+  `;
+
   const grid = document.createElement('section');
   grid.className = 'shield-grid';
-
-  const state = getState();
 
   islandRegistry.forEach((island) => {
     const tile = document.createElement('a');
@@ -44,6 +68,6 @@ export const createShieldScreen = () => {
     <a class="button" href="#/settings">Настройки</a>
   `;
 
-  container.append(header, grid, actions);
+  container.append(header, summary, grid, actions);
   return container;
 };

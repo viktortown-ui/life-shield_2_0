@@ -72,10 +72,53 @@ body {
   height: 44px;
   border-radius: 16px;
   background: linear-gradient(135deg, #4f8bff, #7ef7e6);
-  display: grid;
-  place-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
   color: #0b1220;
   font-weight: 700;
+}
+
+.avatar--tense {
+  background: linear-gradient(135deg, #ffb347, #ffd66d);
+}
+
+.avatar--storm {
+  background: linear-gradient(135deg, #ff6b6b, #ff9d6c);
+}
+
+.avatar-mark {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.avatar-text {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.shield-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.shield-summary div {
+  background: #111a2b;
+  border-radius: 12px;
+  padding: 10px;
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  color: #b8c5dd;
+}
+
+.shield-summary strong {
+  font-size: 16px;
+  color: #e8edf6;
 }
 
 .shield-grid {
