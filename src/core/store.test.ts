@@ -3,19 +3,28 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AppState, IslandId } from './types';
 import { migrate, schemaVersion } from './migrations';
 
+const makeProgress = () => ({
+  lastRunAt: null,
+  runsCount: 0,
+  bestScore: 0
+});
+
 const makeIslands = () =>
   ({
-    bayes: { input: '', lastReport: null },
-    hmm: { input: '', lastReport: null },
-    timeseries: { input: '', lastReport: null },
-    optimization: { input: '', lastReport: null },
-    decisionTree: { input: '', lastReport: null },
-    causalDag: { input: '', lastReport: null }
+    bayes: { input: '', lastReport: null, progress: makeProgress() },
+    hmm: { input: '', lastReport: null, progress: makeProgress() },
+    timeseries: { input: '', lastReport: null, progress: makeProgress() },
+    optimization: { input: '', lastReport: null, progress: makeProgress() },
+    decisionTree: { input: '', lastReport: null, progress: makeProgress() },
+    causalDag: { input: '', lastReport: null, progress: makeProgress() }
   }) satisfies Record<IslandId, AppState['islands'][IslandId]>;
 
 const makeState = (overrides: Partial<AppState> = {}): AppState => ({
   schemaVersion: 0,
   updatedAt: '2024-01-01T00:00:00.000Z',
+  xp: 0,
+  level: 1,
+  streakDays: 0,
   islands: makeIslands(),
   ...overrides
 });

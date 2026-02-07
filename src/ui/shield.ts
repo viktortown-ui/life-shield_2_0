@@ -21,7 +21,7 @@ export const createShieldScreen = () => {
   });
   const verdict = buildGlobalVerdict(reports);
 
-  header.appendChild(createAvatar(verdict));
+  header.appendChild(createAvatar(verdict, state.level));
 
   const summary = document.createElement('section');
   summary.className = 'shield-summary';
@@ -31,12 +31,35 @@ export const createShieldScreen = () => {
       <strong>${verdict.rank}</strong>
     </div>
     <div>
-      <span>Настрой</span>
-      <strong>${verdict.mood}</strong>
+      <span>XP</span>
+      <strong>${state.xp}</strong>
     </div>
     <div>
-      <span>Хаос</span>
-      <strong>${Math.round(verdict.chaos * 100)}%</strong>
+      <span>Стрик</span>
+      <strong>${state.streakDays} д</strong>
+    </div>
+  `;
+
+  const quests = document.createElement('section');
+  quests.className = 'shield-quests';
+  quests.innerHTML = `
+    <h2>Квесты</h2>
+    <div class="quest-list">
+      ${verdict.quests
+        .map(
+          (quest) => `
+        <div class="quest-card">
+          <div class="quest-title">${quest.title}</div>
+          <div class="quest-why">${quest.why}</div>
+          <div class="quest-action">${quest.action}</div>
+          <div class="quest-footer">
+            <span>+${quest.rewardXp} XP</span>
+            <a class="button small" href="#/island/${quest.sourceId}">Выполнить квест</a>
+          </div>
+        </div>
+      `
+        )
+        .join('')}
     </div>
   `;
 
@@ -48,15 +71,24 @@ export const createShieldScreen = () => {
     tile.className = 'shield-tile';
     tile.href = `#/island/${island.id}`;
 
-    const report = state.islands[island.id].lastReport;
+    const islandState = state.islands[island.id];
+    const report = islandState.lastReport;
     const score = report?.score ?? 0;
     const confidence = report?.confidence ?? 0;
     const headline = report?.headline ?? island.title;
+    const progress = islandState.progress;
+    const nextStep =
+      report?.actions?.[0]?.title ?? 'Запустить расчёт и сохранить результат';
 
     tile.innerHTML = `
       <div class="tile-score">${score}</div>
       <div class="tile-confidence">${confidence}%</div>
       <div class="tile-headline">${headline}</div>
+      <div class="tile-progress">
+        <span>Лучший: ${progress.bestScore}</span>
+        <span>Запусков: ${progress.runsCount}</span>
+      </div>
+      <div class="tile-next">Следующий шаг: ${nextStep}</div>
     `;
 
     grid.appendChild(tile);
@@ -68,6 +100,6 @@ export const createShieldScreen = () => {
     <a class="button" href="#/settings">Настройки</a>
   `;
 
-  container.append(header, summary, grid, actions);
+  container.append(header, summary, quests, grid, actions);
   return container;
 };
