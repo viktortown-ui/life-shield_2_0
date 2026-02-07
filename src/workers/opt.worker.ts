@@ -1,4 +1,4 @@
-import { GLPK } from 'glpk.js';
+import GLPK from 'glpk.js';
 import {
   OptimizationActionInput,
   OptimizationInput,
@@ -6,8 +6,6 @@ import {
   OptimizationWorkerRequest,
   OptimizationWorkerResponse
 } from '../islands/optimization';
-
-const glpkPromise = GLPK();
 
 const solveOptimization = (
   glpk: Awaited<ReturnType<typeof GLPK>>,
@@ -112,7 +110,7 @@ self.onmessage = async (
 ) => {
   const { requestId, input } = event.data;
   try {
-    const glpk = await glpkPromise;
+    const glpk = await GLPK();
     const solution = solveOptimization(glpk, input);
     const response: OptimizationWorkerResponse = {
       requestId,
