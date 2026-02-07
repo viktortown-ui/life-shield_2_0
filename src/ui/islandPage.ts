@@ -22,6 +22,10 @@ import {
   parseBayesInput,
   serializeBayesInput
 } from '../islands/bayes';
+import {
+  parseDecisionTreeInput,
+  serializeDecisionTreeInput
+} from '../islands/decisionTree';
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
@@ -455,6 +459,65 @@ export const createIslandPage = (id: IslandId) => {
       if (statusLabel) statusLabel.textContent = 'Решаю…';
       worker.postMessage({ requestId: pendingRequestId, input });
     });
+  } else if (id === 'decisionTree') {
+    const parsedInput = parseDecisionTreeInput(islandState.input);
+
+    form.innerHTML = `
+      <div class="decision-tree-grid">
+        <label>
+          DSL/JSON дерева решений
+          <textarea name="tree" rows="12">${parsedInput.treeText}</textarea>
+        </label>
+        <label>
+          Risk aversion: <span data-risk-value>${parsedInput.settings.riskAversion}</span>
+          <input
+            name="riskAversion"
+            type="range"
+            min="0"
+            max="1"
+            step="0.05"
+            value="${parsedInput.settings.riskAversion}"
+          />
+        </label>
+        <label>
+          Sensitivity target (chanceId)
+          <input
+            name="chanceId"
+            type="text"
+            value="${parsedInput.settings.sensitivity.chanceId}"
+          />
+        </label>
+        <label>
+          Sensitivity outcome label
+          <input
+            name="outcomeLabel"
+            type="text"
+            value="${parsedInput.settings.sensitivity.outcomeLabel}"
+          />
+        </label>
+        <label>
+          Sensitivity ±% по вероятности
+          <input
+            name="deltaPercent"
+            type="number"
+            min="0"
+            max="100"
+            step="1"
+            value="${parsedInput.settings.sensitivity.deltaPercent}"
+          />
+        </label>
+      </div>
+      <button class="button" type="submit">Рассчитать</button>
+    `;
+
+    const riskValue = form.querySelector<HTMLSpanElement>('[data-risk-value]');
+    const riskInput = form.querySelector<HTMLInputElement>('[name="riskAversion"]');
+
+    riskInput?.addEventListener('input', () => {
+      if (riskValue && riskInput) {
+        riskValue.textContent = Number(riskInput.value).toFixed(2);
+      }
+    });
   } else {
     form.innerHTML = `
       <label>
@@ -487,6 +550,30 @@ export const createIslandPage = (id: IslandId) => {
     form.addEventListener('submit', (event) => {
       event.preventDefault();
       const data = new FormData(form);
+      if (id === 'decisionTree') {
+        const treeText = String(data.get('tree') ?? '');
+        const settings = {
+          riskAversion: clamp(Number(data.get('riskAversion') ?? 0), 0, 1),
+          sensitivity: {
+            chanceId: String(data.get('chanceId') ?? '').trim(),
+            outcomeLabel: String(data.get('outcomeLabel') ?? '').trim(),
+            deltaPercent: clamp(
+              Number(data.get('deltaPercent') ?? 0),
+              0,
+              100
+            )
+          }
+        };
+        const input = serializeDecisionTreeInput(treeText, settings);
+        updateIslandInput(id, input);
+        const report = island.getReport(input);
+        updateIslandReport(id, report);
+        islandState.input = input;
+        islandState.lastReport = report;
+        renderReport();
+        return;
+      }
+
       const input = String(data.get('input') ?? '');
       updateIslandInput(id, input);
       const report = island.getReport(input);
