@@ -7,6 +7,15 @@ import { createAvatar } from './avatar';
 const XP_PER_LEVEL = 120;
 const STALE_AFTER_DAYS = 7;
 
+const clampMetric = (value: number) =>
+  Math.min(100, Math.max(0, Math.round(value)));
+
+const normalizeReport = (report: IslandReport): IslandReport => ({
+  ...report,
+  score: clampMetric(report.score),
+  confidence: clampMetric(report.confidence)
+});
+
 const pickTopAction = (report: IslandReport) => {
   if (!report.actions?.length) return null;
   return [...report.actions]
@@ -59,22 +68,26 @@ export const createShieldScreen = () => {
       };
     }
   });
-  const verdict = buildGlobalVerdict(reports);
-  const dailyQuests = [...reports]
-    .sort((a, b) => a.score - b.score)
-    .slice(0, Math.min(2, Math.max(1, reports.length)))
-    .map((report) => {
-      const action = pickTopAction(report);
-      return {
-        title: action?.title ?? 'Собрать свежие данные',
+  const normalizedReports = reports.map((report) => normalizeReport(report));
+  const verdict = buildGlobalVerdict(normalizedReports);
+  const reportById = new Map(
+    normalizedReports.map((report) => [report.id, report])
+  );
+  const weakestReport = [...normalizedReports].sort(
+    (a, b) => a.score - b.score
+  )[0];
+  const questAction = weakestReport ? pickTopAction(weakestReport) : null;
+  const dailyQuest = weakestReport
+    ? {
+        title: questAction?.title ?? 'Собрать свежие данные',
         why:
-          report.insights?.find((item) => item.severity !== 'info')?.title ??
-          report.headline,
-        action: action?.description ?? report.summary,
-        rewardXp: Math.max(12, Math.round((100 - report.score) / 2)),
-        sourceId: report.id
-      };
-    });
+          weakestReport.insights?.find((item) => item.severity !== 'info')
+            ?.title ?? weakestReport.headline,
+        action: questAction?.description ?? weakestReport.summary,
+        rewardXp: Math.max(12, Math.round((100 - weakestReport.score) / 2)),
+        sourceId: weakestReport.id
+      }
+    : null;
 
   header.appendChild(createAvatar(verdict, state.level));
 
@@ -125,28 +138,52 @@ export const createShieldScreen = () => {
   const quests = document.createElement('section');
   quests.className = 'shield-quests';
   quests.innerHTML = `
-    <h2>Daily quest</h2>
+    <h2>Квест дня</h2>
     <div class="quest-list">
-      ${dailyQuests
-        .map(
-          (quest) => `
+      ${
+        dailyQuest
+          ? `
         <div class="quest-card">
-          <div class="quest-title">${quest.title}</div>
-          <div class="quest-why">${quest.why}</div>
-          <div class="quest-action">${quest.action}</div>
+          <div class="quest-title">${dailyQuest.title}</div>
+          <div class="quest-why">${dailyQuest.why}</div>
+          <div class="quest-action">${dailyQuest.action}</div>
           <div class="quest-footer">
-            <span>+${quest.rewardXp} XP</span>
-            <a class="button small" href="#/island/${quest.sourceId}">Выполнить квест</a>
+            <span>+${dailyQuest.rewardXp} XP</span>
+            <a class="button small" href="#/island/${dailyQuest.sourceId}">Выполнить квест</a>
           </div>
         </div>
       `
-        )
-        .join('')}
+          : `
+        <div class="quest-card">
+          <div class="quest-title">Нет доступных квестов</div>
+          <div class="quest-action">Добавьте данные на островах, чтобы получить задание.</div>
+        </div>
+      `
+      }
     </div>
   `;
 
   const grid = document.createElement('section');
   grid.className = 'shield-grid';
+
+  const verdictTile = document.createElement('div');
+  verdictTile.className = 'shield-tile shield-tile--verdict';
+  verdictTile.innerHTML = `
+      <span class="tile-status status--fresh">вердикт дня</span>
+      <div class="tile-score">${clampMetric(verdict.globalScore)}</div>
+      <div class="tile-confidence">${clampMetric(verdict.globalConfidence)}%</div>
+      <div class="tile-headline">${verdict.mood}</div>
+      <div class="tile-progress">
+        <span>Rank: ${verdict.rank}</span>
+        <span>Chaos: ${Math.round(verdict.chaos * 100)}%</span>
+      </div>
+      <div class="tile-next">${
+        verdict.isHighRisk || verdict.isHighUncertainty
+          ? 'Фокус: снизить неопределённость.'
+          : 'Фокус: удержать темп.'
+      }</div>
+    `;
+  grid.appendChild(verdictTile);
 
   islandRegistry.forEach((island) => {
     const tile = document.createElement('a');
@@ -154,9 +191,9 @@ export const createShieldScreen = () => {
     tile.href = `#/island/${island.id}`;
 
     const islandState = state.islands[island.id];
-    const report = islandState.lastReport;
-    const score = report?.score ?? 0;
-    const confidence = report?.confidence ?? 0;
+    const report = reportById.get(island.id) ?? islandState.lastReport;
+    const score = clampMetric(report?.score ?? 0);
+    const confidence = clampMetric(report?.confidence ?? 0);
     const headline = report?.headline ?? island.title;
     const progress = islandState.progress;
     const nextStep =

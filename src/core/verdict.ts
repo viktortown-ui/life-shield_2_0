@@ -9,6 +9,15 @@ import {
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
 
+const clampMetric = (value: number) =>
+  clamp(Number.isFinite(value) ? value : 0, 0, 100);
+
+const normalizeReport = (report: IslandReport): IslandReport => ({
+  ...report,
+  score: clampMetric(report.score),
+  confidence: clampMetric(report.confidence)
+});
+
 const median = (values: number[]) => {
   if (values.length === 0) return 0;
   const sorted = [...values].sort((a, b) => a - b);
@@ -119,16 +128,29 @@ const pickQuests = (reports: IslandReport[]): Quest[] => {
 };
 
 export const buildGlobalVerdict = (reports: IslandReport[]): GlobalVerdict => {
-  const scores = reports.map((report) => report.score);
-  const weights = reports.map((report) => report.confidence);
+  const normalized = reports.map((report) => normalizeReport(report));
+  const scores = normalized.map((report) => report.score);
+  const weights = normalized.map((report) => report.confidence);
   const globalScore = weightedMedian(scores, weights);
+  const globalConfidence = weightedMedian(
+    normalized.map((report) => report.confidence),
+    scores
+  );
   const chaos = calculateChaos(scores);
+  const hasRisk = normalized.some((report) =>
+    report.insights?.some((insight) => insight.severity === 'risk')
+  );
+  const isHighUncertainty = globalConfidence < 50;
+  const isHighRisk = hasRisk || globalScore < 45;
   return {
     globalScore,
+    globalConfidence,
     chaos,
     rank: getRank(globalScore),
     mood: getMood(globalScore, chaos),
-    quests: pickQuests(reports)
+    isHighRisk,
+    isHighUncertainty,
+    quests: pickQuests(normalized)
   };
 };
 

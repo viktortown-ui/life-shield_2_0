@@ -39,9 +39,12 @@ export interface Quest {
 
 export interface GlobalVerdict {
   globalScore: number;
+  globalConfidence: number;
   chaos: number;
   rank: 'S' | 'A' | 'B' | 'C' | 'D';
   mood: 'штиль' | 'напряжение' | 'шторм';
+  isHighRisk: boolean;
+  isHighUncertainty: boolean;
   quests: Quest[];
 }
 
