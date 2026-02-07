@@ -1,7 +1,13 @@
-import { migrateState, schemaVersion } from './migrations';
+import { migrate, schemaVersion } from './migrations';
 import { AppState, IslandId, IslandReport, ValidationResult } from './types';
 
-const STORAGE_KEY = 'lifeshieldv2.state';
+const STORAGE_KEY = 'lifeShieldV2';
+
+interface ExportPayload {
+  schemaVersion: number;
+  exportedAt: string;
+  state: AppState;
+}
 
 const makeEmptyState = (): AppState => ({
   schemaVersion,
@@ -32,7 +38,7 @@ export const ensureState = (): AppState => {
 
   try {
     const parsed = JSON.parse(stored) as AppState;
-    cachedState = migrateState(parsed);
+    cachedState = migrate(parsed);
     persistState(cachedState);
     return cachedState;
   } catch {
@@ -88,7 +94,12 @@ export const resetState = () => {
 };
 
 export const exportState = (): string => {
-  return JSON.stringify(getState(), null, 2);
+  const payload: ExportPayload = {
+    schemaVersion,
+    exportedAt: new Date().toISOString(),
+    state: getState()
+  };
+  return JSON.stringify(payload, null, 2);
 };
 
 export const validateImport = (raw: unknown): ValidationResult => {
@@ -96,11 +107,14 @@ export const validateImport = (raw: unknown): ValidationResult => {
   if (!raw || typeof raw !== 'object') {
     return { ok: false, errors: ['Некорректный формат JSON.'] };
   }
-  const state = raw as AppState;
-  if (!state.schemaVersion) {
+  const payload = raw as ExportPayload;
+  if (typeof payload.schemaVersion !== 'number') {
     errors.push('Отсутствует schemaVersion.');
   }
-  if (!state.islands) {
+  if (typeof payload.exportedAt !== 'string') {
+    errors.push('Отсутствует дата экспорта.');
+  }
+  if (!payload.state?.islands) {
     errors.push('Отсутствуют данные островов.');
   }
   return { ok: errors.length === 0, errors };
@@ -111,7 +125,8 @@ export const importState = (raw: unknown): ValidationResult => {
   if (!validation.ok) {
     return validation;
   }
-  const state = migrateState(raw as AppState);
+  const payload = raw as ExportPayload;
+  const state = migrate(payload.state);
   updateState(state);
   return { ok: true, errors: [] };
 };
