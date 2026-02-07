@@ -111,7 +111,7 @@ const buildQuest = (
 
 const pickQuests = (reports: IslandReport[]): Quest[] => {
   const ordered = [...reports].sort((a, b) => a.score - b.score);
-  const targetCount = Math.min(3, Math.max(2, ordered.length));
+  const targetCount = Math.min(2, Math.max(1, ordered.length));
   return ordered.slice(0, targetCount).map((report) => {
     const action = pickAction(report);
     return buildQuest(report, action);
