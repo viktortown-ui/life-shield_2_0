@@ -15,6 +15,29 @@ body {
   background: #0b1220;
 }
 
+.update-banner {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 16px;
+  background: #17305c;
+  color: #e8edf6;
+  border-bottom: 1px solid #2a4270;
+}
+
+.update-banner.hidden {
+  display: none;
+}
+
+.button.small {
+  padding: 6px 14px;
+  font-size: 12px;
+}
+
 #app {
   max-width: 430px;
   margin: 0 auto;
