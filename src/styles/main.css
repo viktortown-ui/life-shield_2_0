@@ -251,16 +251,61 @@ body {
   margin-bottom: 16px;
 }
 
-.decision-tree-grid {
-  display: grid;
+.decision-tree-header {
+  display: flex;
+  flex-direction: column;
   gap: 12px;
+  margin-bottom: 12px;
+}
+
+.decision-tree-header h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.decision-tree-actions {
+  display: grid;
+  gap: 16px;
   margin-bottom: 16px;
 }
 
-.decision-tree-grid input[type='text'],
-.decision-tree-grid input[type='number'],
-.decision-tree-grid input[type='range'],
-.decision-tree-grid textarea {
+.decision-tree-action {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid #24314d;
+  background: rgba(15, 22, 39, 0.7);
+}
+
+.decision-tree-action-header {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.decision-tree-outcomes {
+  display: grid;
+  gap: 12px;
+}
+
+.decision-tree-outcome {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid #1d2a44;
+  background: #0f1627;
+}
+
+.decision-tree-action label {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.decision-tree-action input[type='text'],
+.decision-tree-action input[type='number'] {
   width: 100%;
   border-radius: 10px;
   border: 1px solid #24314d;
@@ -270,8 +315,49 @@ body {
   font-size: 13px;
 }
 
-.decision-tree-grid input[type='range'] {
-  padding: 4px 0;
+.decision-tree-action-footer {
+  display: grid;
+  gap: 8px;
+  font-size: 12px;
+  color: #b9c3d9;
+}
+
+.decision-tree-hint {
+  font-size: 12px;
+  color: #9fb1d4;
+}
+
+.decision-tree-total strong {
+  color: #e8edf6;
+}
+
+.decision-tree-controls {
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (min-width: 720px) {
+  .decision-tree-header {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .decision-tree-action-header {
+    flex-direction: row;
+    align-items: flex-end;
+    justify-content: space-between;
+  }
+
+  .decision-tree-outcome {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+    align-items: end;
+  }
+
+  .decision-tree-action-footer {
+    grid-template-columns: 1fr auto auto;
+    align-items: center;
+  }
 }
 
 .optimization-grid input,
