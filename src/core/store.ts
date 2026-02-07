@@ -2,6 +2,7 @@ import { migrate, schemaVersion } from './migrations';
 import { AppState, IslandId, IslandReport, ValidationResult } from './types';
 
 const STORAGE_KEY = 'lifeShieldV2';
+const XP_PER_LEVEL = 120;
 
 interface ExportPayload {
   schemaVersion: number;
@@ -9,16 +10,33 @@ interface ExportPayload {
   state: AppState;
 }
 
+const makeIslandProgress = () => ({
+  lastRunAt: null,
+  runsCount: 0,
+  bestScore: 0
+});
+
 const makeEmptyState = (): AppState => ({
   schemaVersion,
   updatedAt: new Date().toISOString(),
+  xp: 0,
+  level: 1,
+  streakDays: 0,
   islands: {
-    bayes: { input: '', lastReport: null },
-    hmm: { input: '', lastReport: null },
-    timeseries: { input: '', lastReport: null },
-    optimization: { input: '', lastReport: null },
-    decisionTree: { input: '', lastReport: null },
-    causalDag: { input: '', lastReport: null }
+    bayes: { input: '', lastReport: null, progress: makeIslandProgress() },
+    hmm: { input: '', lastReport: null, progress: makeIslandProgress() },
+    timeseries: { input: '', lastReport: null, progress: makeIslandProgress() },
+    optimization: {
+      input: '',
+      lastReport: null,
+      progress: makeIslandProgress()
+    },
+    decisionTree: {
+      input: '',
+      lastReport: null,
+      progress: makeIslandProgress()
+    },
+    causalDag: { input: '', lastReport: null, progress: makeIslandProgress() }
   }
 });
 
@@ -61,6 +79,21 @@ const updateState = (nextState: AppState) => {
   persistState(cachedState);
 };
 
+const getDayKey = (value: string | null) => {
+  if (!value) return null;
+  return value.slice(0, 10);
+};
+
+const getDayStamp = (dayKey: string | null) => {
+  if (!dayKey) return null;
+  const [year, month, day] = dayKey.split('-').map(Number);
+  if (!year || !month || !day) return null;
+  return Date.UTC(year, month - 1, day) / (1000 * 60 * 60 * 24);
+};
+
+const computeLevel = (xp: number) =>
+  Math.max(1, Math.floor(xp / XP_PER_LEVEL) + 1);
+
 export const updateIslandInput = (id: IslandId, input: string) => {
   const state = getState();
   updateState({
@@ -77,13 +110,46 @@ export const updateIslandInput = (id: IslandId, input: string) => {
 
 export const updateIslandReport = (id: IslandId, report: IslandReport) => {
   const state = getState();
+  const now = new Date().toISOString();
+  const islandState = state.islands[id];
+  const previousProgress = islandState.progress;
+  const updatedBestScore = Math.max(previousProgress.bestScore, report.score);
+  const nextProgress = {
+    lastRunAt: now,
+    runsCount: previousProgress.runsCount + 1,
+    bestScore: updatedBestScore
+  };
+
+  const previousRunDay = getDayKey(previousProgress.lastRunAt);
+  const currentDay = getDayKey(now);
+  let streakDays = state.streakDays;
+  if (currentDay && currentDay !== previousRunDay) {
+    if (!previousRunDay) {
+      streakDays = 1;
+    } else {
+      const currentStamp = getDayStamp(currentDay);
+      const previousStamp = getDayStamp(previousRunDay);
+      const diffDays =
+        currentStamp && previousStamp ? currentStamp - previousStamp : 0;
+      streakDays = diffDays <= 1 ? streakDays + 1 : 1;
+    }
+  }
+
+  const rewardXp = Math.max(5, Math.round(report.score / 4));
+  const xp = state.xp + rewardXp;
+  const level = computeLevel(xp);
+
   updateState({
     ...state,
+    xp,
+    level,
+    streakDays,
     islands: {
       ...state.islands,
       [id]: {
         ...state.islands[id],
-        lastReport: report
+        lastReport: report,
+        progress: nextProgress
       }
     }
   });

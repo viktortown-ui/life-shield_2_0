@@ -77,33 +77,45 @@ const scoreAction = (action: ActionItem, hasRisk: boolean) => {
   return hasRisk ? base * 1.5 : base;
 };
 
-const pickQuests = (reports: IslandReport[]): Quest[] => {
-  const actions: Array<{ action: ActionItem; sourceId: IslandId; score: number }> =
-    [];
-  reports.forEach((report) => {
-    const hasRisk =
-      report.insights?.some((insight) => insight.severity === 'risk') ?? false;
-    report.actions?.forEach((action) => {
-      actions.push({
-        action,
-        sourceId: report.id,
-        score: scoreAction(action, hasRisk)
-      });
-    });
-  });
-  actions.sort((a, b) => {
-    if (b.score !== a.score) return b.score - a.score;
-    if (b.action.impact !== a.action.impact) {
-      return b.action.impact - a.action.impact;
-    }
-    return a.action.effort - b.action.effort;
-  });
-  return actions.slice(0, 2).map(({ action, sourceId }) => ({
-    title: action.title,
-    impact: action.impact,
-    effort: action.effort,
-    sourceId
+const pickAction = (report: IslandReport): ActionItem | null => {
+  if (!report.actions?.length) return null;
+  const hasRisk =
+    report.insights?.some((insight) => insight.severity === 'risk') ?? false;
+  const scored = report.actions.map((action) => ({
+    action,
+    score: scoreAction(action, hasRisk)
   }));
+  scored.sort((a, b) => b.score - a.score);
+  return scored[0]?.action ?? null;
+};
+
+const buildQuest = (
+  report: IslandReport,
+  action: ActionItem | null
+): Quest => {
+  const weakness = report.score < 50 ? 'критичная зона' : 'зона риска';
+  const insight =
+    report.insights?.find((item) => item.severity !== 'info')?.title ??
+    report.headline;
+  const actionTitle = action?.title ?? 'Собрать свежие данные';
+  const actionDetail = action?.description ?? report.summary;
+  const rewardXp = Math.max(15, Math.round((100 - report.score) / 2));
+  return {
+    title: `${actionTitle}`,
+    why: `${weakness}: ${insight}`,
+    action: actionDetail,
+    rewardXp,
+    sourceId: report.id
+  };
+};
+
+const pickQuests = (reports: IslandReport[]): Quest[] => {
+  const ordered = [...reports].sort((a, b) => a.score - b.score);
+  const targetCount = Math.min(3, Math.max(2, ordered.length));
+  return ordered.slice(0, targetCount).map((report) => {
+    const action = pickAction(report);
+    return buildQuest(report, action);
+  });
 };
 
 export const buildGlobalVerdict = (reports: IslandReport[]): GlobalVerdict => {

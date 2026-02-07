@@ -68,8 +68,8 @@ body {
 }
 
 .avatar {
-  width: 44px;
-  height: 44px;
+  min-width: 120px;
+  padding: 8px 10px;
   border-radius: 16px;
   background: linear-gradient(135deg, #4f8bff, #7ef7e6);
   display: flex;
@@ -79,6 +79,7 @@ body {
   gap: 2px;
   color: #0b1220;
   font-weight: 700;
+  text-align: center;
 }
 
 .avatar--tense {
@@ -94,10 +95,22 @@ body {
   line-height: 1;
 }
 
+.avatar-level {
+  font-size: 10px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
 .avatar-text {
   font-size: 9px;
   text-transform: uppercase;
   letter-spacing: 0.3px;
+}
+
+.avatar-phrase {
+  font-size: 10px;
+  font-weight: 600;
+  opacity: 0.9;
 }
 
 .shield-summary {
@@ -151,6 +164,67 @@ body {
 .tile-headline {
   font-size: 12px;
   color: #c6d3ec;
+}
+
+.tile-progress {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  font-size: 11px;
+  color: #9bb0d3;
+}
+
+.tile-next {
+  font-size: 11px;
+  color: #e8edf6;
+}
+
+.shield-quests {
+  display: grid;
+  gap: 10px;
+}
+
+.shield-quests h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.quest-list {
+  display: grid;
+  gap: 10px;
+}
+
+.quest-card {
+  background: #111a2b;
+  border-radius: 14px;
+  padding: 12px;
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  color: #c6d3ec;
+}
+
+.quest-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #e8edf6;
+}
+
+.quest-why {
+  color: #ffb347;
+}
+
+.quest-action {
+  color: #e8edf6;
+}
+
+.quest-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #7ef7e6;
 }
 
 .island-form textarea,

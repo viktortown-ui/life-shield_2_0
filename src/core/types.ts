@@ -31,8 +31,9 @@ export interface Insight {
 
 export interface Quest {
   title: string;
-  impact: number;
-  effort: number;
+  why: string;
+  action: string;
+  rewardXp: number;
   sourceId: IslandId;
 }
 
@@ -47,11 +48,21 @@ export interface GlobalVerdict {
 export interface IslandState {
   input: string;
   lastReport: IslandReport | null;
+  progress: IslandProgress;
+}
+
+export interface IslandProgress {
+  lastRunAt: string | null;
+  runsCount: number;
+  bestScore: number;
 }
 
 export interface AppState {
   schemaVersion: number;
   updatedAt: string;
+  xp: number;
+  level: number;
+  streakDays: number;
   islands: Record<IslandId, IslandState>;
 }
 
