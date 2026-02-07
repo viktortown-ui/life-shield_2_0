@@ -18,6 +18,7 @@
     "vitest": "^2.1.5"
   },
   "dependencies": {
+    "arima": "^0.2.5",
     "glpk.js": "^5.0.0"
   }
 }
