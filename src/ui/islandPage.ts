@@ -26,6 +26,12 @@ import {
   parseDecisionTreeInput,
   serializeDecisionTreeInput
 } from '../islands/decisionTree';
+import {
+  CausalDagInput,
+  defaultCausalDagInput,
+  parseCausalDagInput,
+  serializeCausalDagInput
+} from '../islands/causalDag';
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
@@ -518,6 +524,252 @@ export const createIslandPage = (id: IslandId) => {
         riskValue.textContent = Number(riskInput.value).toFixed(2);
       }
     });
+  } else if (id === 'causalDag') {
+    const parsed = parseCausalDagInput(islandState.input);
+    const initialInput: CausalDagInput = { ...defaultCausalDagInput, ...parsed };
+
+    const edgeRows = document.createElement('div');
+    edgeRows.className = 'causal-edges';
+
+    const nodesBox = document.createElement('div');
+    nodesBox.className = 'causal-nodes';
+
+    const controlsBox = document.createElement('div');
+    controlsBox.className = 'causal-controls';
+
+    const buildNodes = (edges: CausalDagInput['edges']) => {
+      const nodes = new Set<string>();
+      edges.forEach((edge) => {
+        if (edge.from.trim()) nodes.add(edge.from.trim());
+        if (edge.to.trim()) nodes.add(edge.to.trim());
+      });
+      return Array.from(nodes).sort();
+    };
+
+    const renderEdges = (edges: CausalDagInput['edges']) => {
+      edgeRows.innerHTML = edges
+        .map(
+          (edge, index) => `
+          <div class="causal-edge-row" data-index="${index}">
+            <input name="edge-from-${index}" type="text" value="${edge.from}" placeholder="from" />
+            <span>→</span>
+            <input name="edge-to-${index}" type="text" value="${edge.to}" placeholder="to" />
+            <button class="button ghost" type="button" data-remove-edge="${index}">Удалить</button>
+          </div>
+        `
+        )
+        .join('');
+    };
+
+    const renderNodes = (nodes: string[]) => {
+      nodesBox.innerHTML = nodes.length
+        ? `<div class="causal-node-list">${nodes
+            .map((node) => `<span class="tag">${node}</span>`)
+            .join('')}</div>`
+        : '<p class="muted">Добавьте ребра, чтобы увидеть узлы.</p>';
+    };
+
+    const renderSelectOptions = (
+      select: HTMLSelectElement,
+      nodes: string[],
+      selected: string
+    ) => {
+      select.innerHTML = nodes
+        .map(
+          (node) =>
+            `<option value="${node}" ${node === selected ? 'selected' : ''}>${node}</option>`
+        )
+        .join('');
+    };
+
+    const renderControls = (
+      nodes: string[],
+      controls: string[],
+      mediators: string[]
+    ) => {
+      controlsBox.innerHTML = nodes.length
+        ? nodes
+            .map(
+              (node) => `
+              <label class="causal-control-row">
+                <span>${node}</span>
+                <span>
+                  <label>
+                    <input type="checkbox" name="control-${node}" ${
+                      controls.includes(node) ? 'checked' : ''
+                    } />
+                    control
+                  </label>
+                  <label>
+                    <input type="checkbox" name="mediator-${node}" ${
+                      mediators.includes(node) ? 'checked' : ''
+                    } />
+                    mediator
+                  </label>
+                </span>
+              </label>
+            `
+            )
+            .join('')
+        : '<p class="muted">Нет узлов для выбора контролей.</p>';
+    };
+
+    renderEdges(initialInput.edges);
+    const initialNodes = buildNodes(initialInput.edges);
+    renderNodes(initialNodes);
+
+    form.innerHTML = `
+      <div class="causal-grid">
+        <div>
+          <h3>Узлы</h3>
+          <div data-nodes></div>
+        </div>
+        <div>
+          <h3>Рёбра</h3>
+          <div data-edges></div>
+          <button class="button ghost" type="button" data-add-edge>Добавить ребро</button>
+        </div>
+      </div>
+      <div class="causal-grid">
+        <label>
+          Exposure
+          <select name="exposure"></select>
+        </label>
+        <label>
+          Outcome
+          <select name="outcome"></select>
+        </label>
+      </div>
+      <div>
+        <h3>Контроли и медиаторы</h3>
+        <div data-controls></div>
+      </div>
+      <div class="causal-controls-row">
+        <button class="button" type="submit">Анализ</button>
+        <span class="causal-status" data-status></span>
+      </div>
+    `;
+
+    form.querySelector('[data-edges]')?.appendChild(edgeRows);
+    form.querySelector('[data-nodes]')?.appendChild(nodesBox);
+    form.querySelector('[data-controls]')?.appendChild(controlsBox);
+
+    const exposureSelect = form.querySelector<HTMLSelectElement>('select[name="exposure"]');
+    const outcomeSelect = form.querySelector<HTMLSelectElement>('select[name="outcome"]');
+    const statusLabel = form.querySelector<HTMLSpanElement>('[data-status]');
+
+    if (exposureSelect && outcomeSelect) {
+      renderSelectOptions(exposureSelect, initialNodes, initialInput.exposure);
+      renderSelectOptions(outcomeSelect, initialNodes, initialInput.outcome);
+    }
+    renderControls(initialNodes, initialInput.controls, initialInput.mediators);
+
+    const collectEdges = (): CausalDagInput['edges'] => {
+      const rows = Array.from(
+        edgeRows.querySelectorAll<HTMLDivElement>('.causal-edge-row')
+      );
+      return rows
+        .map((row, index) => {
+          const from = row.querySelector<HTMLInputElement>(
+            `[name="edge-from-${index}"]`
+          );
+          const to = row.querySelector<HTMLInputElement>(
+            `[name="edge-to-${index}"]`
+          );
+          return {
+            from: from?.value.trim() ?? '',
+            to: to?.value.trim() ?? ''
+          };
+        })
+        .filter((edge) => edge.from && edge.to);
+    };
+
+    const collectControls = (nodes: string[], prefix: string) =>
+      nodes.filter((node) => {
+        const checkbox = form.querySelector<HTMLInputElement>(
+          `input[name="${prefix}-${node}"]`
+        );
+        return Boolean(checkbox?.checked);
+      });
+
+    const syncNodes = () => {
+      const edges = collectEdges();
+      const nodes = buildNodes(edges);
+      renderNodes(nodes);
+
+      const selectedExposure = exposureSelect?.value ?? '';
+      const selectedOutcome = outcomeSelect?.value ?? '';
+
+      if (exposureSelect) {
+        renderSelectOptions(
+          exposureSelect,
+          nodes,
+          nodes.includes(selectedExposure) ? selectedExposure : nodes[0] ?? ''
+        );
+      }
+      if (outcomeSelect) {
+        renderSelectOptions(
+          outcomeSelect,
+          nodes,
+          nodes.includes(selectedOutcome) ? selectedOutcome : nodes[0] ?? ''
+        );
+      }
+
+      const currentControls = collectControls(nodes, 'control');
+      const currentMediators = collectControls(nodes, 'mediator');
+      renderControls(nodes, currentControls, currentMediators);
+    };
+
+    form.addEventListener('click', (event) => {
+      const target = event.target as HTMLElement;
+      if (target.matches('[data-add-edge]')) {
+        const edges = collectEdges();
+        edges.push({ from: '', to: '' });
+        renderEdges(edges);
+        syncNodes();
+      }
+      if (target.matches('[data-remove-edge]')) {
+        const index = Number(target.getAttribute('data-remove-edge'));
+        const edges = collectEdges();
+        edges.splice(index, 1);
+        renderEdges(edges.length ? edges : [{ from: '', to: '' }]);
+        syncNodes();
+      }
+    });
+
+    form.addEventListener('change', (event) => {
+      const target = event.target as HTMLElement;
+      if (target.matches('input[name^="edge-"]')) {
+        syncNodes();
+      }
+    });
+
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const edges = collectEdges();
+      const nodes = buildNodes(edges);
+      const exposure = exposureSelect?.value ?? '';
+      const outcome = outcomeSelect?.value ?? '';
+      const controls = collectControls(nodes, 'control');
+      const mediators = collectControls(nodes, 'mediator');
+
+      const payload: CausalDagInput = {
+        edges,
+        exposure,
+        outcome,
+        controls,
+        mediators
+      };
+
+      const serialized = serializeCausalDagInput(payload);
+      updateIslandInput(id, serialized);
+      islandState.input = serialized;
+      const report = island.getReport(serialized);
+      updateIslandReport(id, report);
+      islandState.lastReport = report;
+      if (statusLabel) statusLabel.textContent = 'Готово';
+      renderReport();
+    });
   } else {
     form.innerHTML = `
       <label>
@@ -546,7 +798,7 @@ export const createIslandPage = (id: IslandId) => {
 
   renderReport();
 
-  if (id !== 'optimization') {
+  if (id !== 'optimization' && id !== 'causalDag') {
     form.addEventListener('submit', (event) => {
       event.preventDefault();
       const data = new FormData(form);
