@@ -170,6 +170,71 @@ body {
   font-size: 14px;
 }
 
+.optimization-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.optimization-grid input,
+.optimization-row input {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid #24314d;
+  padding: 8px 10px;
+  background: #0f1627;
+  color: #e8edf6;
+  font-size: 13px;
+}
+
+.optimization-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  color: #a9b6cf;
+  margin-bottom: 8px;
+}
+
+.optimization-columns {
+  font-size: 12px;
+  color: #7f8fb0;
+}
+
+.optimization-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.optimization-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 1.4fr) repeat(3, minmax(90px, 1fr)) auto auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.optimization-mandatory {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #cbd6ea;
+}
+
+.optimization-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+.optimization-status {
+  font-size: 12px;
+  color: #7ef7e6;
+}
+
 .button {
   display: inline-flex;
   align-items: center;
