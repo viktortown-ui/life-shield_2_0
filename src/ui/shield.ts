@@ -221,14 +221,6 @@ export const createShieldScreen = () => {
     <a class="button" href="#/settings">Настройки</a>
   `;
 
-  const bottomNav = document.createElement('nav');
-  bottomNav.className = 'bottom-nav';
-  bottomNav.innerHTML = `
-    <a class="bottom-nav-link active" href="#/">Shield</a>
-    <a class="bottom-nav-link" href="#/island/bayes">Islands</a>
-    <a class="bottom-nav-link" href="#/settings">Settings</a>
-  `;
-
-  container.append(header, summary, xpBlock, quests, grid, actions, bottomNav);
+  container.append(header, summary, xpBlock, quests, grid, actions);
   return container;
 };

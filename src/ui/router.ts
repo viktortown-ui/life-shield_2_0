@@ -15,19 +15,41 @@ const parseRoute = () => {
   return { name: 'shield' };
 };
 
+const createBottomNav = (
+  route: { name: 'shield' } | { name: 'settings' } | { name: 'island'; id: IslandId }
+) => {
+  const nav = document.createElement('nav');
+  nav.className = 'bottom-nav';
+  nav.setAttribute('aria-label', 'Нижняя навигация');
+
+  const islandTarget =
+    route.name === 'island' ? route.id : ('bayes' as IslandId);
+
+  nav.innerHTML = `
+    <a class="bottom-nav-link ${route.name === 'shield' ? 'active' : ''}" href="#/">Щит</a>
+    <a class="bottom-nav-link ${route.name === 'island' ? 'active' : ''}" href="#/island/${islandTarget}">Острова</a>
+    <a class="bottom-nav-link ${route.name === 'settings' ? 'active' : ''}" href="#/settings">Настройки</a>
+  `;
+
+  return nav;
+};
+
 export const initRouter = (root: HTMLElement) => {
   const render = () => {
     root.innerHTML = '';
     const route = parseRoute();
     if (route.name === 'island') {
       root.appendChild(createIslandPage(route.id));
+      root.appendChild(createBottomNav(route));
       return;
     }
     if (route.name === 'settings') {
       root.appendChild(createSettingsScreen());
+      root.appendChild(createBottomNav(route));
       return;
     }
     root.appendChild(createShieldScreen());
+    root.appendChild(createBottomNav(route));
   };
 
   window.addEventListener('hashchange', render);
