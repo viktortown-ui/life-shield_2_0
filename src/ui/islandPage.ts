@@ -40,7 +40,9 @@ import {
   TimeseriesInput,
   TimeseriesWorkerResponse,
   buildTimeseriesReport,
-  parseTimeseriesInput
+  parseTimeseriesInput,
+  parseTimeseriesSeries,
+  serializeTimeseriesInput
 } from '../islands/timeseries';
 
 const clamp = (value: number, min: number, max: number) =>
@@ -996,20 +998,63 @@ export const createIslandPage = (id: IslandId) => {
       renderReport();
     });
   } else if (id === 'timeseries') {
-    const textareaRows = 10;
+    const parsedInput = parseTimeseriesInput(islandState.input);
+    const textareaRows = 5;
+    const formatSeriesInput = (values?: number[]) =>
+      values && values.length ? values.join(', ') : '';
+    const readNumber = (data: FormData, name: string) => {
+      const raw = data.get(name);
+      if (raw === null || raw === '') return undefined;
+      const value = Number(raw);
+      return Number.isFinite(value) ? value : undefined;
+    };
+    const readSeries = (data: FormData, name: string) => {
+      const raw = String(data.get(name) ?? '');
+      const parsed = parseTimeseriesSeries(raw);
+      return parsed.length ? parsed : undefined;
+    };
+
     form.innerHTML = `
-      <label>
-        JSON входные данные
-        <textarea name="input" rows="${textareaRows}" placeholder='{"series":[120,130,110],"horizon":12}'>${islandState.input}</textarea>
-      </label>
+      <div class="timeseries-grid">
+        <label>
+          Ряд чисел
+          <textarea name="series" rows="${textareaRows}" placeholder="120, 130, 125">${formatSeriesInput(parsedInput.series)}</textarea>
+        </label>
+        <label>
+          Доходы
+          <textarea name="income" rows="${textareaRows}" placeholder="180000, 190000">${formatSeriesInput(parsedInput.income)}</textarea>
+        </label>
+        <label>
+          Расходы
+          <textarea name="expenses" rows="${textareaRows}" placeholder="120000, 135000">${formatSeriesInput(parsedInput.expenses)}</textarea>
+        </label>
+        <label>
+          Horizon
+          <input name="horizon" type="number" min="1" step="1" value="${parsedInput.horizon ?? 12}" />
+        </label>
+        <label>
+          Season length
+          <input name="seasonLength" type="number" min="0" step="1" value="${parsedInput.seasonLength ?? ''}" />
+        </label>
+        <label>
+          Test size
+          <input name="testSize" type="number" min="0" step="1" value="${parsedInput.testSize ?? ''}" />
+        </label>
+        <label>
+          Auto
+          <input name="auto" type="checkbox" ${parsedInput.auto === false ? '' : 'checked'} />
+        </label>
+      </div>
       <div class="island-controls">
-        <button class="button" type="submit">Запустить</button>
+        <button class="button" type="submit">Запустить анализ</button>
         <span class="island-status" data-status></span>
       </div>
+      <div class="timeseries-output" data-output></div>
     `;
 
     const statusLabel = form.querySelector<HTMLSpanElement>('[data-status]');
     const submitButton = form.querySelector<HTMLButtonElement>('button[type="submit"]');
+    const outputBlock = form.querySelector<HTMLDivElement>('[data-output]');
     const worker = new Worker(
       new URL('../workers/ts.worker.ts', import.meta.url),
       { type: 'module' }
@@ -1019,6 +1064,39 @@ export const createIslandPage = (id: IslandId) => {
     const setLoading = (loading: boolean, message = '') => {
       if (submitButton) submitButton.disabled = loading;
       if (statusLabel) statusLabel.textContent = message;
+    };
+
+    const formatNumber = (value: number) =>
+      Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(value);
+
+    const renderOutput = (
+      analysisBundle?: TimeseriesAnalysisBundle,
+      reportConfidence?: number
+    ) => {
+      if (!outputBlock) return;
+      if (!analysisBundle?.primary) {
+        outputBlock.innerHTML = '';
+        return;
+      }
+      const primary = analysisBundle.primary;
+      const metricLabel = primary.metric
+        ? `${primary.metric.name}: ${formatNumber(primary.metric.value)}`
+        : 'нет метрики';
+      const trendLabel = formatNumber(primary.trendSlope);
+      const volatilityLabel = formatNumber(primary.volatilityChange);
+      const forecastLabel = primary.forecast.map((value) => formatNumber(value)).join(', ');
+      const confidenceLabel =
+        reportConfidence !== undefined ? `${reportConfidence}%` : '—';
+
+      outputBlock.innerHTML = `
+        <div class="result-metrics">
+          <div><span>Forecast</span><strong>${forecastLabel}</strong></div>
+          <div><span>Metric</span><strong>${metricLabel}</strong></div>
+          <div><span>Trend</span><strong>${trendLabel}</strong></div>
+          <div><span>Volatility</span><strong>${volatilityLabel}</strong></div>
+          <div><span>Confidence</span><strong>${confidenceLabel}</strong></div>
+        </div>
+      `;
     };
 
     const buildTimeseriesPendingReport = (
@@ -1054,23 +1132,25 @@ export const createIslandPage = (id: IslandId) => {
         const report = buildTimeseriesWorkerErrorReport('Нет данных от воркера.');
         updateIslandReport(id, report);
         islandState.lastReport = report;
+        renderOutput();
         return;
       }
       const report = buildTimeseriesReport(input, analysisBundle);
-      updateIslandInput(id, islandState.input);
       updateIslandReport(id, report);
       islandState.lastReport = report;
+      renderOutput(analysisBundle, report.confidence);
     };
 
     worker.addEventListener('message', (event) => {
       const data = event.data as TimeseriesWorkerResponse;
       if (data.requestId !== pendingRequestId) return;
       pendingRequestId = '';
-      setLoading(false, '');
+      setLoading(false, data.error ? 'error' : 'done');
       if (data.error) {
         const report = buildTimeseriesWorkerErrorReport(data.error);
         updateIslandReport(id, report);
         islandState.lastReport = report;
+        renderOutput();
         renderReport();
         return;
       }
@@ -1085,25 +1165,34 @@ export const createIslandPage = (id: IslandId) => {
       );
       updateIslandReport(id, report);
       islandState.lastReport = report;
+      renderOutput();
       pendingRequestId = '';
-      setLoading(false, '');
+      setLoading(false, 'error');
       renderReport();
     });
 
     form.addEventListener('submit', (event) => {
       event.preventDefault();
       const data = new FormData(form);
-      const rawInput = String(data.get('input') ?? '').trim();
-      updateIslandInput(id, rawInput);
-      islandState.input = rawInput;
-      const input = parseTimeseriesInput(rawInput);
+      const input: TimeseriesInput = {
+        series: readSeries(data, 'series'),
+        income: readSeries(data, 'income'),
+        expenses: readSeries(data, 'expenses'),
+        horizon: readNumber(data, 'horizon'),
+        seasonLength: readNumber(data, 'seasonLength'),
+        testSize: readNumber(data, 'testSize'),
+        auto: data.get('auto') !== null
+      };
+      const serialized = serializeTimeseriesInput(input);
+      updateIslandInput(id, serialized);
+      islandState.input = serialized;
       const pending = buildTimeseriesPendingReport(input);
-      updateIslandReport(id, pending);
       islandState.lastReport = pending;
       renderReport();
+      renderOutput();
 
       pendingRequestId = `${Date.now()}-${Math.random()}`;
-      setLoading(true, 'Считаю…');
+      setLoading(true, 'pending');
       worker.postMessage({ requestId: pendingRequestId, input });
     });
   } else {

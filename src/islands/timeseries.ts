@@ -84,6 +84,8 @@ const parseNumberList = (value: string) =>
     .map((token) => Number(token))
     .filter((num) => Number.isFinite(num));
 
+export const parseTimeseriesSeries = (value: string) => parseNumberList(value);
+
 export const mergeSeries = (series?: number[]) =>
   (series ?? []).map((value) => Number(value)).filter(Number.isFinite);
 
@@ -153,6 +155,19 @@ export const parseTimeseriesInput = (raw: string): TimeseriesInput => {
 
   if (rawSeries.length) input.series = rawSeries;
   return input;
+};
+
+export const serializeTimeseriesInput = (input: TimeseriesInput): string => {
+  const normalized: TimeseriesInput = {
+    series: input.series?.length ? input.series : undefined,
+    income: input.income?.length ? input.income : undefined,
+    expenses: input.expenses?.length ? input.expenses : undefined,
+    horizon: input.horizon,
+    seasonLength: input.seasonLength,
+    testSize: input.testSize,
+    auto: input.auto
+  };
+  return JSON.stringify(normalized, null, 2);
 };
 
 const mean = (values: number[]) =>
@@ -267,6 +282,12 @@ export const buildTimeseriesReport = (
       );
     }
   };
+
+  details.push(
+    `Тренд (наклон): ${formatNumber(primary.trendSlope)}, волатильность: ${formatNumber(
+      primary.volatilityChange
+    )}.`
+  );
 
   if (income && expenses) {
     appendForecast('Доходы', income);
