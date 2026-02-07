@@ -177,6 +177,29 @@ body {
   margin-bottom: 16px;
 }
 
+.decision-tree-grid {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.decision-tree-grid input[type='text'],
+.decision-tree-grid input[type='number'],
+.decision-tree-grid input[type='range'],
+.decision-tree-grid textarea {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid #24314d;
+  padding: 8px 10px;
+  background: #0f1627;
+  color: #e8edf6;
+  font-size: 13px;
+}
+
+.decision-tree-grid input[type='range'] {
+  padding: 4px 0;
+}
+
 .optimization-grid input,
 .optimization-row input {
   width: 100%;
