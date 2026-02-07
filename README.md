@@ -18,9 +18,9 @@ npm run preview
 
 ## Deploy to GitHub Pages
 
-```bash
-npm run build
-npm run preview
-```
+1. Go to **Settings → Pages → Source: GitHub Actions**.
+2. Push to `main` (or run the workflow manually) to build and deploy.
+3. The workflow sets `BASE="/<repo-name>/"` so assets resolve correctly on Pages.
 
-Then publish the `dist/` folder with GitHub Pages (Settings → Pages → Build from a branch, `/dist`).
+Notes:
+- GitHub Pages has build limits for the legacy “Build from a branch” flow. This custom workflow uses **GitHub Actions**, so it does not count against the “10 builds per hour” Pages limit.
