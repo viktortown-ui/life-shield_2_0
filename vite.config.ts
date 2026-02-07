@@ -2,7 +2,7 @@ import { defineConfig } from 'vite';
 import { VitePWA, cachePreset } from 'vite-plugin-pwa';
 
 export default defineConfig({
-  base: process.env.BASE ?? '/',
+  base: process.env.BASE ?? '/life-shield_2_0/',
   plugins: [
     VitePWA({
       registerType: 'autoUpdate',
