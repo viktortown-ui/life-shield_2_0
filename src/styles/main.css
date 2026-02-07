@@ -302,6 +302,82 @@ body {
   font-size: 13px;
 }
 
+.causal-grid {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.causal-grid select,
+.causal-grid input,
+.causal-edge-row input {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid #24314d;
+  padding: 8px 10px;
+  background: #0f1627;
+  color: #e8edf6;
+  font-size: 13px;
+}
+
+.causal-edge-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) auto minmax(120px, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.causal-node-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.causal-controls-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.causal-control-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px dashed #1f2a44;
+  font-size: 13px;
+}
+
+.causal-control-row span {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.causal-status {
+  font-size: 12px;
+  color: #7ef7e6;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(79, 139, 255, 0.15);
+  color: #d7e2f7;
+  font-size: 12px;
+}
+
+.muted {
+  color: #7f8fb0;
+  font-size: 13px;
+}
+
 .bayes-controls {
   display: flex;
   gap: 12px;
