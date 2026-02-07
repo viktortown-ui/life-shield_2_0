@@ -35,9 +35,28 @@ import {
   parseCausalDagInput,
   serializeCausalDagInput
 } from '../islands/causalDag';
+import {
+  TimeseriesAnalysisBundle,
+  TimeseriesInput,
+  TimeseriesWorkerResponse,
+  buildTimeseriesReport,
+  parseTimeseriesInput
+} from '../islands/timeseries';
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
+
+const buildIslandErrorReport = (id: IslandId, error: unknown) => ({
+  id,
+  score: 0,
+  confidence: 0,
+  headline: 'Ошибка острова',
+  summary:
+    error instanceof Error
+      ? error.message
+      : 'Остров не смог сформировать отчёт.',
+  details: ['Попробуйте обновить страницу или повторить ввод.']
+});
 
 export const createIslandPage = (id: IslandId) => {
   const island = findIsland(id);
@@ -63,6 +82,14 @@ export const createIslandPage = (id: IslandId) => {
 
   const form = document.createElement('form');
   form.className = 'island-form';
+
+  const safeGetReport = (input: string) => {
+    try {
+      return island.getReport(input);
+    } catch (error) {
+      return buildIslandErrorReport(id, error);
+    }
+  };
 
   if (id === 'bayes') {
     const parsedInput = parseBayesInput(islandState.input);
@@ -717,7 +744,7 @@ export const createIslandPage = (id: IslandId) => {
       const serialized = serializeDecisionTreeInput(input);
       updateIslandInput(id, serialized);
       islandState.input = serialized;
-      const report = island.getReport(serialized);
+      const report = safeGetReport(serialized);
       updateIslandReport(id, report);
       islandState.lastReport = report;
       renderReport();
@@ -962,11 +989,122 @@ export const createIslandPage = (id: IslandId) => {
       const serialized = serializeCausalDagInput(payload);
       updateIslandInput(id, serialized);
       islandState.input = serialized;
-      const report = island.getReport(serialized);
+      const report = safeGetReport(serialized);
       updateIslandReport(id, report);
       islandState.lastReport = report;
       if (statusLabel) statusLabel.textContent = 'Готово';
       renderReport();
+    });
+  } else if (id === 'timeseries') {
+    const textareaRows = 10;
+    form.innerHTML = `
+      <label>
+        JSON входные данные
+        <textarea name="input" rows="${textareaRows}" placeholder='{"series":[120,130,110],"horizon":12}'>${islandState.input}</textarea>
+      </label>
+      <div class="island-controls">
+        <button class="button" type="submit">Запустить</button>
+        <span class="island-status" data-status></span>
+      </div>
+    `;
+
+    const statusLabel = form.querySelector<HTMLSpanElement>('[data-status]');
+    const submitButton = form.querySelector<HTMLButtonElement>('button[type="submit"]');
+    const worker = new Worker(
+      new URL('../workers/ts.worker.ts', import.meta.url),
+      { type: 'module' }
+    );
+    let pendingRequestId = '';
+
+    const setLoading = (loading: boolean, message = '') => {
+      if (submitButton) submitButton.disabled = loading;
+      if (statusLabel) statusLabel.textContent = message;
+    };
+
+    const buildTimeseriesPendingReport = (
+      input: TimeseriesInput
+    ) => ({
+      id: 'timeseries',
+      score: 0,
+      confidence: 0,
+      headline: 'Расчёт запущен',
+      summary: 'Прогноз считается в воркере.',
+      details: [
+        `Горизонт: ${input.horizon ?? 12}`,
+        'Ожидайте, когда воркер вернёт результат.'
+      ],
+      insights: [{ title: 'Идёт расчёт', severity: 'info' }]
+    });
+
+    const buildTimeseriesWorkerErrorReport = (message: string) => ({
+      id: 'timeseries',
+      score: 0,
+      confidence: 0,
+      headline: 'Ошибка расчёта',
+      summary: message,
+      details: ['Попробуйте упростить ввод или повторить позже.'],
+      insights: [{ title: 'Ошибка воркера', severity: 'warning' }]
+    });
+
+    const handleWorkerResponse = (
+      input: TimeseriesInput,
+      analysisBundle?: TimeseriesAnalysisBundle
+    ) => {
+      if (!analysisBundle) {
+        const report = buildTimeseriesWorkerErrorReport('Нет данных от воркера.');
+        updateIslandReport(id, report);
+        islandState.lastReport = report;
+        return;
+      }
+      const report = buildTimeseriesReport(input, analysisBundle);
+      updateIslandInput(id, islandState.input);
+      updateIslandReport(id, report);
+      islandState.lastReport = report;
+    };
+
+    worker.addEventListener('message', (event) => {
+      const data = event.data as TimeseriesWorkerResponse;
+      if (data.requestId !== pendingRequestId) return;
+      pendingRequestId = '';
+      setLoading(false, '');
+      if (data.error) {
+        const report = buildTimeseriesWorkerErrorReport(data.error);
+        updateIslandReport(id, report);
+        islandState.lastReport = report;
+        renderReport();
+        return;
+      }
+      const input = parseTimeseriesInput(islandState.input);
+      handleWorkerResponse(input, data.analysis);
+      renderReport();
+    });
+
+    worker.addEventListener('error', () => {
+      const report = buildTimeseriesWorkerErrorReport(
+        'Ошибка воркера при расчёте.'
+      );
+      updateIslandReport(id, report);
+      islandState.lastReport = report;
+      pendingRequestId = '';
+      setLoading(false, '');
+      renderReport();
+    });
+
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const data = new FormData(form);
+      const rawInput = String(data.get('input') ?? '').trim();
+      updateIslandInput(id, rawInput);
+      islandState.input = rawInput;
+      const input = parseTimeseriesInput(rawInput);
+      const pending = buildTimeseriesPendingReport(input);
+      updateIslandReport(id, pending);
+      islandState.lastReport = pending;
+      renderReport();
+
+      pendingRequestId = `${Date.now()}-${Math.random()}`;
+      setLoading(true, 'Считаю…');
+      worker.postMessage({ requestId: pendingRequestId, input });
     });
   } else {
     form.innerHTML = `
@@ -982,7 +1120,7 @@ export const createIslandPage = (id: IslandId) => {
   result.className = 'island-result';
 
   const renderReport = () => {
-    const report = islandState.lastReport ?? island.getReport(islandState.input);
+    const report = islandState.lastReport ?? safeGetReport(islandState.input);
     result.innerHTML = `
       <div class="result-metrics">
         <div><span>Score</span><strong>${report.score}</strong></div>
@@ -996,13 +1134,18 @@ export const createIslandPage = (id: IslandId) => {
 
   renderReport();
 
-  if (id !== 'optimization' && id !== 'causalDag' && id !== 'decisionTree') {
+  if (
+    id !== 'optimization' &&
+    id !== 'causalDag' &&
+    id !== 'decisionTree' &&
+    id !== 'timeseries'
+  ) {
     form.addEventListener('submit', (event) => {
       event.preventDefault();
       const data = new FormData(form);
       const input = String(data.get('input') ?? '');
       updateIslandInput(id, input);
-      const report = island.getReport(input);
+      const report = safeGetReport(input);
       updateIslandReport(id, report);
       islandState.input = input;
       islandState.lastReport = report;

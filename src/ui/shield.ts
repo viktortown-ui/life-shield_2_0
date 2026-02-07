@@ -17,7 +17,22 @@ export const createShieldScreen = () => {
   const state = getState();
   const reports = islandRegistry.map((island) => {
     const islandState = state.islands[island.id];
-    return islandState.lastReport ?? island.getReport(islandState.input);
+    if (islandState.lastReport) return islandState.lastReport;
+    try {
+      return island.getReport(islandState.input);
+    } catch (error) {
+      return {
+        id: island.id,
+        score: 0,
+        confidence: 0,
+        headline: 'Ошибка острова',
+        summary:
+          error instanceof Error
+            ? error.message
+            : 'Остров не смог сформировать отчёт.',
+        details: ['Попробуйте обновить страницу или повторить ввод.']
+      };
+    }
   });
   const verdict = buildGlobalVerdict(reports);
 

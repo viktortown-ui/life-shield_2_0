@@ -1,4 +1,3 @@
-import ARIMA from 'arima';
 import { ActionItem, Insight, IslandReport } from '../core/types';
 
 export interface TimeseriesInput {
@@ -89,8 +88,6 @@ interface ArimaModel {
 
 type ArimaConstructor = new (options: ArimaOptions) => ArimaModel;
 
-const DefaultArima = ARIMA as unknown as ArimaConstructor;
-
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
 
@@ -114,7 +111,7 @@ const mergeSeries = (series?: number[]) =>
 const safeSeries = (series: number[]) =>
   series.filter((value) => Number.isFinite(value));
 
-const parseTimeseriesInput = (raw: string): TimeseriesInput => {
+export const parseTimeseriesInput = (raw: string): TimeseriesInput => {
   const trimmed = raw.trim();
   if (!trimmed) return { horizon: 12 };
 
@@ -352,7 +349,7 @@ export const analyzeSeries = (
     maxDSeasonal?: number;
     maxQSeasonal?: number;
   },
-  Arima: ArimaConstructor = DefaultArima
+  Arima: ArimaConstructor
 ): TimeseriesAnalysis | null => {
   const series = safeSeries(seriesRaw);
   if (series.length < 4) return null;
@@ -464,7 +461,7 @@ export const analyzeSeries = (
 
 export const runTimeseriesAnalysis = (
   input: TimeseriesInput,
-  Arima: ArimaConstructor = DefaultArima
+  Arima: ArimaConstructor
 ): TimeseriesAnalysisBundle => {
   const horizon = input.horizon ?? 12;
   const seasonLength = input.seasonLength;
@@ -663,6 +660,33 @@ export const buildTimeseriesReport = (
 
 export const getTimeseriesReport = (rawInput: string): IslandReport => {
   const input = parseTimeseriesInput(rawInput);
-  const analysisBundle = runTimeseriesAnalysis(input);
-  return buildTimeseriesReport(input, analysisBundle);
+  const details = [
+    'Нажмите «Запустить», чтобы рассчитать прогноз в отдельном воркере.',
+    'Формат JSON: { "series": [120, 130, 110], "horizon": 12 }',
+    'Можно указать income и expenses для оценки покрытия.'
+  ];
+
+  return {
+    id: 'timeseries',
+    score: 0,
+    confidence: 20,
+    headline: 'Прогноз готовится в воркере',
+    summary:
+      'Расчёт ARIMA выполняется асинхронно, чтобы не блокировать интерфейс.',
+    details,
+    actions: [
+      {
+        title: 'Запустить расчёт в воркере',
+        impact: 70,
+        effort: 10,
+        description: 'Заполните данные и нажмите «Запустить».'
+      }
+    ],
+    insights: [
+      {
+        title: 'Пока нет расчёта — запустите воркер',
+        severity: 'info'
+      }
+    ]
+  };
 };
