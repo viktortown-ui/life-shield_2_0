@@ -36,6 +36,9 @@ jobs:
         env:
           BASE: "/${{ github.event.repository.name }}/"
 
+      - name: Sanity check dist
+        run: test -s dist/index.html
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
