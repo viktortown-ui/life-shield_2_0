@@ -23,6 +23,9 @@ import {
   serializeBayesInput
 } from '../islands/bayes';
 import {
+  DecisionTreeActionInput,
+  DecisionTreeInput,
+  DecisionTreeOutcomeInput,
   parseDecisionTreeInput,
   serializeDecisionTreeInput
 } from '../islands/decisionTree';
@@ -466,63 +469,258 @@ export const createIslandPage = (id: IslandId) => {
       worker.postMessage({ requestId: pendingRequestId, input });
     });
   } else if (id === 'decisionTree') {
-    const parsedInput = parseDecisionTreeInput(islandState.input);
+    const initialInput = parseDecisionTreeInput(islandState.input);
+    const actionRows = document.createElement('div');
+    actionRows.className = 'decision-tree-actions';
+
+    const formatProbability = (value: number) =>
+      Number.isFinite(value) ? value.toFixed(2) : '0.00';
+
+    const renderActions = (actions: DecisionTreeActionInput[]) => {
+      actionRows.innerHTML = actions
+        .map((action, actionIndex) => {
+          const totalProb = action.outcomes.reduce(
+            (sum, outcome) => sum + (outcome.probability ?? 0),
+            0
+          );
+          return `
+          <div class="decision-tree-action" data-action-index="${actionIndex}">
+            <div class="decision-tree-action-header">
+              <label>
+                Action
+                <input
+                  name="action-name-${actionIndex}"
+                  type="text"
+                  value="${action.name}"
+                  placeholder="A/B/C"
+                />
+              </label>
+              <button class="button ghost" type="button" data-remove-action="${actionIndex}">
+                Удалить действие
+              </button>
+            </div>
+            <div class="decision-tree-outcomes">
+              ${action.outcomes
+                .map(
+                  (outcome, outcomeIndex) => `
+                <div class="decision-tree-outcome" data-outcome-index="${outcomeIndex}">
+                  <label>
+                    Probability
+                    <input
+                      name="outcome-prob-${actionIndex}-${outcomeIndex}"
+                      type="number"
+                      min="0"
+                      max="1"
+                      step="0.01"
+                      value="${
+                        outcome.probability == null ? '' : outcome.probability
+                      }"
+                    />
+                  </label>
+                  <label>
+                    Payoff
+                    <input
+                      name="outcome-payoff-${actionIndex}-${outcomeIndex}"
+                      type="number"
+                      step="1"
+                      value="${outcome.payoff == null ? '' : outcome.payoff}"
+                    />
+                  </label>
+                  <label>
+                    Risk tag
+                    <input
+                      name="outcome-risk-${actionIndex}-${outcomeIndex}"
+                      type="text"
+                      value="${outcome.riskTag}"
+                      placeholder="low/med/high"
+                    />
+                  </label>
+                  <button
+                    class="button ghost"
+                    type="button"
+                    data-remove-outcome="${actionIndex}-${outcomeIndex}"
+                  >
+                    Удалить исход
+                  </button>
+                </div>
+              `
+                )
+                .join('')}
+            </div>
+            <div class="decision-tree-action-footer">
+              <div class="decision-tree-hint">
+                сумма вероятностей должна быть 1.0
+              </div>
+              <div class="decision-tree-total">
+                Σp: <strong data-prob-total="${actionIndex}">${formatProbability(
+                  totalProb
+                )}</strong>
+              </div>
+              <button class="button ghost" type="button" data-add-outcome="${actionIndex}">
+                Добавить исход
+              </button>
+            </div>
+          </div>
+        `;
+        })
+        .join('');
+    };
+
+    const nextActionName = (actions: DecisionTreeActionInput[]) => {
+      const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+      const index = actions.length;
+      if (index < alphabet.length) return alphabet[index];
+      return `Action ${index + 1}`;
+    };
+
+    const readNumberInput = (input: HTMLInputElement | null) => {
+      if (!input) return null;
+      const raw = input.value.trim();
+      if (!raw) return null;
+      const parsed = Number(raw);
+      return Number.isFinite(parsed) ? parsed : null;
+    };
+
+    const collectActions = (): DecisionTreeActionInput[] => {
+      const rows = Array.from(
+        actionRows.querySelectorAll<HTMLDivElement>('.decision-tree-action')
+      );
+      return rows.map((row, actionIndex) => {
+        const nameInput = row.querySelector<HTMLInputElement>(
+          `[name="action-name-${actionIndex}"]`
+        );
+        const outcomeRows = Array.from(
+          row.querySelectorAll<HTMLDivElement>('.decision-tree-outcome')
+        );
+        const outcomes = outcomeRows.map((outcomeRow, outcomeIndex) => {
+          const probabilityInput = outcomeRow.querySelector<HTMLInputElement>(
+            `[name="outcome-prob-${actionIndex}-${outcomeIndex}"]`
+          );
+          const payoffInput = outcomeRow.querySelector<HTMLInputElement>(
+            `[name="outcome-payoff-${actionIndex}-${outcomeIndex}"]`
+          );
+          const riskInput = outcomeRow.querySelector<HTMLInputElement>(
+            `[name="outcome-risk-${actionIndex}-${outcomeIndex}"]`
+          );
+
+          return {
+            probability: readNumberInput(probabilityInput),
+            payoff: readNumberInput(payoffInput),
+            riskTag: riskInput?.value.trim() ?? ''
+          } satisfies DecisionTreeOutcomeInput;
+        });
+
+        return {
+          name: nameInput?.value.trim() ?? '',
+          outcomes: outcomes.length
+            ? outcomes
+            : [{ probability: null, payoff: null, riskTag: '' }]
+        };
+      });
+    };
+
+    const updateProbabilityTotals = () => {
+      const actions = collectActions();
+      actions.forEach((action, actionIndex) => {
+        const total = action.outcomes.reduce(
+          (sum, outcome) => sum + (outcome.probability ?? 0),
+          0
+        );
+        const totalNode = actionRows.querySelector<HTMLSpanElement>(
+          `[data-prob-total="${actionIndex}"]`
+        );
+        if (totalNode) totalNode.textContent = formatProbability(total);
+      });
+    };
 
     form.innerHTML = `
-      <div class="decision-tree-grid">
-        <label>
-          DSL/JSON дерева решений
-          <textarea name="tree" rows="12">${parsedInput.treeText}</textarea>
-        </label>
-        <label>
-          Risk aversion: <span data-risk-value>${parsedInput.settings.riskAversion}</span>
-          <input
-            name="riskAversion"
-            type="range"
-            min="0"
-            max="1"
-            step="0.05"
-            value="${parsedInput.settings.riskAversion}"
-          />
-        </label>
-        <label>
-          Sensitivity target (chanceId)
-          <input
-            name="chanceId"
-            type="text"
-            value="${parsedInput.settings.sensitivity.chanceId}"
-          />
-        </label>
-        <label>
-          Sensitivity outcome label
-          <input
-            name="outcomeLabel"
-            type="text"
-            value="${parsedInput.settings.sensitivity.outcomeLabel}"
-          />
-        </label>
-        <label>
-          Sensitivity ±% по вероятности
-          <input
-            name="deltaPercent"
-            type="number"
-            min="0"
-            max="100"
-            step="1"
-            value="${parsedInput.settings.sensitivity.deltaPercent}"
-          />
-        </label>
+      <div class="decision-tree-header">
+        <h3>Actions</h3>
+        <button class="button ghost" type="button" data-add-action>
+          Добавить действие
+        </button>
       </div>
-      <button class="button" type="submit">Рассчитать</button>
     `;
 
-    const riskValue = form.querySelector<HTMLSpanElement>('[data-risk-value]');
-    const riskInput = form.querySelector<HTMLInputElement>('[name="riskAversion"]');
+    renderActions(initialInput.actions);
+    updateProbabilityTotals();
+    form.appendChild(actionRows);
 
-    riskInput?.addEventListener('input', () => {
-      if (riskValue && riskInput) {
-        riskValue.textContent = Number(riskInput.value).toFixed(2);
+    const controls = document.createElement('div');
+    controls.className = 'decision-tree-controls';
+    controls.innerHTML = `<button class="button" type="submit">Рассчитать</button>`;
+    form.appendChild(controls);
+
+    form.addEventListener('click', (event) => {
+      const target = event.target as HTMLElement;
+      if (target.matches('[data-add-action]')) {
+        const actions = collectActions();
+        actions.push({
+          name: nextActionName(actions),
+          outcomes: [{ probability: null, payoff: null, riskTag: '' }]
+        });
+        renderActions(actions);
+        updateProbabilityTotals();
       }
+      if (target.matches('[data-remove-action]')) {
+        const index = Number(target.getAttribute('data-remove-action'));
+        const actions = collectActions().filter((_, idx) => idx !== index);
+        renderActions(actions.length ? actions : initialInput.actions);
+        updateProbabilityTotals();
+      }
+      if (target.matches('[data-add-outcome]')) {
+        const index = Number(target.getAttribute('data-add-outcome'));
+        const actions = collectActions();
+        if (actions[index]) {
+          actions[index].outcomes.push({
+            probability: null,
+            payoff: null,
+            riskTag: ''
+          });
+          renderActions(actions);
+          updateProbabilityTotals();
+        }
+      }
+      if (target.matches('[data-remove-outcome]')) {
+        const [actionIndex, outcomeIndex] = String(
+          target.getAttribute('data-remove-outcome')
+        )
+          .split('-')
+          .map(Number);
+        const actions = collectActions();
+        if (actions[actionIndex]) {
+          actions[actionIndex].outcomes = actions[actionIndex].outcomes.filter(
+            (_, idx) => idx !== outcomeIndex
+          );
+          if (!actions[actionIndex].outcomes.length) {
+            actions[actionIndex].outcomes = [
+              { probability: null, payoff: null, riskTag: '' }
+            ];
+          }
+          renderActions(actions);
+          updateProbabilityTotals();
+        }
+      }
+    });
+
+    form.addEventListener('input', (event) => {
+      const target = event.target as HTMLElement;
+      if (target.matches('input[type=\"number\"]')) {
+        updateProbabilityTotals();
+      }
+    });
+
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const actions = collectActions();
+      const input: DecisionTreeInput = { actions };
+      const serialized = serializeDecisionTreeInput(input);
+      updateIslandInput(id, serialized);
+      islandState.input = serialized;
+      const report = island.getReport(serialized);
+      updateIslandReport(id, report);
+      islandState.lastReport = report;
+      renderReport();
     });
   } else if (id === 'causalDag') {
     const parsed = parseCausalDagInput(islandState.input);
@@ -798,34 +996,10 @@ export const createIslandPage = (id: IslandId) => {
 
   renderReport();
 
-  if (id !== 'optimization' && id !== 'causalDag') {
+  if (id !== 'optimization' && id !== 'causalDag' && id !== 'decisionTree') {
     form.addEventListener('submit', (event) => {
       event.preventDefault();
       const data = new FormData(form);
-      if (id === 'decisionTree') {
-        const treeText = String(data.get('tree') ?? '');
-        const settings = {
-          riskAversion: clamp(Number(data.get('riskAversion') ?? 0), 0, 1),
-          sensitivity: {
-            chanceId: String(data.get('chanceId') ?? '').trim(),
-            outcomeLabel: String(data.get('outcomeLabel') ?? '').trim(),
-            deltaPercent: clamp(
-              Number(data.get('deltaPercent') ?? 0),
-              0,
-              100
-            )
-          }
-        };
-        const input = serializeDecisionTreeInput(treeText, settings);
-        updateIslandInput(id, input);
-        const report = island.getReport(input);
-        updateIslandReport(id, report);
-        islandState.input = input;
-        islandState.lastReport = report;
-        renderReport();
-        return;
-      }
-
       const input = String(data.get('input') ?? '');
       updateIslandInput(id, input);
       const report = island.getReport(input);
