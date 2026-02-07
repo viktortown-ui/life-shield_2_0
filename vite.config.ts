@@ -5,7 +5,7 @@ export default defineConfig({
   base: process.env.BASE ?? '/',
   plugins: [
     VitePWA({
-      registerType: 'prompt',
+      registerType: 'autoUpdate',
       includeAssets: ['icon.svg'],
       manifest: {
         name: 'LifeShieldV2',
@@ -27,7 +27,18 @@ export default defineConfig({
         ]
       },
       workbox: {
-        runtimeCaching: cachePreset
+        cleanupOutdatedCaches: true,
+        runtimeCaching: [
+          {
+            urlPattern: ({ request }) => request.mode === 'navigate',
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'pages',
+              networkTimeoutSeconds: 3
+            }
+          },
+          ...cachePreset
+        ]
       }
     })
   ],

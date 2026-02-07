@@ -1,6 +1,11 @@
 import './styles/main.css';
 import { ensureState } from './core/store';
-import { applyUpdate, initPwaUpdate, onUpdateState } from './core/pwaUpdate';
+import {
+  applyUpdate,
+  initPwaUpdate,
+  onUpdateState,
+  panicReset
+} from './core/pwaUpdate';
 import { initRouter } from './ui/router';
 
 const renderFatalError = (error: unknown) => {
@@ -38,12 +43,27 @@ try {
   document.body.prepend(banner);
 
   const bannerButton = banner.querySelector('button') as HTMLButtonElement;
+  const bannerText = banner.querySelector('span') as HTMLSpanElement;
+  let needsPanicReset = false;
+
   bannerButton.addEventListener('click', () => {
-    applyUpdate();
+    if (needsPanicReset) {
+      void panicReset();
+    } else {
+      applyUpdate();
+    }
   });
 
   onUpdateState((state) => {
-    banner.classList.toggle('hidden', !state.ready);
+    needsPanicReset = state.panic;
+    if (state.panic) {
+      bannerText.textContent = 'Новая версия доступна. Сбросить кэш?';
+      bannerButton.textContent = 'Сбросить кэш';
+    } else {
+      bannerText.textContent = 'Доступно обновление.';
+      bannerButton.textContent = 'Обновить';
+    }
+    banner.classList.toggle('hidden', !state.ready && !state.panic);
   });
 
   const root = document.getElementById('app');
