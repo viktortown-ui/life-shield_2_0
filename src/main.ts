@@ -311,6 +311,9 @@ try {
       }
     }
     if (isDiagnosticsEntry(error)) {
+      if (!shouldShowFatalOverlay(error)) {
+        return;
+      }
       const displayEntry =
         error.stack || error.jsonPreview || error.source
           ? error
