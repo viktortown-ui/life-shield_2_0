@@ -80,6 +80,11 @@ body {
   justify-content: space-between;
 }
 
+.error-overlay__status {
+  font-size: 12px;
+  color: #b8c5dd;
+}
+
 .error-overlay__debug {
   display: inline-flex;
   align-items: center;
@@ -120,7 +125,14 @@ body {
 .diagnostics-panel__actions {
   margin: 10px 0;
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.diagnostics-panel__status {
+  font-size: 11px;
+  color: #9aa8c2;
 }
 
 .diagnostics-panel__list {

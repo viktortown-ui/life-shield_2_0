@@ -13,8 +13,9 @@ export type NormalizedError = {
 
 export type DiagnosticsEntry = {
   id: string;
+  errorId: string;
   ts: string;
-  kind: 'error' | 'rejection' | 'resource';
+  kind: 'error' | 'rejection' | 'resource' | 'console';
   message: string;
   stack?: string;
   name?: string;
@@ -24,6 +25,7 @@ export type DiagnosticsEntry = {
   lineno?: number;
   colno?: number;
   source?: string;
+  level?: 'warn' | 'error';
 };
 
 type DiagnosticsState = {
@@ -31,6 +33,19 @@ type DiagnosticsState = {
   panel: HTMLDetailsElement | null;
   list: HTMLUListElement | null;
 };
+
+type NetworkFailure = {
+  url: string;
+  status?: number;
+  statusText?: string;
+  initiatorType?: string;
+  method?: string;
+  ts: string;
+  type: 'resource' | 'fetch';
+};
+
+const ERROR_ID_PROP = '__lsDiagnosticsErrorId';
+const ERROR_CAPTURED_PROP = '__lsDiagnosticsCaptured';
 
 const ensureString = (value: unknown): string => {
   if (typeof value === 'string') return value;
@@ -40,8 +55,9 @@ const ensureString = (value: unknown): string => {
 
 export const normalizeUnknownError = (value: unknown): NormalizedError => {
   if (value instanceof Error) {
+    const message = String(value.message || value.name || '').trim();
     return {
-      message: value.message || value.name || 'Unknown error',
+      message: message || 'Unknown error',
       stack: value.stack,
       name: value.name,
       rawType: 'Error'
@@ -49,8 +65,9 @@ export const normalizeUnknownError = (value: unknown): NormalizedError => {
   }
 
   if (typeof value === 'string') {
+    const message = value.trim();
     return {
-      message: value || 'Unknown error',
+      message: message || 'Unknown error',
       rawType: 'string'
     };
   }
@@ -67,14 +84,16 @@ export const normalizeUnknownError = (value: unknown): NormalizedError => {
     message = ensureString(value);
   }
 
+  const trimmedMessage = String(message).trim();
   return {
-    message: message || 'Unknown error',
+    message: trimmedMessage || 'Unknown error',
     rawType,
     jsonPreview: jsonPreview || undefined
   };
 };
 
 const formatEntryDetails = (entry: DiagnosticsEntry): string => {
+  const errorId = entry.errorId ? `Error ID: ${entry.errorId}` : '';
   const location = entry.filename
     ? `${entry.filename}${entry.lineno ? `:${entry.lineno}` : ''}${
         entry.colno ? `:${entry.colno}` : ''
@@ -83,7 +102,9 @@ const formatEntryDetails = (entry: DiagnosticsEntry): string => {
   const source = entry.source ? `Source: ${entry.source}` : '';
   const stack = entry.stack ? `Stack:\n${entry.stack}` : '';
   const jsonPreview = entry.jsonPreview ? `Data: ${entry.jsonPreview}` : '';
-  return [location, source, stack, jsonPreview].filter(Boolean).join('\n');
+  return [errorId, location, source, stack, jsonPreview]
+    .filter(Boolean)
+    .join('\n');
 };
 
 const loadStoredEntries = (): DiagnosticsEntry[] => {
@@ -104,20 +125,58 @@ const persistEntries = (entries: DiagnosticsEntry[]) => {
   safeSetItem(DIAGNOSTICS_KEY, JSON.stringify(entries.slice(-MAX_ENTRIES)));
 };
 
-const buildReport = (entries: DiagnosticsEntry[]) => ({
+const collectFailedResources = (): NetworkFailure[] => {
+  if (!('performance' in window) || !performance.getEntriesByType) {
+    return [];
+  }
+  const resources = performance.getEntriesByType(
+    'resource'
+  ) as PerformanceResourceTiming[];
+  return resources
+    .map((entry) => {
+      const status =
+        'responseStatus' in entry
+          ? Number((entry as PerformanceResourceTiming & { responseStatus?: number }).responseStatus)
+          : undefined;
+      const failed =
+        (typeof status === 'number' && status >= 400) ||
+        (typeof status === 'number' && status === 0);
+      if (!failed) return null;
+      return {
+        url: entry.name,
+        status: typeof status === 'number' ? status : undefined,
+        initiatorType: entry.initiatorType || undefined,
+        ts: new Date().toISOString(),
+        type: 'resource' as const
+      };
+    })
+    .filter(Boolean) as NetworkFailure[];
+};
+
+const buildReport = (
+  entries: DiagnosticsEntry[],
+  networkFailures: NetworkFailure[]
+) => ({
   generatedAt: new Date().toISOString(),
   url: window.location.href,
   userAgent: navigator.userAgent,
-  entries
+  entries,
+  network: {
+    failedResources: collectFailedResources(),
+    failedFetches: networkFailures
+  }
 });
 
-const copyDiagnostics = async (entries: DiagnosticsEntry[]): Promise<void> => {
-  const content = JSON.stringify(buildReport(entries), null, 2);
-  if (!content) return;
+const copyDiagnostics = async (
+  entries: DiagnosticsEntry[],
+  networkFailures: NetworkFailure[]
+): Promise<boolean> => {
+  const content = JSON.stringify(buildReport(entries, networkFailures), null, 2);
+  if (!content) return false;
   try {
     if (navigator.clipboard?.writeText) {
       await navigator.clipboard.writeText(content);
-      return;
+      return true;
     }
   } catch {
     // ignore
@@ -132,13 +191,18 @@ const copyDiagnostics = async (entries: DiagnosticsEntry[]): Promise<void> => {
   try {
     if (document.execCommand('copy')) {
       textarea.remove();
-      return;
+      return true;
     }
   } catch {
     // ignore
   }
   textarea.remove();
-  window.prompt('Copy diagnostics', content);
+  try {
+    window.prompt('Copy diagnostics', content);
+    return true;
+  } catch {
+    return false;
+  }
 };
 
 const renderEntry = (entry: DiagnosticsEntry) => {
@@ -170,9 +234,19 @@ const updatePanel = (state: DiagnosticsState) => {
   });
 };
 
+const showCopyStatus = (
+  element: HTMLElement,
+  ok: boolean
+): number => {
+  element.textContent = ok ? 'Скопировано.' : 'Не удалось скопировать.';
+  return window.setTimeout(() => {
+    element.textContent = '';
+  }, 4000);
+};
+
 const createPanel = (
   state: DiagnosticsState,
-  onCopy: () => void
+  onCopy: () => Promise<boolean>
 ): HTMLDetailsElement => {
   const panel = document.createElement('details');
   panel.className = 'diagnostics-panel';
@@ -184,13 +258,19 @@ const createPanel = (
   const actions = document.createElement('div');
   actions.className = 'diagnostics-panel__actions';
 
+  const copyStatus = document.createElement('span');
+  copyStatus.className = 'diagnostics-panel__status';
+
   const copyButton = document.createElement('button');
   copyButton.type = 'button';
   copyButton.className = 'button small';
   copyButton.textContent = 'Copy diagnostics';
-  copyButton.addEventListener('click', () => onCopy());
+  copyButton.addEventListener('click', async () => {
+    const ok = await onCopy();
+    showCopyStatus(copyStatus, ok);
+  });
 
-  actions.append(copyButton);
+  actions.append(copyStatus, copyButton);
 
   const list = document.createElement('ul');
   list.className = 'diagnostics-panel__list';
@@ -204,10 +284,42 @@ const createPanel = (
 const buildEntryId = () =>
   `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 
-const fromErrorEvent = (event: ErrorEvent): DiagnosticsEntry => {
+const markErrorObject = (value: unknown, errorId: string, captured: boolean) => {
+  if (!value || typeof value !== 'object') return;
+  try {
+    Object.defineProperty(value, ERROR_ID_PROP, {
+      value: errorId,
+      configurable: true
+    });
+    Object.defineProperty(value, ERROR_CAPTURED_PROP, {
+      value: captured,
+      configurable: true
+    });
+  } catch {
+    // ignore
+  }
+};
+
+const getMarkedErrorId = (value: unknown): string | null => {
+  if (!value || typeof value !== 'object') return null;
+  const candidate = (value as { [ERROR_ID_PROP]?: unknown })[ERROR_ID_PROP];
+  return typeof candidate === 'string' ? candidate : null;
+};
+
+const isMarkedCaptured = (value: unknown): boolean => {
+  if (!value || typeof value !== 'object') return false;
+  return Boolean((value as { [ERROR_CAPTURED_PROP]?: boolean })[ERROR_CAPTURED_PROP]);
+};
+
+const fromErrorEvent = (event: ErrorEvent): DiagnosticsEntry | null => {
+  if (event.error && isMarkedCaptured(event.error)) {
+    return null;
+  }
   const normalized = normalizeUnknownError(event.error ?? event.message);
+  const errorId = getMarkedErrorId(event.error) ?? buildEntryId();
   return {
-    id: buildEntryId(),
+    id: errorId,
+    errorId,
     ts: new Date().toISOString(),
     kind: 'error',
     message: normalized.message,
@@ -230,8 +342,10 @@ const fromResourceEvent = (event: Event): DiagnosticsEntry => {
     (target instanceof HTMLImageElement && target.src) ||
     '';
   const message = `Resource load failed: ${tag}${source ? ` (${source})` : ''}`;
+  const errorId = buildEntryId();
   return {
-    id: buildEntryId(),
+    id: errorId,
+    errorId,
     ts: new Date().toISOString(),
     kind: 'resource',
     message,
@@ -242,10 +356,15 @@ const fromResourceEvent = (event: Event): DiagnosticsEntry => {
 
 const fromRejectionEvent = (
   event: PromiseRejectionEvent
-): DiagnosticsEntry => {
+): DiagnosticsEntry | null => {
+  if (event.reason && isMarkedCaptured(event.reason)) {
+    return null;
+  }
   const normalized = normalizeUnknownError(event.reason);
+  const errorId = getMarkedErrorId(event.reason) ?? buildEntryId();
   return {
-    id: buildEntryId(),
+    id: errorId,
+    errorId,
     ts: new Date().toISOString(),
     kind: 'rejection',
     message: normalized.message,
@@ -256,10 +375,57 @@ const fromRejectionEvent = (
   };
 };
 
+const fromConsoleEvent = (
+  level: 'warn' | 'error',
+  args: unknown[]
+): DiagnosticsEntry => {
+  const normalizedArgs = args.map((value) => normalizeUnknownError(value));
+  const message = normalizedArgs.map((entry) => entry.message).join(' ').trim();
+  let jsonPreview = '';
+  try {
+    jsonPreview = JSON.stringify(args);
+  } catch {
+    jsonPreview = '';
+  }
+  const errorId = buildEntryId();
+  return {
+    id: errorId,
+    errorId,
+    ts: new Date().toISOString(),
+    kind: 'console',
+    level,
+    message: message || 'Console message',
+    rawType: `console:${level}`,
+    jsonPreview: jsonPreview || undefined
+  };
+};
+
+const fromUnknownError = (
+  error: unknown,
+  source?: string
+): DiagnosticsEntry => {
+  const normalized = normalizeUnknownError(error);
+  const errorId = buildEntryId();
+  markErrorObject(error, errorId, true);
+  return {
+    id: errorId,
+    errorId,
+    ts: new Date().toISOString(),
+    kind: 'error',
+    message: normalized.message,
+    stack: normalized.stack,
+    name: normalized.name,
+    rawType: normalized.rawType,
+    jsonPreview: normalized.jsonPreview,
+    source
+  };
+};
+
 export type DiagnosticsController = {
   getEntries: () => DiagnosticsEntry[];
-  copy: () => Promise<void>;
+  copy: () => Promise<boolean>;
   onEntry: (callback: (entry: DiagnosticsEntry) => void) => void;
+  captureError: (error: unknown, source?: string) => DiagnosticsEntry;
 };
 
 export const initDiagnostics = (): DiagnosticsController => {
@@ -268,6 +434,7 @@ export const initDiagnostics = (): DiagnosticsController => {
     panel: null,
     list: null
   };
+  const networkFailures: NetworkFailure[] = [];
   const entryListeners = new Set<(entry: DiagnosticsEntry) => void>();
 
   const pushEntry = (entry: DiagnosticsEntry) => {
@@ -279,30 +446,104 @@ export const initDiagnostics = (): DiagnosticsController => {
 
   const handleError = (event: Event) => {
     if (event instanceof ErrorEvent) {
-      pushEntry(fromErrorEvent(event));
+      const entry = fromErrorEvent(event);
+      if (entry) {
+        pushEntry(entry);
+      }
       return;
     }
     pushEntry(fromResourceEvent(event));
   };
 
   const handleRejection = (event: PromiseRejectionEvent) => {
-    pushEntry(fromRejectionEvent(event));
+    const entry = fromRejectionEvent(event);
+    if (entry) {
+      pushEntry(entry);
+    }
+  };
+
+  const wrapConsole = (level: 'warn' | 'error') => {
+    const original = console[level];
+    console[level] = (...args: unknown[]) => {
+      try {
+        pushEntry(fromConsoleEvent(level, args));
+      } catch {
+        // ignore
+      }
+      original.apply(console, args);
+    };
+  };
+
+  const wrapFetch = () => {
+    if (!('fetch' in window)) return;
+    const original = window.fetch.bind(window);
+    window.fetch = async (...args: Parameters<typeof fetch>) => {
+      try {
+        const response = await original(...args);
+        if (!response.ok) {
+          networkFailures.push({
+            url: response.url,
+            status: response.status,
+            statusText: response.statusText,
+            method: (args[1]?.method || 'GET').toUpperCase(),
+            ts: new Date().toISOString(),
+            type: 'fetch'
+          });
+        }
+        return response;
+      } catch (error) {
+        const request = args[0];
+        const url =
+          typeof request === 'string'
+            ? request
+            : request instanceof Request
+              ? request.url
+              : 'unknown';
+        networkFailures.push({
+          url,
+          statusText: normalizeUnknownError(error).message,
+          method: (args[1]?.method || 'GET').toUpperCase(),
+          ts: new Date().toISOString(),
+          type: 'fetch'
+        });
+        throw error;
+      }
+    };
   };
 
   window.addEventListener('error', handleError, true);
   window.addEventListener('unhandledrejection', handleRejection);
 
+  wrapConsole('warn');
+  wrapConsole('error');
+  wrapFetch();
+
   const panel = createPanel(state, () => {
-    void copyDiagnostics(state.entries);
+    return copyDiagnostics(state.entries, networkFailures);
   });
   document.body.append(panel);
   updatePanel(state);
 
   return {
     getEntries: () => state.entries,
-    copy: () => copyDiagnostics(state.entries),
+    copy: () => copyDiagnostics(state.entries, networkFailures),
     onEntry: (callback) => {
       entryListeners.add(callback);
+    },
+    captureError: (error, source) => {
+      const entry = fromUnknownError(error, source);
+      pushEntry(entry);
+      try {
+        if (typeof window.reportError === 'function') {
+          const reportedError =
+            error instanceof Error ? error : new Error(entry.message);
+          markErrorObject(reportedError, entry.errorId, true);
+          window.reportError(reportedError);
+        }
+      } catch {
+        // ignore
+      }
+      return entry;
     }
   };
 };
