@@ -43,6 +43,81 @@ const makeEmptyState = (): AppState => ({
 
 let cachedState: AppState | null = null;
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
+
+const safeNumber = (value: unknown, fallback: number): number =>
+  typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+
+const safeString = (value: unknown, fallback: string): string =>
+  typeof value === 'string' ? value : fallback;
+
+const mergeProgress = (
+  base: AppState['islands'][IslandId]['progress'],
+  incoming: unknown
+) => {
+  if (!isRecord(incoming)) {
+    return base;
+  }
+  return {
+    lastRunAt:
+      incoming.lastRunAt === null || typeof incoming.lastRunAt === 'string'
+        ? incoming.lastRunAt
+        : base.lastRunAt,
+    runsCount: safeNumber(incoming.runsCount, base.runsCount),
+    bestScore: safeNumber(incoming.bestScore, base.bestScore)
+  };
+};
+
+const mergeIslandState = (
+  base: AppState['islands'][IslandId],
+  incoming: unknown
+): AppState['islands'][IslandId] => {
+  if (!isRecord(incoming)) {
+    return base;
+  }
+  return {
+    input: safeString(incoming.input, base.input),
+    lastReport: incoming.lastReport ?? base.lastReport,
+    progress: mergeProgress(base.progress, incoming.progress)
+  };
+};
+
+const mergeWithDefaults = (
+  base: AppState,
+  incoming: unknown
+): AppState => {
+  if (!isRecord(incoming)) {
+    return base;
+  }
+  const islands = isRecord(incoming.islands) ? incoming.islands : {};
+  return {
+    ...base,
+    schemaVersion: safeNumber(incoming.schemaVersion, base.schemaVersion),
+    updatedAt: safeString(incoming.updatedAt, base.updatedAt),
+    xp: safeNumber(incoming.xp, base.xp),
+    level: safeNumber(incoming.level, base.level),
+    streakDays: safeNumber(incoming.streakDays, base.streakDays),
+    islands: {
+      bayes: mergeIslandState(base.islands.bayes, islands.bayes),
+      hmm: mergeIslandState(base.islands.hmm, islands.hmm),
+      timeseries: mergeIslandState(base.islands.timeseries, islands.timeseries),
+      optimization: mergeIslandState(
+        base.islands.optimization,
+        islands.optimization
+      ),
+      decisionTree: mergeIslandState(
+        base.islands.decisionTree,
+        islands.decisionTree
+      ),
+      causalDag: mergeIslandState(
+        base.islands.causalDag,
+        islands.causalDag
+      )
+    }
+  };
+};
+
 export const ensureState = (): AppState => {
   if (cachedState) {
     return cachedState;
@@ -56,8 +131,9 @@ export const ensureState = (): AppState => {
   }
 
   try {
-    const parsed = JSON.parse(stored) as AppState;
-    cachedState = migrate(parsed);
+    const parsed = JSON.parse(stored) as unknown;
+    const merged = mergeWithDefaults(makeEmptyState(), parsed);
+    cachedState = migrate(merged);
     persistState(cachedState);
     return cachedState;
   } catch {

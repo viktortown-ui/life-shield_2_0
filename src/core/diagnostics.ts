@@ -15,7 +15,7 @@ export type DiagnosticsEntry = {
   id: string;
   errorId: string;
   ts: string;
-  kind: 'error' | 'rejection' | 'resource' | 'console';
+  kind: 'error' | 'rejection' | 'resource' | 'console' | 'overlay' | 'breadcrumb';
   message: string;
   stack?: string;
   name?: string;
@@ -100,9 +100,10 @@ const formatEntryDetails = (entry: DiagnosticsEntry): string => {
       }`
     : '';
   const source = entry.source ? `Source: ${entry.source}` : '';
+  const rawType = entry.rawType ? `Type: ${entry.rawType}` : '';
   const stack = entry.stack ? `Stack:\n${entry.stack}` : '';
   const jsonPreview = entry.jsonPreview ? `Data: ${entry.jsonPreview}` : '';
-  return [errorId, location, source, stack, jsonPreview]
+  return [errorId, location, source, rawType, stack, jsonPreview]
     .filter(Boolean)
     .join('\n');
 };
@@ -161,6 +162,11 @@ const buildReport = (
   url: window.location.href,
   userAgent: navigator.userAgent,
   entries,
+  lastBreadcrumb:
+    entries
+      .slice()
+      .reverse()
+      .find((entry) => entry.kind === 'breadcrumb')?.message ?? null,
   network: {
     failedResources: collectFailedResources(),
     failedFetches: networkFailures
@@ -421,11 +427,54 @@ const fromUnknownError = (
   };
 };
 
+const fromOverlayInvocation = (
+  error: unknown,
+  invoker: Error,
+  source?: string
+): DiagnosticsEntry => {
+  const normalized = normalizeUnknownError(error);
+  const errorId = buildEntryId();
+  const stackParts = [
+    normalized.stack,
+    invoker.stack ? `Invoker stack:\n${invoker.stack}` : ''
+  ].filter(Boolean);
+  return {
+    id: errorId,
+    errorId,
+    ts: new Date().toISOString(),
+    kind: 'overlay',
+    message: 'overlay_invoked',
+    stack: stackParts.join('\n') || invoker.stack,
+    name: normalized.name,
+    rawType: normalized.rawType || 'overlay',
+    jsonPreview: normalized.jsonPreview,
+    source
+  };
+};
+
+const fromBreadcrumb = (message: string): DiagnosticsEntry => {
+  const errorId = buildEntryId();
+  return {
+    id: errorId,
+    errorId,
+    ts: new Date().toISOString(),
+    kind: 'breadcrumb',
+    message,
+    rawType: 'breadcrumb'
+  };
+};
+
 export type DiagnosticsController = {
   getEntries: () => DiagnosticsEntry[];
   copy: () => Promise<boolean>;
   onEntry: (callback: (entry: DiagnosticsEntry) => void) => void;
   captureError: (error: unknown, source?: string) => DiagnosticsEntry;
+  captureOverlayInvocation: (
+    error: unknown,
+    invoker: Error,
+    source?: string
+  ) => DiagnosticsEntry;
+  pushBreadcrumb: (step: string) => DiagnosticsEntry;
 };
 
 export const initDiagnostics = (): DiagnosticsController => {
@@ -543,6 +592,16 @@ export const initDiagnostics = (): DiagnosticsController => {
       } catch {
         // ignore
       }
+      return entry;
+    },
+    captureOverlayInvocation: (error, invoker, source) => {
+      const entry = fromOverlayInvocation(error, invoker, source);
+      pushEntry(entry);
+      return entry;
+    },
+    pushBreadcrumb: (step) => {
+      const entry = fromBreadcrumb(step);
+      pushEntry(entry);
       return entry;
     }
   };
