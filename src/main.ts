@@ -4,6 +4,7 @@ import {
   normalizeUnknownError,
   type DiagnosticsEntry
 } from './core/diagnostics';
+import { shouldShowFatalOverlay } from './core/diagnosticsOverlay';
 import { ensureState } from './core/store';
 import {
   applyUpdate,
@@ -325,13 +326,7 @@ try {
     showOverlay(displayEntry);
   };
   diagnostics.onEntry((entry) => {
-    if (
-      entry.kind === 'console_error' ||
-      entry.kind === 'breadcrumb' ||
-      entry.kind === 'overlay_invoked'
-    ) {
-      return;
-    }
+    if (!shouldShowFatalOverlay(entry)) return;
     showOverlay(entry);
   });
   ensureState();
