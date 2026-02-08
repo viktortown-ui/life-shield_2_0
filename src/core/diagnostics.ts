@@ -24,7 +24,8 @@ export type DiagnosticsEntry = {
     | 'overlay_invoked'
     | 'blank_screen_detected'
     | 'dom_mutation'
-    | 'breadcrumb';
+    | 'breadcrumb'
+    | 'service_worker';
   message: string;
   stack?: string;
   name?: string;
@@ -49,6 +50,16 @@ export type DiagnosticsEntry = {
     beforeCount: number;
     afterCount: number;
   };
+  suspectedMuted?: boolean;
+  scriptInventory?: ScriptInventoryEntry[];
+  externalScripts?: ScriptInventoryEntry[];
+  lastBreadcrumb?: string | null;
+};
+
+type ScriptInventoryEntry = {
+  src: string;
+  origin: string;
+  sameOrigin: boolean;
 };
 
 type DiagnosticsState = {
@@ -139,6 +150,18 @@ const formatEntryDetails = (entry: DiagnosticsEntry): string => {
   const domMutation = entry.domMutation
     ? `DOM mutation: ${JSON.stringify(entry.domMutation)}`
     : '';
+  const suspectedMuted = entry.suspectedMuted
+    ? `Suspected muted script error: ${entry.suspectedMuted}`
+    : '';
+  const lastBreadcrumb = entry.lastBreadcrumb
+    ? `Last breadcrumb: ${entry.lastBreadcrumb}`
+    : '';
+  const scriptInventory = entry.scriptInventory
+    ? `Script inventory: ${JSON.stringify(entry.scriptInventory)}`
+    : '';
+  const externalScripts = entry.externalScripts
+    ? `External scripts: ${JSON.stringify(entry.externalScripts)}`
+    : '';
   const jsonPreview = entry.jsonPreview ? `Data: ${entry.jsonPreview}` : '';
   return [
     errorId,
@@ -151,6 +174,10 @@ const formatEntryDetails = (entry: DiagnosticsEntry): string => {
     snapshot,
     styleSnapshot,
     domMutation,
+    suspectedMuted,
+    lastBreadcrumb,
+    scriptInventory,
+    externalScripts,
     jsonPreview
   ]
     .filter(Boolean)
@@ -343,6 +370,45 @@ const createPanel = (
 const buildEntryId = () =>
   `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 
+const collectScriptInventory = (): {
+  allScripts: ScriptInventoryEntry[];
+  externalScripts: ScriptInventoryEntry[];
+} => {
+  const scripts = Array.from(document.scripts);
+  const allScripts = scripts.map((script) => {
+    const src = script.src || '';
+    if (!src) {
+      return {
+        src: '',
+        origin: 'inline',
+        sameOrigin: true
+      };
+    }
+    try {
+      const origin = new URL(src, window.location.href).origin;
+      return {
+        src,
+        origin,
+        sameOrigin: origin === window.location.origin
+      };
+    } catch {
+      return {
+        src,
+        origin: 'invalid',
+        sameOrigin: false
+      };
+    }
+  });
+  const externalScripts = allScripts.filter((entry) => !entry.sameOrigin);
+  return { allScripts, externalScripts };
+};
+
+const getLastBreadcrumb = (entries: DiagnosticsEntry[]): string | null =>
+  entries
+    .slice()
+    .reverse()
+    .find((entry) => entry.kind === 'breadcrumb')?.message ?? null;
+
 const markErrorObject = (value: unknown, errorId: string, captured: boolean) => {
   if (!value || typeof value !== 'object') return;
   try {
@@ -391,6 +457,14 @@ const fromErrorEvent = (event: ErrorEvent): DiagnosticsEntry | null => {
     lineno: event.lineno || undefined,
     colno: event.colno || undefined
   };
+};
+
+const isMutedScriptError = (event: ErrorEvent) => {
+  if (event.message !== 'Script error.') return false;
+  const hasLocation = Boolean(event.filename);
+  const hasLine = typeof event.lineno === 'number' && event.lineno > 0;
+  const hasCol = typeof event.colno === 'number' && event.colno > 0;
+  return !hasLocation || !hasLine || !hasCol;
 };
 
 const fromResourceEvent = (event: Event): DiagnosticsEntry => {
@@ -553,6 +627,13 @@ export const initDiagnostics = (): DiagnosticsController => {
     if (event instanceof ErrorEvent) {
       const entry = fromErrorEvent(event);
       if (entry) {
+        if (isMutedScriptError(event)) {
+          const { allScripts, externalScripts } = collectScriptInventory();
+          entry.suspectedMuted = true;
+          entry.scriptInventory = allScripts;
+          entry.externalScripts = externalScripts;
+          entry.lastBreadcrumb = getLastBreadcrumb(state.entries);
+        }
         pushEntry(entry);
       }
       return;
@@ -583,7 +664,21 @@ export const initDiagnostics = (): DiagnosticsController => {
   const wrapFetch = () => {
     if (!('fetch' in window)) return;
     const original = window.fetch.bind(window);
+    let swFetchLogged = false;
     window.fetch = async (...args: Parameters<typeof fetch>) => {
+      if (!swFetchLogged && navigator.serviceWorker?.controller) {
+        swFetchLogged = true;
+        const id = buildEntryId();
+        pushEntry({
+          id,
+          errorId: id,
+          ts: new Date().toISOString(),
+          kind: 'service_worker',
+          message: 'service_worker_fetch',
+          rawType: 'service_worker',
+          source: navigator.serviceWorker.controller.scriptURL || undefined
+        });
+      }
       try {
         const response = await original(...args);
         if (!response.ok) {
