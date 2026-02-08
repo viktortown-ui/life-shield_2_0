@@ -5,6 +5,7 @@ import {
   getUpdateState,
   onUpdateState
 } from '../core/pwaUpdate';
+import { reportCaughtError } from '../core/reportError';
 
 export const createSettingsScreen = () => {
   const container = document.createElement('div');
@@ -96,7 +97,8 @@ export const createSettingsScreen = () => {
         hint.textContent = result.ok
           ? 'Импорт завершён.'
           : `Ошибка импорта: ${result.errors.join(' ')}`;
-      } catch {
+      } catch (error) {
+        reportCaughtError(error);
         hint.textContent = 'Введите корректный JSON перед импортом.';
       }
     }
@@ -120,7 +122,8 @@ export const createSettingsScreen = () => {
       hint.textContent = result.ok
         ? 'Импорт завершён.'
         : `Ошибка импорта: ${result.errors.join(' ')}`;
-    } catch {
+    } catch (error) {
+      reportCaughtError(error);
       hint.textContent = 'Введите корректный JSON перед импортом.';
     }
   });

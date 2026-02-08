@@ -8,6 +8,7 @@ import {
   summarizeSamples
 } from '../lib/bayes.js';
 import { BayesInput, BayesWorkerRequest } from '../islands/bayes';
+import { reportCaughtError } from '../core/reportError';
 
 const makePosteriorSvg = (samples: number[]) => {
   const width = 320;
@@ -174,6 +175,7 @@ self.onmessage = (event: MessageEvent<BayesWorkerRequest>) => {
       }
     });
   } catch (error) {
+    reportCaughtError(error);
     const message =
       error instanceof Error ? error.message : 'Неожиданная ошибка воркера.';
     self.postMessage({ type: 'error', requestId, error: message });

@@ -1,6 +1,7 @@
 import ARIMAPromise from 'arima/async';
 import { TimeseriesWorkerRequest, TimeseriesWorkerResponse } from '../islands/timeseries';
 import { runTimeseriesAnalysis } from './timeseriesAnalysis';
+import { reportCaughtError } from '../core/reportError';
 
 const arimaPromise = ARIMAPromise.then((Arima) => Arima);
 
@@ -17,6 +18,7 @@ self.onmessage = async (
     };
     self.postMessage(response);
   } catch (error) {
+    reportCaughtError(error);
     const response: TimeseriesWorkerResponse = {
       requestId,
       error:

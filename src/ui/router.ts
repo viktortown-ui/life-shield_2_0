@@ -2,6 +2,8 @@ import { createIslandPage } from './islandPage';
 import { createSettingsScreen } from './settings';
 import { createShieldScreen } from './shield';
 import { IslandId } from '../core/types';
+import { safeClear } from '../core/storage';
+import { reportCaughtError } from '../core/reportError';
 
 const parseRoute = () => {
   const hash = window.location.hash.replace('#', '') || '/';
@@ -36,20 +38,47 @@ const createBottomNav = (
 
 export const initRouter = (root: HTMLElement) => {
   const render = () => {
-    root.innerHTML = '';
-    const route = parseRoute();
-    if (route.name === 'island') {
-      root.appendChild(createIslandPage(route.id));
+    try {
+      root.innerHTML = '';
+      const route = parseRoute();
+      if (route.name === 'island') {
+        root.appendChild(createIslandPage(route.id));
+        root.appendChild(createBottomNav(route));
+        return;
+      }
+      if (route.name === 'settings') {
+        root.appendChild(createSettingsScreen());
+        root.appendChild(createBottomNav(route));
+        return;
+      }
+      root.appendChild(createShieldScreen());
       root.appendChild(createBottomNav(route));
-      return;
+    } catch (error) {
+      reportCaughtError(error);
+      if (typeof window.reportError === 'function') {
+        try {
+          const reportable = error instanceof Error ? error : new Error(String(error));
+          window.reportError(reportable);
+        } catch (reportError) {
+          reportCaughtError(reportError);
+        }
+      }
+      root.innerHTML = `
+        <div class="screen">
+          <h1>Произошла ошибка</h1>
+          <p>Не удалось отрисовать экран. Попробуйте сбросить данные.</p>
+          <button class="button" data-reset>Reset app data</button>
+        </div>
+      `;
+      const resetButton = root.querySelector<HTMLButtonElement>('[data-reset]');
+      resetButton?.addEventListener('click', () => {
+        try {
+          safeClear();
+        } finally {
+          window.location.reload();
+        }
+      });
     }
-    if (route.name === 'settings') {
-      root.appendChild(createSettingsScreen());
-      root.appendChild(createBottomNav(route));
-      return;
-    }
-    root.appendChild(createShieldScreen());
-    root.appendChild(createBottomNav(route));
   };
 
   window.addEventListener('hashchange', render);

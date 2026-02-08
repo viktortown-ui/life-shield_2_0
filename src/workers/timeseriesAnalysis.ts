@@ -6,6 +6,7 @@ import type {
   TimeseriesModelParams
 } from '../islands/timeseries';
 import { mergeSeries } from '../islands/timeseries';
+import { reportCaughtError } from '../core/reportError';
 
 interface ArimaOptions {
   auto?: boolean;
@@ -162,7 +163,8 @@ const runGridSearch = (
                   bestModel = model;
                   bestMetric = candidateMetric;
                 }
-              } catch {
+              } catch (error) {
+                reportCaughtError(error);
                 // ignore failed config
               }
             }
@@ -256,7 +258,8 @@ const analyzeSeries = (
         const [prediction] = model.predict(testSize);
         metric = evaluateForecast(testSeries, prediction.slice(0, testSize));
       }
-    } catch {
+    } catch (error) {
+      reportCaughtError(error);
       model = null;
       modelParams = null;
     }

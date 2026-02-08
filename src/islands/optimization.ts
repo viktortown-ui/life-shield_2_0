@@ -1,4 +1,5 @@
 import { ActionItem, IslandReport } from '../core/types';
+import { reportCaughtError } from '../core/reportError';
 
 export interface OptimizationActionInput {
   name: string;
@@ -107,7 +108,8 @@ export const parseOptimizationInput = (raw: string): OptimizationInput => {
           }))
         : defaultOptimizationInput.actions
     };
-  } catch {
+  } catch (error) {
+    reportCaughtError(error);
     return defaultOptimizationInput;
   }
 };

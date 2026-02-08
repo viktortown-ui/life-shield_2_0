@@ -12,6 +12,7 @@ import {
   panicReset
 } from './core/pwaUpdate';
 import { safeClear } from './core/storage';
+import { reportCaughtError } from './core/reportError';
 import { initRouter } from './ui/router';
 
 const isDiagnosticsEntry = (error: unknown): error is DiagnosticsEntry =>
@@ -84,6 +85,11 @@ const initErrorOverlay = (onCopyDiagnostics: () => Promise<boolean>) => {
   copyButton.className = 'button small';
   copyButton.textContent = 'Copy diagnostics';
 
+  const resetButton = document.createElement('button');
+  resetButton.type = 'button';
+  resetButton.className = 'button small';
+  resetButton.textContent = 'Reset app data';
+
   const debugToggle = document.createElement('label');
   debugToggle.className = 'error-overlay__debug';
 
@@ -94,7 +100,7 @@ const initErrorOverlay = (onCopyDiagnostics: () => Promise<boolean>) => {
   debugLabel.textContent = 'Debug';
 
   debugToggle.append(debugCheckbox, debugLabel);
-  actions.append(copyStatus, copyButton, debugToggle);
+  actions.append(copyStatus, copyButton, resetButton, debugToggle);
   card.append(title, message, stack, actions);
   overlay.append(card);
   document.body.append(overlay);
@@ -133,6 +139,16 @@ const initErrorOverlay = (onCopyDiagnostics: () => Promise<boolean>) => {
     }, 4000);
   });
 
+  resetButton.addEventListener('click', () => {
+    try {
+      safeClear();
+    } catch (error) {
+      reportCaughtError(error);
+    } finally {
+      window.location.reload();
+    }
+  });
+
   return showError;
 };
 
@@ -158,6 +174,115 @@ const renderFatalError = (error: unknown) => {
   });
 };
 
+const MAX_APP_SNAPSHOT_LENGTH = 500;
+
+const truncateSnapshot = (value: string, maxLength = MAX_APP_SNAPSHOT_LENGTH) =>
+  value.length > maxLength ? `${value.slice(0, maxLength)}…` : value;
+
+const buildStyleSnapshot = (root: HTMLElement | null) => {
+  if (!root) {
+    return {
+      display: 'missing',
+      visibility: 'missing',
+      opacity: 'missing',
+      height: 0,
+      width: 0
+    };
+  }
+  const style = window.getComputedStyle(root);
+  const rect = root.getBoundingClientRect();
+  return {
+    display: style.display,
+    visibility: style.visibility,
+    opacity: style.opacity,
+    height: rect.height,
+    width: rect.width
+  };
+};
+
+const initBlankScreenWatchdog = (
+  diagnostics: ReturnType<typeof initDiagnostics>
+) => {
+  const checkBlankScreen = () => {
+    const root = document.getElementById('app');
+    const styleSnapshot = buildStyleSnapshot(root);
+    const childCount = root?.children.length ?? 0;
+    const opacity = Number.parseFloat(styleSnapshot.opacity);
+    const hasSize = styleSnapshot.height > 0 && styleSnapshot.width > 0;
+    const suspicious =
+      !root ||
+      childCount === 0 ||
+      styleSnapshot.display === 'none' ||
+      styleSnapshot.visibility === 'hidden' ||
+      (Number.isFinite(opacity) && opacity <= 0) ||
+      !hasSize;
+
+    if (!suspicious) return;
+
+    diagnostics.captureEvent({
+      kind: 'blank_screen_detected',
+      message: 'blank_screen_detected',
+      rawType: 'blank_screen_detected',
+      snapshot: root
+        ? truncateSnapshot(root.outerHTML)
+        : 'missing #app element',
+      styleSnapshot,
+      invokerStack: new Error('blank screen detected').stack,
+      jsonPreview: JSON.stringify({
+        rootExists: Boolean(root),
+        childCount,
+        hasSize
+      })
+    });
+  };
+
+  window.setTimeout(() => {
+    try {
+      checkBlankScreen();
+    } catch (error) {
+      reportCaughtError(error);
+    }
+  }, 1000);
+
+  window.setTimeout(() => {
+    try {
+      checkBlankScreen();
+    } catch (error) {
+      reportCaughtError(error);
+    }
+  }, 3000);
+};
+
+const initDomMutationObserver = (
+  root: HTMLElement,
+  diagnostics: ReturnType<typeof initDiagnostics>
+) => {
+  const countNodes = () => root.querySelectorAll('*').length + 1;
+  let previousCount = countNodes();
+
+  const observer = new MutationObserver(() => {
+    const nextCount = countNodes();
+    const delta = Math.abs(nextCount - previousCount);
+    if (
+      previousCount > 0 &&
+      (nextCount === 0 || delta >= Math.max(10, Math.round(previousCount * 0.5)))
+    ) {
+      diagnostics.captureEvent({
+        kind: 'dom_mutation',
+        message: 'dom_mutation',
+        rawType: 'dom_mutation',
+        domMutation: {
+          beforeCount: previousCount,
+          afterCount: nextCount
+        }
+      });
+    }
+    previousCount = nextCount;
+  });
+
+  observer.observe(root, { childList: true, subtree: true });
+};
+
 let showErrorOverlay: ((error: unknown) => void) | null = null;
 const diagnostics = initDiagnostics();
 
@@ -166,7 +291,7 @@ try {
   diagnostics.pushBreadcrumb('boot: load_config');
   const showOverlay = initErrorOverlay(() => diagnostics.copy());
   showErrorOverlay = (error: unknown) => {
-    const invoker = new Error('Error overlay invoked');
+    const invoker = new Error('overlay invoked');
     const overlayEntry = diagnostics.captureOverlayInvocation(
       error,
       invoker,
@@ -179,7 +304,8 @@ try {
             ? error
             : new Error(formatInlineError(error).message);
         window.reportError(reportable);
-      } catch {
+      } catch (error) {
+        reportCaughtError(error);
         // ignore
       }
     }
@@ -199,7 +325,11 @@ try {
     showOverlay(displayEntry);
   };
   diagnostics.onEntry((entry) => {
-    if (entry.kind === 'console' || entry.kind === 'breadcrumb' || entry.kind === 'overlay') {
+    if (
+      entry.kind === 'console_error' ||
+      entry.kind === 'breadcrumb' ||
+      entry.kind === 'overlay_invoked'
+    ) {
       return;
     }
     showOverlay(entry);
@@ -273,13 +403,16 @@ try {
     diagnostics.pushBreadcrumb('boot: mount_ui');
     initRouter(root);
     diagnostics.pushBreadcrumb('boot: ready');
+    initBlankScreenWatchdog(diagnostics);
+    initDomMutationObserver(root, diagnostics);
   }
 } catch (error) {
   if (typeof window.reportError === 'function') {
     try {
       const reportable = error instanceof Error ? error : new Error(String(error));
       window.reportError(reportable);
-    } catch {
+    } catch (error) {
+      reportCaughtError(error);
       // ignore
     }
   }

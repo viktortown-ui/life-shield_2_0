@@ -1,4 +1,5 @@
 import { IslandReport, ActionItem } from '../core/types';
+import { reportCaughtError } from '../core/reportError';
 
 export interface DecisionTreeOutcomeInput {
   probability: number | null;
@@ -103,7 +104,8 @@ export const parseDecisionTreeInput = (raw: string): DecisionTreeInput => {
         actions: actions.length ? actions : defaultDecisionTreeInput.actions
       };
     }
-  } catch {
+  } catch (error) {
+    reportCaughtError(error);
     return { ...defaultDecisionTreeInput };
   }
 

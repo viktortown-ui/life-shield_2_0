@@ -6,6 +6,7 @@ import {
   OptimizationWorkerRequest,
   OptimizationWorkerResponse
 } from '../islands/optimization';
+import { reportCaughtError } from '../core/reportError';
 
 const solveOptimization = (
   glpk: Awaited<ReturnType<typeof GLPK>>,
@@ -118,6 +119,7 @@ self.onmessage = async (
     };
     self.postMessage(response);
   } catch (error) {
+    reportCaughtError(error);
     const response: OptimizationWorkerResponse = {
       requestId,
       solution: {
