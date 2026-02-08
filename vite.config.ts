@@ -1,8 +1,24 @@
 import { defineConfig } from 'vite';
+import { execSync } from 'node:child_process';
 import { VitePWA, cachePreset } from 'vite-plugin-pwa';
+
+const buildId = (() => {
+  try {
+    return execSync('git rev-parse --short HEAD', {
+      encoding: 'utf8'
+    }).trim();
+  } catch {
+    return 'unknown';
+  }
+})();
+const builtAt = new Date().toISOString();
 
 export default defineConfig({
   base: process.env.BASE ?? '/life-shield_2_0/',
+  define: {
+    __BUILD_ID__: JSON.stringify(buildId),
+    __BUILD_TIME__: JSON.stringify(builtAt)
+  },
   plugins: [
     VitePWA({
       registerType: 'autoUpdate',

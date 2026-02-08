@@ -1,5 +1,6 @@
 import { safeGetItem, safeSetItem } from './storage';
 import { reportCaughtError } from './reportError';
+import { buildInfo } from './buildInfo';
 
 const DIAGNOSTICS_KEY = 'lifeShieldV2:diagnostics';
 const MAX_ENTRIES = 50;
@@ -236,6 +237,7 @@ const buildReport = (
   networkFailures: NetworkFailure[]
 ) => ({
   generatedAt: new Date().toISOString(),
+  build: buildInfo,
   url: window.location.href,
   userAgent: navigator.userAgent,
   entries,
@@ -630,6 +632,7 @@ export const initDiagnostics = (): DiagnosticsController => {
         if (isMutedScriptError(event)) {
           const { allScripts, externalScripts } = collectScriptInventory();
           entry.suspectedMuted = true;
+          entry.level = 'warn';
           entry.scriptInventory = allScripts;
           entry.externalScripts = externalScripts;
           entry.lastBreadcrumb = getLastBreadcrumb(state.entries);
