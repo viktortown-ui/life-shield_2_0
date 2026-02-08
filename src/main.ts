@@ -36,6 +36,7 @@ const formatInlineError = (error: unknown) => {
       entry.stack,
       entry.jsonPreview ? `Data: ${entry.jsonPreview}` : '',
       entry.source ? `Source: ${entry.source}` : '',
+      entry.rawType ? `Type: ${entry.rawType}` : '',
       location ? `Location: ${location}` : ''
     ].filter(Boolean);
     return {
@@ -45,9 +46,14 @@ const formatInlineError = (error: unknown) => {
   }
 
   const normalized = normalizeUnknownError(error);
+  const details = [
+    normalized.stack,
+    normalized.jsonPreview,
+    normalized.rawType ? `Type: ${normalized.rawType}` : ''
+  ].filter(Boolean);
   return {
     message: normalized.message,
-    stack: normalized.stack || normalized.jsonPreview || ''
+    stack: details.join('\n')
   };
 };
 
@@ -156,20 +162,51 @@ let showErrorOverlay: ((error: unknown) => void) | null = null;
 const diagnostics = initDiagnostics();
 
 try {
+  diagnostics.pushBreadcrumb('boot: start');
+  diagnostics.pushBreadcrumb('boot: load_config');
   const showOverlay = initErrorOverlay(() => diagnostics.copy());
   showErrorOverlay = (error: unknown) => {
+    const invoker = new Error('Error overlay invoked');
+    const overlayEntry = diagnostics.captureOverlayInvocation(
+      error,
+      invoker,
+      'overlay'
+    );
+    if (typeof window.reportError === 'function') {
+      try {
+        const reportable =
+          error instanceof Error
+            ? error
+            : new Error(formatInlineError(error).message);
+        window.reportError(reportable);
+      } catch {
+        // ignore
+      }
+    }
     if (isDiagnosticsEntry(error)) {
-      showOverlay(error);
+      const displayEntry =
+        error.stack || error.jsonPreview || error.source
+          ? error
+          : { ...error, stack: overlayEntry.stack };
+      showOverlay(displayEntry);
       return;
     }
     const entry = diagnostics.captureError(error, 'overlay');
-    showOverlay(entry);
+    const displayEntry =
+      entry.stack || entry.jsonPreview || entry.source
+        ? entry
+        : { ...entry, stack: overlayEntry.stack };
+    showOverlay(displayEntry);
   };
   diagnostics.onEntry((entry) => {
-    if (entry.kind === 'console') return;
+    if (entry.kind === 'console' || entry.kind === 'breadcrumb' || entry.kind === 'overlay') {
+      return;
+    }
     showOverlay(entry);
   });
   ensureState();
+  diagnostics.pushBreadcrumb('boot: load_storage');
+  diagnostics.pushBreadcrumb('boot: hydrate_state');
   initPwaUpdate();
 
   const swBanner = document.createElement('div');
@@ -233,9 +270,19 @@ try {
 
   const root = document.getElementById('app');
   if (root) {
+    diagnostics.pushBreadcrumb('boot: mount_ui');
     initRouter(root);
+    diagnostics.pushBreadcrumb('boot: ready');
   }
 } catch (error) {
+  if (typeof window.reportError === 'function') {
+    try {
+      const reportable = error instanceof Error ? error : new Error(String(error));
+      window.reportError(reportable);
+    } catch {
+      // ignore
+    }
+  }
   if (showErrorOverlay) {
     showErrorOverlay(error);
   } else {
