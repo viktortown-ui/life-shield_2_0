@@ -39,6 +39,9 @@ jobs:
       - name: Sanity check dist
         run: test -s dist/index.html
 
+      - name: Ensure production index (no /src/main.ts)
+        run: '! rg -n "/src/main.ts" dist/index.html'
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:

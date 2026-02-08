@@ -8,6 +8,23 @@ import {
 } from './core/pwaUpdate';
 import { initRouter } from './ui/router';
 
+const formatInlineError = (error: unknown) => {
+  if (error instanceof Error) {
+    return {
+      message: error.message || error.name,
+      stack: error.stack || ''
+    };
+  }
+  if (typeof error === 'string') {
+    return { message: error, stack: '' };
+  }
+  try {
+    return { message: JSON.stringify(error), stack: '' };
+  } catch {
+    return { message: String(error), stack: '' };
+  }
+};
+
 const initErrorOverlay = () => {
   const overlay = document.createElement('div');
   overlay.className = 'error-overlay hidden';
@@ -65,25 +82,8 @@ const initErrorOverlay = () => {
 
   debugCheckbox.addEventListener('change', updateStackVisibility);
 
-  const formatError = (error: unknown) => {
-    if (error instanceof Error) {
-      return {
-        message: error.message || error.name,
-        stack: error.stack || ''
-      };
-    }
-    if (typeof error === 'string') {
-      return { message: error, stack: '' };
-    }
-    try {
-      return { message: JSON.stringify(error), stack: '' };
-    } catch {
-      return { message: String(error), stack: '' };
-    }
-  };
-
   const showError = (error: unknown) => {
-    const { message: msg, stack: stackText } = formatError(error);
+    const { message: msg, stack: stackText } = formatInlineError(error);
     message.textContent = msg || 'Неизвестная ошибка.';
     stack.textContent = stackText;
     overlay.classList.remove('hidden');
@@ -157,6 +157,22 @@ try {
   ensureState();
   initPwaUpdate();
 
+  const swBanner = document.createElement('div');
+  swBanner.className = 'sw-banner hidden';
+  swBanner.innerHTML = `
+    <div class="sw-banner__content">
+      <strong>Не удалось включить офлайн-режим.</strong>
+      <span class="sw-banner__message">
+        Приложение работает без сервис-воркера.
+      </span>
+    </div>
+    <pre class="sw-banner__stack hidden"></pre>
+  `;
+  document.body.prepend(swBanner);
+
+  const swStack = swBanner.querySelector('pre') as HTMLPreElement;
+  const isDebug = !import.meta.env.PROD;
+
   const banner = document.createElement('div');
   banner.className = 'update-banner hidden';
   banner.innerHTML = `
@@ -187,6 +203,17 @@ try {
       bannerButton.textContent = 'Обновить';
     }
     banner.classList.toggle('hidden', !state.ready && !state.panic);
+
+    if (state.registerError) {
+      const { message: errorMessage, stack } = formatInlineError(
+        state.registerError
+      );
+      swStack.textContent = [errorMessage, stack].filter(Boolean).join('\n');
+      swStack.classList.toggle('hidden', !isDebug || !swStack.textContent);
+      swBanner.classList.remove('hidden');
+    } else {
+      swBanner.classList.add('hidden');
+    }
   });
 
   const root = document.getElementById('app');
