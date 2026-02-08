@@ -1,4 +1,5 @@
 import './styles/main.css';
+import { initDiagnostics, normalizeUnknownError, type DiagnosticsEntry } from './core/diagnostics';
 import { ensureState } from './core/store';
 import {
   applyUpdate,
@@ -6,26 +7,43 @@ import {
   onUpdateState,
   panicReset
 } from './core/pwaUpdate';
+import { safeClear } from './core/storage';
 import { initRouter } from './ui/router';
 
 const formatInlineError = (error: unknown) => {
-  if (error instanceof Error) {
+  const isEntry =
+    typeof error === 'object' &&
+    error !== null &&
+    'kind' in error &&
+    'message' in error;
+
+  if (isEntry) {
+    const entry = error as DiagnosticsEntry;
+    const location = entry.filename
+      ? `${entry.filename}${entry.lineno ? `:${entry.lineno}` : ''}${
+          entry.colno ? `:${entry.colno}` : ''
+        }`
+      : '';
+    const stackLines = [
+      entry.stack,
+      entry.jsonPreview ? `Data: ${entry.jsonPreview}` : '',
+      entry.source ? `Source: ${entry.source}` : '',
+      location ? `Location: ${location}` : ''
+    ].filter(Boolean);
     return {
-      message: error.message || error.name,
-      stack: error.stack || ''
+      message: entry.message,
+      stack: stackLines.join('\n')
     };
   }
-  if (typeof error === 'string') {
-    return { message: error, stack: '' };
-  }
-  try {
-    return { message: JSON.stringify(error), stack: '' };
-  } catch {
-    return { message: String(error), stack: '' };
-  }
+
+  const normalized = normalizeUnknownError(error);
+  return {
+    message: normalized.message,
+    stack: normalized.stack || normalized.jsonPreview || ''
+  };
 };
 
-const initErrorOverlay = () => {
+const initErrorOverlay = (onCopyDiagnostics: () => void) => {
   const overlay = document.createElement('div');
   overlay.className = 'error-overlay hidden';
 
@@ -47,7 +65,7 @@ const initErrorOverlay = () => {
   const copyButton = document.createElement('button');
   copyButton.type = 'button';
   copyButton.className = 'button small';
-  copyButton.textContent = 'Скопировать';
+  copyButton.textContent = 'Copy diagnostics';
 
   const debugToggle = document.createElement('label');
   debugToggle.className = 'error-overlay__debug';
@@ -90,39 +108,8 @@ const initErrorOverlay = () => {
     updateStackVisibility();
   };
 
-  const copyToClipboard = async () => {
-    const content = debugEnabled && stack.textContent
-      ? `${message.textContent}\n\n${stack.textContent}`
-      : message.textContent || '';
-    if (!content) return;
-    try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(content);
-        return;
-      }
-    } catch {
-      // ignore and fall back
-    }
-    const textarea = document.createElement('textarea');
-    textarea.value = content;
-    textarea.style.position = 'fixed';
-    textarea.style.opacity = '0';
-    document.body.append(textarea);
-    textarea.select();
-    document.execCommand('copy');
-    textarea.remove();
-  };
-
   copyButton.addEventListener('click', () => {
-    void copyToClipboard();
-  });
-
-  window.addEventListener('error', (event) => {
-    showError(event.error ?? event.message);
-  });
-
-  window.addEventListener('unhandledrejection', (event) => {
-    showError(event.reason);
+    onCopyDiagnostics();
   });
 
   return showError;
@@ -143,7 +130,7 @@ const renderFatalError = (error: unknown) => {
   const resetButton = root.querySelector<HTMLButtonElement>('[data-reset]');
   resetButton?.addEventListener('click', () => {
     try {
-      localStorage.clear();
+      safeClear();
     } finally {
       window.location.reload();
     }
@@ -151,9 +138,15 @@ const renderFatalError = (error: unknown) => {
 };
 
 let showErrorOverlay: ((error: unknown) => void) | null = null;
+const diagnostics = initDiagnostics();
 
 try {
-  showErrorOverlay = initErrorOverlay();
+  showErrorOverlay = initErrorOverlay(() => {
+    void diagnostics.copy();
+  });
+  diagnostics.onEntry((entry) => {
+    showErrorOverlay?.(entry);
+  });
   ensureState();
   initPwaUpdate();
 
@@ -224,7 +217,9 @@ try {
   if (showErrorOverlay) {
     showErrorOverlay(error);
   } else {
-    initErrorOverlay()(error);
+    initErrorOverlay(() => {
+      void diagnostics.copy();
+    })(error);
   }
   renderFatalError(error);
 }
