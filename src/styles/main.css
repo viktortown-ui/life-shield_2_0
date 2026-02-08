@@ -553,6 +553,20 @@ body {
   backdrop-filter: blur(6px);
 }
 
+.build-footer {
+  position: fixed;
+  left: 50%;
+  bottom: calc(82px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  width: min(430px, calc(100% - 32px));
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #8ea0c5;
+  opacity: 0.85;
+  pointer-events: none;
+}
+
 .bottom-nav-link {
   min-height: 48px;
   border-radius: 999px;

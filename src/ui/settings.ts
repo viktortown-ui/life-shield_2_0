@@ -3,7 +3,8 @@ import {
   applyUpdate,
   checkForUpdate,
   getUpdateState,
-  onUpdateState
+  onUpdateState,
+  panicReset
 } from '../core/pwaUpdate';
 import { reportCaughtError } from '../core/reportError';
 
@@ -42,6 +43,7 @@ export const createSettingsScreen = () => {
       <button class="button ghost" data-action="check-update">Проверить обновление</button>
       <button class="button" data-action="apply-update" disabled>Обновить сейчас</button>
       <button class="button ghost" data-action="restart">Перезапустить приложение</button>
+      <button class="button ghost" data-action="panic-reset">Panic reset cache</button>
       <button class="button ghost" data-action="reset">Сброс кэша/данных</button>
     </div>
     <p class="settings-hint">Обновление появится как только новая версия будет готова.</p>
@@ -146,6 +148,17 @@ export const createSettingsScreen = () => {
 
     if (action === 'restart') {
       window.location.reload();
+      return;
+    }
+
+    if (action === 'panic-reset') {
+      const confirmed = window.confirm(
+        'Сбросить сервис-воркер и весь Cache Storage? Приложение перезагрузится.'
+      );
+      if (!confirmed) {
+        return;
+      }
+      await panicReset();
       return;
     }
 

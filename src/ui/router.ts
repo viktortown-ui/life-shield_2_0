@@ -4,6 +4,7 @@ import { createShieldScreen } from './shield';
 import { IslandId } from '../core/types';
 import { safeClear } from '../core/storage';
 import { reportCaughtError } from '../core/reportError';
+import { buildInfo } from '../core/buildInfo';
 
 const parseRoute = () => {
   const hash = window.location.hash.replace('#', '') || '/';
@@ -36,6 +37,16 @@ const createBottomNav = (
   return nav;
 };
 
+const createBuildFooter = () => {
+  const footer = document.createElement('footer');
+  footer.className = 'build-footer';
+  footer.innerHTML = `
+    <span>Build ${buildInfo.id}</span>
+    <span>${buildInfo.builtAt}</span>
+  `;
+  return footer;
+};
+
 export const initRouter = (root: HTMLElement) => {
   const render = () => {
     try {
@@ -44,15 +55,18 @@ export const initRouter = (root: HTMLElement) => {
       if (route.name === 'island') {
         root.appendChild(createIslandPage(route.id));
         root.appendChild(createBottomNav(route));
+        root.appendChild(createBuildFooter());
         return;
       }
       if (route.name === 'settings') {
         root.appendChild(createSettingsScreen());
         root.appendChild(createBottomNav(route));
+        root.appendChild(createBuildFooter());
         return;
       }
       root.appendChild(createShieldScreen());
       root.appendChild(createBottomNav(route));
+      root.appendChild(createBuildFooter());
     } catch (error) {
       reportCaughtError(error);
       if (typeof window.reportError === 'function') {
