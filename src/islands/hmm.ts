@@ -1,4 +1,5 @@
 import { ActionItem, IslandReport, Insight } from '../core/types';
+import { reportCaughtError } from '../core/reportError';
 
 export type HmmState = 'Stable' | 'Strain' | 'Crisis' | 'Recovery';
 export type IncomeTrend = 'up' | 'flat' | 'down';
@@ -178,7 +179,8 @@ export const parseHmmInput = (raw: string): HmmInput => {
       initialDistribution: parsed.initialDistribution,
       trainIterations: parsed.trainIterations
     };
-  } catch {
+  } catch (error) {
+    reportCaughtError(error);
     const lines = trimmed.split(/\n+/).map((line) => line.trim()).filter(Boolean);
     const weeks = lines
       .map((line) => parseObservationLine(line))

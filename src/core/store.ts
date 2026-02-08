@@ -1,6 +1,7 @@
 import { migrate, schemaVersion } from './migrations';
 import { AppState, IslandId, IslandReport, ValidationResult } from './types';
 import { safeGetItem, safeRemoveItem, safeSetItem } from './storage';
+import { reportCaughtError } from './reportError';
 
 const STORAGE_KEY = 'lifeShieldV2';
 const XP_PER_LEVEL = 120;
@@ -136,7 +137,8 @@ export const ensureState = (): AppState => {
     cachedState = migrate(merged);
     persistState(cachedState);
     return cachedState;
-  } catch {
+  } catch (error) {
+    reportCaughtError(error);
     safeRemoveItem(STORAGE_KEY);
     cachedState = makeEmptyState();
     persistState(cachedState);

@@ -1,4 +1,5 @@
 import { ActionItem, Insight, IslandReport } from '../core/types';
+import { reportCaughtError } from '../core/reportError';
 
 export interface TimeseriesInput {
   series?: number[];
@@ -102,7 +103,8 @@ export const parseTimeseriesInput = (raw: string): TimeseriesInput => {
       expenses: parsed.expenses ? mergeSeries(parsed.expenses) : undefined,
       horizon: parsed.horizon ?? 12
     };
-  } catch {
+  } catch (error) {
+    reportCaughtError(error);
     // fallback to text parsing
   }
 

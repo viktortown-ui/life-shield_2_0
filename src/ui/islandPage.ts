@@ -1,6 +1,7 @@
 import { findIsland } from '../core/registry';
 import { getState, updateIslandInput, updateIslandReport } from '../core/store';
 import { IslandId } from '../core/types';
+import { reportCaughtError } from '../core/reportError';
 import {
   OptimizationActionInput,
   OptimizationInput,
@@ -89,6 +90,7 @@ export const createIslandPage = (id: IslandId) => {
     try {
       return island.getReport(input);
     } catch (error) {
+      reportCaughtError(error);
       return buildIslandErrorReport(id, error);
     }
   };

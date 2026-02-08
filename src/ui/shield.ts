@@ -2,6 +2,7 @@ import { islandRegistry } from '../core/registry';
 import { getState } from '../core/store';
 import { buildGlobalVerdict } from '../core/verdict';
 import { IslandReport } from '../core/types';
+import { reportCaughtError } from '../core/reportError';
 import { createAvatar } from './avatar';
 
 const XP_PER_LEVEL = 120;
@@ -55,6 +56,7 @@ export const createShieldScreen = () => {
     try {
       return island.getReport(islandState.input);
     } catch (error) {
+      reportCaughtError(error);
       return {
         id: island.id,
         score: 0,

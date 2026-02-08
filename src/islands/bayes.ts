@@ -1,4 +1,5 @@
 import { ActionItem, IslandReport } from '../core/types';
+import { reportCaughtError } from '../core/reportError';
 
 export type BayesDistribution = 'normal' | 'lognormal';
 
@@ -157,7 +158,8 @@ export const parseBayesInput = (raw: string): BayesInput => {
           ? parsed.simulationRuns
           : defaultBayesInput.simulationRuns
     };
-  } catch {
+  } catch (error) {
+    reportCaughtError(error);
     return defaultBayesInput;
   }
 };

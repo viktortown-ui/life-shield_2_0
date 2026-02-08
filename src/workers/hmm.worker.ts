@@ -1,4 +1,5 @@
 import { HmmInput, runHmmAnalysis } from '../islands/hmm';
+import { reportCaughtError } from '../core/reportError';
 
 export interface HmmWorkerRequest {
   type: 'run';
@@ -21,6 +22,7 @@ self.onmessage = (event: MessageEvent<HmmWorkerRequest>) => {
     const result = runHmmAnalysis(input);
     self.postMessage({ type: 'success', requestId, result } satisfies HmmWorkerResponse);
   } catch (error) {
+    reportCaughtError(error);
     const message =
       error instanceof Error ? error.message : 'Неожиданная ошибка в HMM воркере.';
     self.postMessage({ type: 'error', requestId, error: message } satisfies HmmWorkerResponse);

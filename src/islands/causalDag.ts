@@ -1,4 +1,5 @@
 import { IslandReport } from '../core/types';
+import { reportCaughtError } from '../core/reportError';
 import {
   DagittyGraph,
   DagittyNode,
@@ -151,7 +152,8 @@ export const parseCausalDagInput = (raw: string): CausalDagInput => {
         ? parsed.mediators.map((value) => normalizeName(String(value)))
         : defaultCausalDagInput.mediators
     };
-  } catch {
+  } catch (error) {
+    reportCaughtError(error);
     return { ...defaultCausalDagInput };
   }
 };
@@ -285,6 +287,7 @@ export const analyzeCausalDag = (input: CausalDagInput): CausalDagAnalysis => {
       if (target) graph.setTargets([target]);
       graph.setAdjustedNodes(mapVertices(graph, controls));
     } catch (error) {
+      reportCaughtError(error);
       errors.push(`Не удалось разобрать DAG: ${(error as Error).message}`);
     }
   }
@@ -314,6 +317,7 @@ export const analyzeCausalDag = (input: CausalDagInput): CausalDagAnalysis => {
       });
       adjustmentSets.sort((a, b) => a.length - b.length || a.join(',').localeCompare(b.join(',')));
     } catch (error) {
+      reportCaughtError(error);
       warnings.push(`Не удалось получить adjustment sets: ${(error as Error).message}`);
     }
 

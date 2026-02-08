@@ -1,4 +1,5 @@
 import { safeGetItem, safeSetItem } from './storage';
+import { reportCaughtError } from './reportError';
 
 const DIAGNOSTICS_KEY = 'lifeShieldV2:diagnostics';
 const MAX_ENTRIES = 50;
@@ -15,7 +16,15 @@ export type DiagnosticsEntry = {
   id: string;
   errorId: string;
   ts: string;
-  kind: 'error' | 'rejection' | 'resource' | 'console' | 'overlay' | 'breadcrumb';
+  kind:
+    | 'error'
+    | 'rejection'
+    | 'resource'
+    | 'console_error'
+    | 'overlay_invoked'
+    | 'blank_screen_detected'
+    | 'dom_mutation'
+    | 'breadcrumb';
   message: string;
   stack?: string;
   name?: string;
@@ -26,6 +35,20 @@ export type DiagnosticsEntry = {
   colno?: number;
   source?: string;
   level?: 'warn' | 'error';
+  invokerStack?: string;
+  normalizedError?: NormalizedError;
+  snapshot?: string;
+  styleSnapshot?: {
+    display: string;
+    visibility: string;
+    opacity: string;
+    height: number;
+    width: number;
+  };
+  domMutation?: {
+    beforeCount: number;
+    afterCount: number;
+  };
 };
 
 type DiagnosticsState = {
@@ -80,7 +103,8 @@ export const normalizeUnknownError = (value: unknown): NormalizedError => {
   try {
     jsonPreview = JSON.stringify(value);
     message = jsonPreview || '';
-  } catch {
+  } catch (error) {
+    reportCaughtError(error);
     message = ensureString(value);
   }
 
@@ -102,8 +126,33 @@ const formatEntryDetails = (entry: DiagnosticsEntry): string => {
   const source = entry.source ? `Source: ${entry.source}` : '';
   const rawType = entry.rawType ? `Type: ${entry.rawType}` : '';
   const stack = entry.stack ? `Stack:\n${entry.stack}` : '';
+  const invokerStack = entry.invokerStack
+    ? `Invoker stack:\n${entry.invokerStack}`
+    : '';
+  const normalizedError = entry.normalizedError
+    ? `Normalized error: ${JSON.stringify(entry.normalizedError)}`
+    : '';
+  const snapshot = entry.snapshot ? `Snapshot:\n${entry.snapshot}` : '';
+  const styleSnapshot = entry.styleSnapshot
+    ? `Style snapshot: ${JSON.stringify(entry.styleSnapshot)}`
+    : '';
+  const domMutation = entry.domMutation
+    ? `DOM mutation: ${JSON.stringify(entry.domMutation)}`
+    : '';
   const jsonPreview = entry.jsonPreview ? `Data: ${entry.jsonPreview}` : '';
-  return [errorId, location, source, rawType, stack, jsonPreview]
+  return [
+    errorId,
+    location,
+    source,
+    rawType,
+    stack,
+    invokerStack,
+    normalizedError,
+    snapshot,
+    styleSnapshot,
+    domMutation,
+    jsonPreview
+  ]
     .filter(Boolean)
     .join('\n');
 };
@@ -116,7 +165,8 @@ const loadStoredEntries = (): DiagnosticsEntry[] => {
     if (Array.isArray(parsed)) {
       return parsed.slice(-MAX_ENTRIES) as DiagnosticsEntry[];
     }
-  } catch {
+  } catch (error) {
+    reportCaughtError(error);
     return [];
   }
   return [];
@@ -184,7 +234,8 @@ const copyDiagnostics = async (
       await navigator.clipboard.writeText(content);
       return true;
     }
-  } catch {
+  } catch (error) {
+    reportCaughtError(error);
     // ignore
   }
   const textarea = document.createElement('textarea');
@@ -199,14 +250,16 @@ const copyDiagnostics = async (
       textarea.remove();
       return true;
     }
-  } catch {
+  } catch (error) {
+    reportCaughtError(error);
     // ignore
   }
   textarea.remove();
   try {
     window.prompt('Copy diagnostics', content);
     return true;
-  } catch {
+  } catch (error) {
+    reportCaughtError(error);
     return false;
   }
 };
@@ -301,7 +354,8 @@ const markErrorObject = (value: unknown, errorId: string, captured: boolean) => 
       value: captured,
       configurable: true
     });
-  } catch {
+  } catch (error) {
+    reportCaughtError(error);
     // ignore
   }
 };
@@ -390,7 +444,8 @@ const fromConsoleEvent = (
   let jsonPreview = '';
   try {
     jsonPreview = JSON.stringify(args);
-  } catch {
+  } catch (error) {
+    reportCaughtError(error);
     jsonPreview = '';
   }
   const errorId = buildEntryId();
@@ -398,7 +453,7 @@ const fromConsoleEvent = (
     id: errorId,
     errorId,
     ts: new Date().toISOString(),
-    kind: 'console',
+    kind: 'console_error',
     level,
     message: message || 'Console message',
     rawType: `console:${level}`,
@@ -434,21 +489,19 @@ const fromOverlayInvocation = (
 ): DiagnosticsEntry => {
   const normalized = normalizeUnknownError(error);
   const errorId = buildEntryId();
-  const stackParts = [
-    normalized.stack,
-    invoker.stack ? `Invoker stack:\n${invoker.stack}` : ''
-  ].filter(Boolean);
   return {
     id: errorId,
     errorId,
     ts: new Date().toISOString(),
-    kind: 'overlay',
+    kind: 'overlay_invoked',
     message: 'overlay_invoked',
-    stack: stackParts.join('\n') || invoker.stack,
+    stack: normalized.stack,
     name: normalized.name,
     rawType: normalized.rawType || 'overlay',
     jsonPreview: normalized.jsonPreview,
-    source
+    source,
+    invokerStack: invoker.stack,
+    normalizedError: normalized
   };
 };
 
@@ -473,6 +526,9 @@ export type DiagnosticsController = {
     error: unknown,
     invoker: Error,
     source?: string
+  ) => DiagnosticsEntry;
+  captureEvent: (
+    entry: Omit<DiagnosticsEntry, 'id' | 'errorId' | 'ts'>
   ) => DiagnosticsEntry;
   pushBreadcrumb: (step: string) => DiagnosticsEntry;
 };
@@ -516,7 +572,8 @@ export const initDiagnostics = (): DiagnosticsController => {
     console[level] = (...args: unknown[]) => {
       try {
         pushEntry(fromConsoleEvent(level, args));
-      } catch {
+      } catch (error) {
+        reportCaughtError(error);
         // ignore
       }
       original.apply(console, args);
@@ -541,6 +598,7 @@ export const initDiagnostics = (): DiagnosticsController => {
         }
         return response;
       } catch (error) {
+        reportCaughtError(error);
         const request = args[0];
         const url =
           typeof request === 'string'
@@ -589,7 +647,8 @@ export const initDiagnostics = (): DiagnosticsController => {
           markErrorObject(reportedError, entry.errorId, true);
           window.reportError(reportedError);
         }
-      } catch {
+      } catch (error) {
+        reportCaughtError(error);
         // ignore
       }
       return entry;
@@ -598,6 +657,17 @@ export const initDiagnostics = (): DiagnosticsController => {
       const entry = fromOverlayInvocation(error, invoker, source);
       pushEntry(entry);
       return entry;
+    },
+    captureEvent: (entry) => {
+      const id = buildEntryId();
+      const fullEntry: DiagnosticsEntry = {
+        ...entry,
+        id,
+        errorId: id,
+        ts: new Date().toISOString()
+      };
+      pushEntry(fullEntry);
+      return fullEntry;
     },
     pushBreadcrumb: (step) => {
       const entry = fromBreadcrumb(step);

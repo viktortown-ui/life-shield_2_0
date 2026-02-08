@@ -1,4 +1,5 @@
 import { registerSW } from 'virtual:pwa-register';
+import { reportCaughtError } from './reportError';
 
 type UpdateState = {
   ready: boolean;
@@ -72,6 +73,7 @@ export const initPwaUpdate = () => {
       }
     });
   } catch (error) {
+    reportCaughtError(error);
     registerError = error;
     console.warn('PWA registerSW failed:', error);
     notify();
