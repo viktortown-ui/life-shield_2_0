@@ -1,5 +1,9 @@
 import './styles/main.css';
-import { initDiagnostics, normalizeUnknownError, type DiagnosticsEntry } from './core/diagnostics';
+import {
+  initDiagnostics,
+  normalizeUnknownError,
+  type DiagnosticsEntry
+} from './core/diagnostics';
 import { ensureState } from './core/store';
 import {
   applyUpdate,
@@ -10,21 +14,25 @@ import {
 import { safeClear } from './core/storage';
 import { initRouter } from './ui/router';
 
+const isDiagnosticsEntry = (error: unknown): error is DiagnosticsEntry =>
+  typeof error === 'object' &&
+  error !== null &&
+  'kind' in error &&
+  'message' in error &&
+  'errorId' in error;
+
 const formatInlineError = (error: unknown) => {
-  const isEntry =
-    typeof error === 'object' &&
-    error !== null &&
-    'kind' in error &&
-    'message' in error;
+  const isEntry = isDiagnosticsEntry(error);
 
   if (isEntry) {
-    const entry = error as DiagnosticsEntry;
+    const entry = error;
     const location = entry.filename
       ? `${entry.filename}${entry.lineno ? `:${entry.lineno}` : ''}${
           entry.colno ? `:${entry.colno}` : ''
         }`
       : '';
     const stackLines = [
+      entry.errorId ? `Error ID: ${entry.errorId}` : '',
       entry.stack,
       entry.jsonPreview ? `Data: ${entry.jsonPreview}` : '',
       entry.source ? `Source: ${entry.source}` : '',
@@ -43,7 +51,7 @@ const formatInlineError = (error: unknown) => {
   };
 };
 
-const initErrorOverlay = (onCopyDiagnostics: () => void) => {
+const initErrorOverlay = (onCopyDiagnostics: () => Promise<boolean>) => {
   const overlay = document.createElement('div');
   overlay.className = 'error-overlay hidden';
 
@@ -62,6 +70,9 @@ const initErrorOverlay = (onCopyDiagnostics: () => void) => {
   const actions = document.createElement('div');
   actions.className = 'error-overlay__actions';
 
+  const copyStatus = document.createElement('span');
+  copyStatus.className = 'error-overlay__status';
+
   const copyButton = document.createElement('button');
   copyButton.type = 'button';
   copyButton.className = 'button small';
@@ -77,7 +88,7 @@ const initErrorOverlay = (onCopyDiagnostics: () => void) => {
   debugLabel.textContent = 'Debug';
 
   debugToggle.append(debugCheckbox, debugLabel);
-  actions.append(copyButton, debugToggle);
+  actions.append(copyStatus, copyButton, debugToggle);
   card.append(title, message, stack, actions);
   overlay.append(card);
   document.body.append(overlay);
@@ -108,8 +119,12 @@ const initErrorOverlay = (onCopyDiagnostics: () => void) => {
     updateStackVisibility();
   };
 
-  copyButton.addEventListener('click', () => {
-    onCopyDiagnostics();
+  copyButton.addEventListener('click', async () => {
+    const ok = await onCopyDiagnostics();
+    copyStatus.textContent = ok ? 'Скопировано.' : 'Не удалось скопировать.';
+    window.setTimeout(() => {
+      copyStatus.textContent = '';
+    }, 4000);
   });
 
   return showError;
@@ -141,11 +156,18 @@ let showErrorOverlay: ((error: unknown) => void) | null = null;
 const diagnostics = initDiagnostics();
 
 try {
-  showErrorOverlay = initErrorOverlay(() => {
-    void diagnostics.copy();
-  });
+  const showOverlay = initErrorOverlay(() => diagnostics.copy());
+  showErrorOverlay = (error: unknown) => {
+    if (isDiagnosticsEntry(error)) {
+      showOverlay(error);
+      return;
+    }
+    const entry = diagnostics.captureError(error, 'overlay');
+    showOverlay(entry);
+  };
   diagnostics.onEntry((entry) => {
-    showErrorOverlay?.(entry);
+    if (entry.kind === 'console') return;
+    showOverlay(entry);
   });
   ensureState();
   initPwaUpdate();
@@ -217,9 +239,8 @@ try {
   if (showErrorOverlay) {
     showErrorOverlay(error);
   } else {
-    initErrorOverlay(() => {
-      void diagnostics.copy();
-    })(error);
+    const entry = diagnostics.captureError(error, 'bootstrap');
+    initErrorOverlay(() => diagnostics.copy())(entry);
   }
   renderFatalError(error);
 }
