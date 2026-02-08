@@ -9,6 +9,11 @@ type UpdateState = {
 };
 
 type Listener = (state: UpdateState) => void;
+type ServiceWorkerLogEntry = {
+  message: string;
+  source?: string;
+  details?: Record<string, unknown>;
+};
 
 let updateReady = false;
 let offlineReady = false;
@@ -55,7 +60,9 @@ const triggerPanic = () => {
   notify();
 };
 
-export const initPwaUpdate = () => {
+export const initPwaUpdate = (
+  onServiceWorkerEvent?: (entry: ServiceWorkerLogEntry) => void
+) => {
   try {
     updateAction = registerSW({
       onNeedRefresh() {
@@ -65,6 +72,42 @@ export const initPwaUpdate = () => {
       onOfflineReady() {
         offlineReady = true;
         notify();
+      },
+      onRegisteredSW(swUrl, registration) {
+        onServiceWorkerEvent?.({
+          message: 'service_worker_registered',
+          source: swUrl,
+          details: { scope: registration?.scope }
+        });
+        if (!registration) return;
+        const reportWorkerState = (
+          worker: ServiceWorker | null,
+          label: string
+        ) => {
+          if (!worker) return;
+          onServiceWorkerEvent?.({
+            message: `service_worker_${label}`,
+            source: worker.scriptURL,
+            details: { state: worker.state }
+          });
+          worker.addEventListener('statechange', () => {
+            onServiceWorkerEvent?.({
+              message: `service_worker_${label}`,
+              source: worker.scriptURL,
+              details: { state: worker.state }
+            });
+          });
+        };
+        reportWorkerState(registration.installing, 'installing');
+        reportWorkerState(registration.waiting, 'waiting');
+        reportWorkerState(registration.active, 'active');
+        registration.addEventListener('updatefound', () => {
+          onServiceWorkerEvent?.({
+            message: 'service_worker_updatefound',
+            source: swUrl
+          });
+          reportWorkerState(registration.installing, 'installing');
+        });
       },
       onRegisterError(error) {
         registerError = error;
@@ -90,6 +133,17 @@ export const initPwaUpdate = () => {
       triggerPanic();
     }
   });
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      const controller = navigator.serviceWorker.controller;
+      onServiceWorkerEvent?.({
+        message: 'service_worker_controllerchange',
+        source: controller?.scriptURL,
+        details: { state: controller?.state }
+      });
+    });
+  }
 };
 
 export const onUpdateState = (listener: Listener) => {

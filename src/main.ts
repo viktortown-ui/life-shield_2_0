@@ -337,7 +337,15 @@ try {
   ensureState();
   diagnostics.pushBreadcrumb('boot: load_storage');
   diagnostics.pushBreadcrumb('boot: hydrate_state');
-  initPwaUpdate();
+  initPwaUpdate((entry) => {
+    diagnostics.captureEvent({
+      kind: 'service_worker',
+      message: entry.message,
+      rawType: 'service_worker',
+      source: entry.source,
+      jsonPreview: entry.details ? JSON.stringify(entry.details) : undefined
+    });
+  });
 
   const swBanner = document.createElement('div');
   swBanner.className = 'sw-banner hidden';
