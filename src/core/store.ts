@@ -1,5 +1,6 @@
 import { migrate, schemaVersion } from './migrations';
 import { AppState, IslandId, IslandReport, ValidationResult } from './types';
+import { safeGetItem, safeRemoveItem, safeSetItem } from './storage';
 
 const STORAGE_KEY = 'lifeShieldV2';
 const XP_PER_LEVEL = 120;
@@ -47,7 +48,7 @@ export const ensureState = (): AppState => {
     return cachedState;
   }
 
-  const stored = localStorage.getItem(STORAGE_KEY);
+  const stored = safeGetItem(STORAGE_KEY);
   if (!stored) {
     cachedState = makeEmptyState();
     persistState(cachedState);
@@ -60,6 +61,7 @@ export const ensureState = (): AppState => {
     persistState(cachedState);
     return cachedState;
   } catch {
+    safeRemoveItem(STORAGE_KEY);
     cachedState = makeEmptyState();
     persistState(cachedState);
     return cachedState;
@@ -71,7 +73,7 @@ export const getState = (): AppState => {
 };
 
 const persistState = (state: AppState) => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  safeSetItem(STORAGE_KEY, JSON.stringify(state));
 };
 
 const updateState = (nextState: AppState) => {
