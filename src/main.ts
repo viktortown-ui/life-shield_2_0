@@ -4,6 +4,7 @@ import {
   normalizeUnknownError,
   type DiagnosticsEntry
 } from './core/diagnostics';
+import { buildInfo } from './core/buildInfo';
 import { shouldShowFatalOverlay } from './core/diagnosticsOverlay';
 import { ensureState } from './core/store';
 import {
@@ -59,7 +60,10 @@ const formatInlineError = (error: unknown) => {
   };
 };
 
-const initErrorOverlay = (onCopyDiagnostics: () => Promise<boolean>) => {
+const initErrorOverlay = (
+  diagnostics: ReturnType<typeof initDiagnostics>,
+  onCopyDiagnostics: () => Promise<boolean>
+) => {
   const overlay = document.createElement('div');
   overlay.className = 'error-overlay hidden';
 
@@ -124,12 +128,74 @@ const initErrorOverlay = (onCopyDiagnostics: () => Promise<boolean>) => {
 
   debugCheckbox.addEventListener('change', updateStackVisibility);
 
+  const getReasonInfo = (error: unknown) => {
+    if (isDiagnosticsEntry(error)) {
+      return {
+        kind: error.kind,
+        message: error.message
+      };
+    }
+    const normalized = normalizeUnknownError(error);
+    return {
+      kind: 'unknown',
+      message: normalized.message
+    };
+  };
+
+  const updateOverlayState = (
+    visible: boolean,
+    reasonKind: string | null = null,
+    invokerStackTop: string | null = null
+  ) => {
+    diagnostics.setOverlayState({
+      visible,
+      title: title.textContent ?? '',
+      messageLen: message.textContent?.length ?? 0,
+      lastShownReasonKind: reasonKind,
+      invokerStackTop
+    });
+  };
+
   const showError = (error: unknown) => {
     const { message: msg, stack: stackText } = formatInlineError(error);
+    const invoker = new Error('overlay shown');
+    const reason = getReasonInfo(error);
     message.textContent = msg || 'Неизвестная ошибка.';
     stack.textContent = stackText;
+    diagnostics.captureEvent({
+      kind: 'overlay_shown',
+      message: 'overlay shown',
+      rawType: 'overlay_shown',
+      jsonPreview: JSON.stringify({
+        reasonKind: reason.kind,
+        reasonMessage: reason.message,
+        buildId: buildInfo.id
+      }),
+      invokerStack: invoker.stack
+    });
     overlay.classList.remove('hidden');
     updateStackVisibility();
+    const invokerStackTop =
+      invoker.stack
+        ?.split('\n')
+        .slice(1)
+        .find((line) => line.trim().length > 0)
+        ?.trim() ?? null;
+    updateOverlayState(true, reason.kind, invokerStackTop);
+  };
+
+  const hideOverlay = (reason: string) => {
+    if (overlay.classList.contains('hidden')) return;
+    overlay.classList.add('hidden');
+    message.textContent = '';
+    stack.textContent = '';
+    updateOverlayState(false, null, null);
+    diagnostics.captureEvent({
+      kind: 'overlay_auto_hidden_no_fatal',
+      message: 'overlay auto-hidden: no fatal error',
+      rawType: 'overlay_auto_hidden_no_fatal',
+      jsonPreview: JSON.stringify({ reason })
+    });
   };
 
   copyButton.addEventListener('click', async () => {
@@ -150,7 +216,11 @@ const initErrorOverlay = (onCopyDiagnostics: () => Promise<boolean>) => {
     }
   });
 
-  return showError;
+  return {
+    showError,
+    hideOverlay,
+    isVisible: () => !overlay.classList.contains('hidden')
+  };
 };
 
 const renderFatalError = (error: unknown) => {
@@ -286,11 +356,19 @@ const initDomMutationObserver = (
 
 let showErrorOverlay: ((error: unknown) => void) | null = null;
 const diagnostics = initDiagnostics();
+let lastFatalEntry: DiagnosticsEntry | null = null;
 
 try {
   diagnostics.pushBreadcrumb('boot: start');
   diagnostics.pushBreadcrumb('boot: load_config');
-  const showOverlay = initErrorOverlay(() => diagnostics.copy());
+  const overlayController = initErrorOverlay(diagnostics, () =>
+    diagnostics.copy()
+  );
+  const enforceOverlayInvariant = (reason: string) => {
+    if (overlayController.isVisible() && !lastFatalEntry) {
+      overlayController.hideOverlay(reason);
+    }
+  };
   showErrorOverlay = (error: unknown) => {
     const invoker = new Error('overlay invoked');
     const overlayEntry = diagnostics.captureOverlayInvocation(
@@ -311,14 +389,20 @@ try {
       }
     }
     if (isDiagnosticsEntry(error)) {
+      if (error.kind === 'service_worker') {
+        enforceOverlayInvariant('service_worker_entry');
+        return;
+      }
       if (!shouldShowFatalOverlay(error)) {
+        enforceOverlayInvariant('non_fatal_entry');
         return;
       }
       const displayEntry =
         error.stack || error.jsonPreview || error.source
           ? error
           : { ...error, stack: overlayEntry.stack };
-      showOverlay(displayEntry);
+      lastFatalEntry = error;
+      overlayController.showError(displayEntry);
       return;
     }
     const entry = diagnostics.captureError(error, 'overlay');
@@ -326,11 +410,16 @@ try {
       entry.stack || entry.jsonPreview || entry.source
         ? entry
         : { ...entry, stack: overlayEntry.stack };
-    showOverlay(displayEntry);
+    lastFatalEntry = entry;
+    overlayController.showError(displayEntry);
   };
   diagnostics.onEntry((entry) => {
-    if (!shouldShowFatalOverlay(entry)) return;
-    showOverlay(entry);
+    if (!shouldShowFatalOverlay(entry)) {
+      enforceOverlayInvariant('non_fatal_diagnostics_entry');
+      return;
+    }
+    lastFatalEntry = entry;
+    overlayController.showError(entry);
   });
   ensureState();
   diagnostics.pushBreadcrumb('boot: load_storage');
@@ -426,7 +515,7 @@ try {
     showErrorOverlay(error);
   } else {
     const entry = diagnostics.captureError(error, 'bootstrap');
-    initErrorOverlay(() => diagnostics.copy())(entry);
+    initErrorOverlay(diagnostics, () => diagnostics.copy()).showError(entry);
   }
   renderFatalError(error);
 }
