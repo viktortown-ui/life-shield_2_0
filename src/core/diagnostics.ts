@@ -23,6 +23,8 @@ export type DiagnosticsEntry = {
     | 'resource'
     | 'console_error'
     | 'overlay_invoked'
+    | 'overlay_shown'
+    | 'overlay_auto_hidden_no_fatal'
     | 'blank_screen_detected'
     | 'dom_mutation'
     | 'breadcrumb'
@@ -67,6 +69,7 @@ type DiagnosticsState = {
   entries: DiagnosticsEntry[];
   panel: HTMLDetailsElement | null;
   list: HTMLUListElement | null;
+  overlay: DiagnosticsOverlayState;
 };
 
 type NetworkFailure = {
@@ -81,6 +84,15 @@ type NetworkFailure = {
 
 const ERROR_ID_PROP = '__lsDiagnosticsErrorId';
 const ERROR_CAPTURED_PROP = '__lsDiagnosticsCaptured';
+const DEFAULT_OVERLAY_STATE = {
+  visible: false,
+  title: '',
+  messageLen: 0,
+  lastShownReasonKind: null as string | null,
+  invokerStackTop: null as string | null
+};
+
+export type DiagnosticsOverlayState = typeof DEFAULT_OVERLAY_STATE;
 
 const ensureString = (value: unknown): string => {
   if (typeof value === 'string') return value;
@@ -234,13 +246,15 @@ const collectFailedResources = (): NetworkFailure[] => {
 
 const buildReport = (
   entries: DiagnosticsEntry[],
-  networkFailures: NetworkFailure[]
+  networkFailures: NetworkFailure[],
+  overlay: DiagnosticsOverlayState
 ) => ({
   generatedAt: new Date().toISOString(),
   build: buildInfo,
   url: window.location.href,
   userAgent: navigator.userAgent,
   entries,
+  overlay,
   lastBreadcrumb:
     entries
       .slice()
@@ -254,9 +268,14 @@ const buildReport = (
 
 const copyDiagnostics = async (
   entries: DiagnosticsEntry[],
-  networkFailures: NetworkFailure[]
+  networkFailures: NetworkFailure[],
+  overlay: DiagnosticsOverlayState
 ): Promise<boolean> => {
-  const content = JSON.stringify(buildReport(entries, networkFailures), null, 2);
+  const content = JSON.stringify(
+    buildReport(entries, networkFailures, overlay),
+    null,
+    2
+  );
   if (!content) return false;
   try {
     if (navigator.clipboard?.writeText) {
@@ -607,13 +626,15 @@ export type DiagnosticsController = {
     entry: Omit<DiagnosticsEntry, 'id' | 'errorId' | 'ts'>
   ) => DiagnosticsEntry;
   pushBreadcrumb: (step: string) => DiagnosticsEntry;
+  setOverlayState: (overlay: DiagnosticsOverlayState) => void;
 };
 
 export const initDiagnostics = (): DiagnosticsController => {
   const state: DiagnosticsState = {
     entries: loadStoredEntries(),
     panel: null,
-    list: null
+    list: null,
+    overlay: DEFAULT_OVERLAY_STATE
   };
   const networkFailures: NetworkFailure[] = [];
   const entryListeners = new Set<(entry: DiagnosticsEntry) => void>();
@@ -724,14 +745,14 @@ export const initDiagnostics = (): DiagnosticsController => {
   wrapFetch();
 
   const panel = createPanel(state, () => {
-    return copyDiagnostics(state.entries, networkFailures);
+    return copyDiagnostics(state.entries, networkFailures, state.overlay);
   });
   document.body.append(panel);
   updatePanel(state);
 
   return {
     getEntries: () => state.entries,
-    copy: () => copyDiagnostics(state.entries, networkFailures),
+    copy: () => copyDiagnostics(state.entries, networkFailures, state.overlay),
     onEntry: (callback) => {
       entryListeners.add(callback);
     },
@@ -771,6 +792,9 @@ export const initDiagnostics = (): DiagnosticsController => {
       const entry = fromBreadcrumb(step);
       pushEntry(entry);
       return entry;
+    },
+    setOverlayState: (overlay) => {
+      state.overlay = overlay;
     }
   };
 };
