@@ -4,6 +4,7 @@ type UpdateState = {
   ready: boolean;
   offlineReady: boolean;
   panic: boolean;
+  registerError: unknown | null;
 };
 
 type Listener = (state: UpdateState) => void;
@@ -11,6 +12,7 @@ type Listener = (state: UpdateState) => void;
 let updateReady = false;
 let offlineReady = false;
 let panicMode = false;
+let registerError: unknown | null = null;
 let updateAction: ((reloadPage?: boolean) => void) | null = null;
 const listeners = new Set<Listener>();
 
@@ -53,16 +55,27 @@ const triggerPanic = () => {
 };
 
 export const initPwaUpdate = () => {
-  updateAction = registerSW({
-    onNeedRefresh() {
-      updateReady = true;
-      notify();
-    },
-    onOfflineReady() {
-      offlineReady = true;
-      notify();
-    }
-  });
+  try {
+    updateAction = registerSW({
+      onNeedRefresh() {
+        updateReady = true;
+        notify();
+      },
+      onOfflineReady() {
+        offlineReady = true;
+        notify();
+      },
+      onRegisterError(error) {
+        registerError = error;
+        console.warn('PWA registerSW failed:', error);
+        notify();
+      }
+    });
+  } catch (error) {
+    registerError = error;
+    console.warn('PWA registerSW failed:', error);
+    notify();
+  }
 
   window.addEventListener('error', (event) => {
     if (isChunkLoadError(event.error ?? event.message)) {
@@ -114,5 +127,6 @@ export const panicReset = async () => {
 export const getUpdateState = (): UpdateState => ({
   ready: updateReady,
   offlineReady,
-  panic: panicMode
+  panic: panicMode,
+  registerError
 });

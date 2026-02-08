@@ -27,6 +27,12 @@ npm run preview
 Notes:
 - GitHub Pages has build limits for the legacy “Build from a branch” flow. This custom workflow uses **GitHub Actions**, so it does not count against the “10 builds per hour” Pages limit.
 
+## Если белый экран
+
+- Откройте **View Source** и убедитесь, что в HTML нет `/src/main.ts` (должны быть production assets из `dist`).
+- В **Network** проверьте, что `sw.js` загрузился без ошибок.
+- Убедитесь, что последний **Actions run** завершился успешно и выкатил свежий `dist`.
+
 ## Replacing the SVG app icon later
 
 The PWA is currently configured to use a text-only `public/icon.svg`. If you want to swap in PNGs later:
