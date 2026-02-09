@@ -183,8 +183,11 @@ export const panicReset = async () => {
     reportCaughtError(error);
   }
   safeClear();
-  const reload = window.location.reload as (forcedReload?: boolean) => void;
-  reload(true);
+  try {
+    window.location.reload();
+  } catch (error) {
+    reportCaughtError(error);
+  }
 };
 
 export const getUpdateState = (): UpdateState => ({

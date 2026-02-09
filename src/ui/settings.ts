@@ -138,12 +138,22 @@ export const createSettingsScreen = () => {
 
     if (action === 'check-update') {
       maintenanceHint.textContent = 'Проверяем наличие обновлений...';
-      checkForUpdate();
+      try {
+        checkForUpdate();
+      } catch (error) {
+        reportCaughtError(error);
+        maintenanceHint.textContent = 'Не удалось проверить обновления.';
+      }
       return;
     }
 
     if (action === 'apply-update') {
-      applyUpdate();
+      try {
+        applyUpdate();
+      } catch (error) {
+        reportCaughtError(error);
+        maintenanceHint.textContent = 'Не удалось применить обновление.';
+      }
       return;
     }
 
@@ -159,7 +169,12 @@ export const createSettingsScreen = () => {
       if (!confirmed) {
         return;
       }
-      await panicReset();
+      try {
+        await panicReset();
+      } catch (error) {
+        reportCaughtError(error);
+        maintenanceHint.textContent = 'Не удалось сбросить кеш.';
+      }
       return;
     }
 
