@@ -25,6 +25,7 @@ export type DiagnosticsEntry = {
     | 'console_error'
     | 'overlay_invoked'
     | 'overlay_shown'
+    | 'overlay_probe'
     | 'overlay_auto_hidden_no_fatal'
     | 'blank_screen_detected'
     | 'dom_mutation'
@@ -43,6 +44,7 @@ export type DiagnosticsEntry = {
   invokerStack?: string;
   normalizedError?: NormalizedError;
   snapshot?: string;
+  uiStateDump?: UiStateDump;
   styleSnapshot?: {
     display: string;
     visibility: string;
@@ -108,14 +110,72 @@ type OverlaySnapshot = {
   isBackdrop: boolean;
 };
 
+type ElementsFromPointEntry = {
+  tagName: string;
+  id: string;
+  className: string;
+};
+
+type ElementsFromPointSnapshot = {
+  point: 'center' | 'leftTop' | 'rightTop' | 'leftBottom' | 'rightBottom';
+  x: number;
+  y: number;
+  elements: ElementsFromPointEntry[];
+};
+
+type OverlayTopBlocker = {
+  point: ElementsFromPointSnapshot['point'];
+  tagName: string;
+  id: string;
+  className: string;
+  position: string;
+  zIndex: string;
+  display: string;
+  visibility: string;
+  opacity: string;
+  pointerEvents: string;
+  filter: string;
+  backdropFilter: string;
+};
+
+type OverlayCandidateSnapshot = {
+  tagName: string;
+  id: string;
+  className: string;
+  zIndex: number;
+  position: string;
+  opacity: string;
+  pointerEvents: string;
+  rect: {
+    width: number;
+    height: number;
+    area: number;
+  };
+};
+
+type DialogSnapshot = {
+  tagName: string;
+  id: string;
+  className: string;
+  rect: {
+    width: number;
+    height: number;
+    area: number;
+  };
+};
+
 export type UiStateDump = {
   ts: string;
-  source: 'manual' | 'hotkey' | 'auto' | 'copy';
+  source: 'manual' | 'hotkey' | 'auto' | 'copy' | 'overlay_probe';
   bodyClassName: string;
   bodyOverflow: string;
   app: UiElementStyleSnapshot;
   overlayContainer: UiElementStyleSnapshot;
   overlays: OverlaySnapshot[];
+  elementsFromPoint: ElementsFromPointSnapshot[];
+  topBlocker: OverlayTopBlocker | null;
+  topCandidates: OverlayCandidateSnapshot[];
+  openDialogs: DialogSnapshot[];
   uiBlocked: boolean;
 };
 
@@ -194,6 +254,9 @@ const formatEntryDetails = (entry: DiagnosticsEntry): string => {
     ? `Normalized error: ${JSON.stringify(entry.normalizedError)}`
     : '';
   const snapshot = entry.snapshot ? `Snapshot:\n${entry.snapshot}` : '';
+  const uiStateDump = entry.uiStateDump
+    ? `UI state dump: ${JSON.stringify(entry.uiStateDump)}`
+    : '';
   const styleSnapshot = entry.styleSnapshot
     ? `Style snapshot: ${JSON.stringify(entry.styleSnapshot)}`
     : '';
@@ -225,6 +288,7 @@ const formatEntryDetails = (entry: DiagnosticsEntry): string => {
     invokerStack,
     normalizedError,
     snapshot,
+    uiStateDump,
     styleSnapshot,
     domMutation,
     suspectedMuted,
@@ -735,6 +799,11 @@ export type DiagnosticsController = {
     invoker: Error,
     source?: string
   ) => DiagnosticsEntry;
+  captureOverlayProbe: (
+    message: string,
+    details?: Record<string, unknown>,
+    options?: { force?: boolean }
+  ) => DiagnosticsEntry | null;
   captureEvent: (
     entry: Omit<DiagnosticsEntry, 'id' | 'errorId' | 'ts'>
   ) => DiagnosticsEntry;
@@ -754,6 +823,8 @@ export const initDiagnostics = (): DiagnosticsController => {
   const networkFailures: NetworkFailure[] = [];
   const entryListeners = new Set<(entry: DiagnosticsEntry) => void>();
   const autoUiDumpIntervalMs = 4000;
+  const overlayProbeCooldownMs = 2000;
+  let lastOverlayProbeAt = 0;
 
   const getElementStyleSnapshot = (element: Element | null): UiElementStyleSnapshot => {
     if (!element || !(element instanceof Element)) {
@@ -783,6 +854,89 @@ export const initDiagnostics = (): DiagnosticsController => {
     source: UiStateDump['source']
   ): UiStateDump => {
     const bodyStyle = window.getComputedStyle(document.body);
+    const viewportWidth = Math.max(0, window.innerWidth || 0);
+    const viewportHeight = Math.max(0, window.innerHeight || 0);
+    const clampPoint = (value: number, max: number) =>
+      Math.min(Math.max(value, 0), Math.max(max - 1, 0));
+    const points: Array<ElementsFromPointSnapshot['point']> = [
+      'center',
+      'leftTop',
+      'rightTop',
+      'leftBottom',
+      'rightBottom'
+    ];
+    const pointCoords: Record<ElementsFromPointSnapshot['point'], { x: number; y: number }> = {
+      center: {
+        x: clampPoint(viewportWidth / 2, viewportWidth),
+        y: clampPoint(viewportHeight / 2, viewportHeight)
+      },
+      leftTop: { x: clampPoint(1, viewportWidth), y: clampPoint(1, viewportHeight) },
+      rightTop: {
+        x: clampPoint(viewportWidth - 1, viewportWidth),
+        y: clampPoint(1, viewportHeight)
+      },
+      leftBottom: {
+        x: clampPoint(1, viewportWidth),
+        y: clampPoint(viewportHeight - 1, viewportHeight)
+      },
+      rightBottom: {
+        x: clampPoint(viewportWidth - 1, viewportWidth),
+        y: clampPoint(viewportHeight - 1, viewportHeight)
+      }
+    };
+    const elementsFromPointSnapshots: ElementsFromPointSnapshot[] = points.map(
+      (point) => {
+        const { x, y } = pointCoords[point];
+        const elements = document
+          .elementsFromPoint(x, y)
+          .slice(0, 8)
+          .map((element) => {
+            const rawClassName =
+              typeof (element as HTMLElement).className === 'string'
+                ? (element as HTMLElement).className
+                : element.getAttribute('class') ?? '';
+            return {
+              tagName: element.tagName.toLowerCase(),
+              id: (element as HTMLElement).id || '',
+              className: rawClassName.trim()
+            };
+          });
+        return { point, x, y, elements };
+      }
+    );
+    let topBlocker: OverlayTopBlocker | null = null;
+    for (const snapshot of elementsFromPointSnapshots) {
+      const stack = document.elementsFromPoint(snapshot.x, snapshot.y);
+      const blocker = stack.find((element) => {
+        const style = window.getComputedStyle(element);
+        const opacity = Number.parseFloat(style.opacity);
+        const isVisible = !Number.isNaN(opacity) ? opacity > 0.02 : true;
+        return style.pointerEvents !== 'none' && isVisible;
+      });
+      if (blocker) {
+        const style = window.getComputedStyle(blocker);
+        const rawClassName =
+          typeof (blocker as HTMLElement).className === 'string'
+            ? (blocker as HTMLElement).className
+            : blocker.getAttribute('class') ?? '';
+        topBlocker = {
+          point: snapshot.point,
+          tagName: blocker.tagName.toLowerCase(),
+          id: (blocker as HTMLElement).id || '',
+          className: rawClassName.trim(),
+          position: style.position,
+          zIndex: style.zIndex,
+          display: style.display,
+          visibility: style.visibility,
+          opacity: style.opacity,
+          pointerEvents: style.pointerEvents,
+          filter: style.filter,
+          backdropFilter:
+            style.backdropFilter || style.getPropertyValue('backdrop-filter')
+        };
+        break;
+      }
+    }
     const overlays = Array.from(
       document.querySelectorAll<HTMLElement>(
         '[role="dialog"], .overlay, .modal, .backdrop'
@@ -808,6 +962,70 @@ export const initDiagnostics = (): DiagnosticsController => {
       bodyStyle.overflow === 'hidden' ||
       bodyStyle.overflowX === 'hidden' ||
       bodyStyle.overflowY === 'hidden';
+    const candidateElements = Array.from(
+      document.body.querySelectorAll<HTMLElement>('*')
+    );
+    const overlayCandidates: OverlayCandidateSnapshot[] = candidateElements
+      .map((element) => {
+        const style = window.getComputedStyle(element);
+        const position = style.position;
+        if (position !== 'fixed' && position !== 'sticky') return null;
+        if (style.pointerEvents === 'none') return null;
+        if (style.visibility === 'hidden' || style.display === 'none') return null;
+        const zIndexValue = Number.parseInt(style.zIndex, 10);
+        const hasHighZ = Number.isFinite(zIndexValue) && zIndexValue >= 100;
+        const backdropFilter =
+          style.backdropFilter || style.getPropertyValue('backdrop-filter');
+        const hasBackdrop = backdropFilter && backdropFilter !== 'none';
+        const filter = style.filter || '';
+        const hasBlur = filter.toLowerCase().includes('blur');
+        if (!hasHighZ && !hasBackdrop && !hasBlur) return null;
+        const rect = element.getBoundingClientRect();
+        const area = rect.width * rect.height;
+        const rawClassName =
+          typeof element.className === 'string'
+            ? element.className
+            : element.getAttribute('class') ?? '';
+        return {
+          tagName: element.tagName.toLowerCase(),
+          id: element.id || '',
+          className: rawClassName.trim(),
+          zIndex: Number.isFinite(zIndexValue) ? zIndexValue : 0,
+          position,
+          opacity: style.opacity,
+          pointerEvents: style.pointerEvents,
+          rect: {
+            width: rect.width,
+            height: rect.height,
+            area
+          }
+        };
+      })
+      .filter(Boolean) as OverlayCandidateSnapshot[];
+    overlayCandidates.sort((a, b) => {
+      if (b.zIndex !== a.zIndex) return b.zIndex - a.zIndex;
+      return b.rect.area - a.rect.area;
+    });
+    const topCandidates = overlayCandidates.slice(0, 20);
+    const openDialogs = Array.from(
+      document.querySelectorAll<HTMLDialogElement>('dialog[open]')
+    ).map((dialog) => {
+      const rect = dialog.getBoundingClientRect();
+      const rawClassName =
+        typeof dialog.className === 'string'
+          ? dialog.className
+          : dialog.getAttribute('class') ?? '';
+      return {
+        tagName: dialog.tagName.toLowerCase(),
+        id: dialog.id || '',
+        className: rawClassName.trim(),
+        rect: {
+          width: rect.width,
+          height: rect.height,
+          area: rect.width * rect.height
+        }
+      };
+    });
     return {
       ts: new Date().toISOString(),
       source,
@@ -818,6 +1036,10 @@ export const initDiagnostics = (): DiagnosticsController => {
         document.querySelector('.overlay-container, #overlay-container')
       ),
       overlays,
+      elementsFromPoint: elementsFromPointSnapshots,
+      topBlocker,
+      topCandidates,
+      openDialogs,
       uiBlocked: overflowHidden || overlayBlocks
     };
   };
@@ -825,6 +1047,35 @@ export const initDiagnostics = (): DiagnosticsController => {
   const recordUiStateDump = (source: UiStateDump['source']) => {
     state.uiStateDump = collectUiStateDump(source);
     return state.uiStateDump;
+  };
+
+  const captureOverlayProbe = (
+    source: UiStateDump['source'],
+    message: string,
+    details?: Record<string, unknown>,
+    options?: { force?: boolean }
+  ) => {
+    const now = Date.now();
+    if (!options?.force && now - lastOverlayProbeAt < overlayProbeCooldownMs) {
+      return null;
+    }
+    const dump = collectUiStateDump(source);
+    state.uiStateDump = dump;
+    lastOverlayProbeAt = now;
+    const id = buildEntryId();
+    const entry: DiagnosticsEntry = {
+      id,
+      errorId: id,
+      ts: new Date().toISOString(),
+      kind: 'overlay_probe',
+      message,
+      stack: new Error('overlay probe').stack,
+      rawType: 'overlay_probe',
+      jsonPreview: details ? JSON.stringify(details) : undefined,
+      uiStateDump: dump
+    };
+    pushEntry(entry);
+    return entry;
   };
 
   const maybeAutoDumpUiState = () => {
@@ -837,6 +1088,51 @@ export const initDiagnostics = (): DiagnosticsController => {
     if (!dump.uiBlocked) return;
     state.uiStateDump = dump;
     state.lastAutoUiDumpAt = now;
+  };
+
+  const startOverlayMutationObserver = () => {
+    const body = document.body;
+    if (!body || !('MutationObserver' in window)) return;
+    const viewportArea = Math.max(0, window.innerWidth * window.innerHeight);
+    const minArea = viewportArea * 0.3;
+    const observer = new MutationObserver((mutations) => {
+      const candidates: HTMLElement[] = [];
+      mutations.forEach((mutation) => {
+        mutation.addedNodes.forEach((node) => {
+          if (node instanceof HTMLElement) {
+            candidates.push(node);
+          } else if (node instanceof Element) {
+            candidates.push(...Array.from(node.querySelectorAll<HTMLElement>('*')));
+          }
+        });
+      });
+      const match = candidates.find((element) => {
+        const style = window.getComputedStyle(element);
+        if (style.position !== 'fixed' && style.position !== 'sticky') return false;
+        const zIndexValue = Number.parseInt(style.zIndex, 10);
+        if (!Number.isFinite(zIndexValue) || zIndexValue < 100) return false;
+        const rect = element.getBoundingClientRect();
+        const area = rect.width * rect.height;
+        return area >= minArea;
+      });
+      if (match) {
+        const rect = match.getBoundingClientRect();
+        captureOverlayProbe('overlay_probe', 'mutation_observer', {
+          tagName: match.tagName.toLowerCase(),
+          id: match.id || '',
+          className:
+            typeof match.className === 'string'
+              ? match.className
+              : match.getAttribute('class') ?? '',
+          rect: {
+            width: rect.width,
+            height: rect.height,
+            area: rect.width * rect.height
+          }
+        });
+      }
+    });
+    observer.observe(body, { childList: true, subtree: true });
   };
 
   const pushEntry = (entry: DiagnosticsEntry) => {
@@ -1000,6 +1296,7 @@ export const initDiagnostics = (): DiagnosticsController => {
   );
   document.body.append(panel);
   updatePanel(state);
+  startOverlayMutationObserver();
 
   window.setInterval(() => {
     try {
@@ -1063,6 +1360,8 @@ export const initDiagnostics = (): DiagnosticsController => {
       pushEntry(entry);
       return entry;
     },
+    captureOverlayProbe: (message, details, options) =>
+      captureOverlayProbe('overlay_probe', message, details, options),
     captureEvent: (entry) => {
       const id = buildEntryId();
       const fullEntry: DiagnosticsEntry = {
