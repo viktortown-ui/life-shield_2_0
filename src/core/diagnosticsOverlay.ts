@@ -13,10 +13,17 @@ export const isMutedScriptErrorEntry = (entry: DiagnosticsEntry): boolean =>
   entry.kind === 'error' && isMutedScriptEntry(entry);
 
 export const shouldShowFatalOverlay = (entry: DiagnosticsEntry): boolean => {
-  if (entry.kind !== 'error' && entry.kind !== 'rejection') {
+  const fatalKinds = new Set<DiagnosticsEntry['kind']>([
+    'error',
+    'rejection',
+    'resource',
+    'blank_screen_detected',
+    'console_error'
+  ]);
+  if (!fatalKinds.has(entry.kind)) {
     return false;
   }
-  if (isMutedScriptEntry(entry)) {
+  if (entry.kind === 'error' && isMutedScriptEntry(entry)) {
     return false;
   }
   return true;

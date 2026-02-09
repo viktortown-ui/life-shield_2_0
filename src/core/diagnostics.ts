@@ -259,28 +259,37 @@ const buildReport = (
   entries: DiagnosticsEntry[],
   networkFailures: NetworkFailure[],
   overlay: DiagnosticsOverlayState
-) => ({
-  generatedAt: new Date().toISOString(),
-  build: buildInfo,
-  url: window.location.href,
-  userAgent: navigator.userAgent,
-  entries,
-  overlay,
-  lastFatalEntry:
-    entries
-      .slice()
-      .reverse()
-      .find((entry) => shouldShowFatalOverlay(entry)) ?? null,
-  lastBreadcrumb:
-    entries
-      .slice()
-      .reverse()
-      .find((entry) => entry.kind === 'breadcrumb')?.message ?? null,
-  network: {
-    failedResources: collectFailedResources(),
-    failedFetches: networkFailures
-  }
-});
+) => {
+  const root = document.getElementById('app');
+  const lastEntry = entries.length ? entries[entries.length - 1] : null;
+  return {
+    generatedAt: new Date().toISOString(),
+    build: buildInfo,
+    url: window.location.href,
+    currentRoute: window.location.hash,
+    userAgent: navigator.userAgent,
+    entries,
+    overlay,
+    overlayVisible: overlay.visible,
+    lastFatalEntry:
+      entries
+        .slice()
+        .reverse()
+        .find((entry) => shouldShowFatalOverlay(entry)) ?? null,
+    lastNonFatal: lastEntry,
+    lastBreadcrumb:
+      entries
+        .slice()
+        .reverse()
+        .find((entry) => entry.kind === 'breadcrumb')?.message ?? null,
+    rootChildCount: root ? root.childElementCount : null,
+    rootHTMLLength: root ? root.innerHTML.length : null,
+    network: {
+      failedResources: collectFailedResources(),
+      failedFetches: networkFailures
+    }
+  };
+};
 
 const copyDiagnostics = async (
   entries: DiagnosticsEntry[],
@@ -455,6 +464,13 @@ const collectScriptResources = (): ScriptResourceEntry[] => {
     }));
 };
 
+const attachScriptInventory = (entry: DiagnosticsEntry) => {
+  const { allScripts, externalScripts } = collectScriptInventory();
+  entry.scriptInventory = allScripts;
+  entry.externalScripts = externalScripts;
+  entry.scriptResourceEntries = collectScriptResources();
+};
+
 const getLastBreadcrumb = (entries: DiagnosticsEntry[]): string | null =>
   entries
     .slice()
@@ -516,6 +532,19 @@ const isMutedScriptError = (event: ErrorEvent) => {
   const hasLocation = Boolean(event.filename);
   const hasLine = typeof event.lineno === 'number' && event.lineno > 0;
   const hasCol = typeof event.colno === 'number' && event.colno > 0;
+  return !hasLocation || !hasLine || !hasCol;
+};
+
+const isMutedScriptMessage = (
+  message: string,
+  filename?: string,
+  lineno?: number,
+  colno?: number
+) => {
+  if (message !== 'Script error.') return false;
+  const hasLocation = Boolean(filename);
+  const hasLine = typeof lineno === 'number' && lineno > 0;
+  const hasCol = typeof colno === 'number' && colno > 0;
   return !hasLocation || !hasLine || !hasCol;
 };
 
@@ -681,10 +710,7 @@ export const initDiagnostics = (): DiagnosticsController => {
     if (event instanceof ErrorEvent) {
       const entry = fromErrorEvent(event);
       if (entry) {
-        const { allScripts, externalScripts } = collectScriptInventory();
-        entry.scriptInventory = allScripts;
-        entry.externalScripts = externalScripts;
-        entry.scriptResourceEntries = collectScriptResources();
+        attachScriptInventory(entry);
         if (isMutedScriptError(event)) {
           entry.suspectedMuted = true;
           entry.level = 'warn';
@@ -767,6 +793,52 @@ export const initDiagnostics = (): DiagnosticsController => {
         throw error;
       }
     };
+  };
+
+  window.onerror = (
+    message,
+    filename,
+    lineno,
+    colno,
+    error
+  ): boolean | void => {
+    if (error && isMarkedCaptured(error)) {
+      return;
+    }
+    const normalized = normalizeUnknownError(error ?? message);
+    const errorId = getMarkedErrorId(error) ?? buildEntryId();
+    const entry: DiagnosticsEntry = {
+      id: errorId,
+      errorId,
+      ts: new Date().toISOString(),
+      kind: 'error',
+      message: normalized.message,
+      stack: normalized.stack,
+      name: normalized.name,
+      rawType: normalized.rawType,
+      jsonPreview: normalized.jsonPreview,
+      filename: typeof filename === 'string' ? filename : undefined,
+      lineno: typeof lineno === 'number' ? lineno : undefined,
+      colno: typeof colno === 'number' ? colno : undefined
+    };
+    attachScriptInventory(entry);
+    if (
+      isMutedScriptMessage(
+        entry.message,
+        entry.filename,
+        entry.lineno,
+        entry.colno
+      )
+    ) {
+      entry.suspectedMuted = true;
+      entry.level = 'warn';
+      entry.lastBreadcrumb = getLastBreadcrumb(state.entries);
+    }
+    if (error) {
+      markErrorObject(error, entry.errorId, true);
+    }
+    pushEntry(entry);
+    return;
   };
 
   window.addEventListener('error', handleError, true);
