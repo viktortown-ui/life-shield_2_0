@@ -64,7 +64,8 @@ const formatInlineError = (error: unknown) => {
 
 const initErrorOverlay = (
   diagnostics: ReturnType<typeof initDiagnostics>,
-  onCopyDiagnostics: () => Promise<boolean>
+  onCopyDiagnostics: () => Promise<boolean>,
+  onDumpUiState: () => void
 ) => {
   const overlay = document.createElement('div');
   overlay.className = 'error-overlay hidden';
@@ -92,6 +93,11 @@ const initErrorOverlay = (
   copyButton.className = 'button small';
   copyButton.textContent = 'Copy diagnostics';
 
+  const dumpButton = document.createElement('button');
+  dumpButton.type = 'button';
+  dumpButton.className = 'button small';
+  dumpButton.textContent = 'Dump UI state';
+
   const resetButton = document.createElement('button');
   resetButton.type = 'button';
   resetButton.className = 'button small';
@@ -107,7 +113,10 @@ const initErrorOverlay = (
   debugLabel.textContent = 'Debug';
 
   debugToggle.append(debugCheckbox, debugLabel);
-  actions.append(copyStatus, copyButton, resetButton, debugToggle);
+  const buttons = document.createElement('div');
+  buttons.className = 'error-overlay__buttons';
+  buttons.append(copyButton, dumpButton, resetButton);
+  actions.append(copyStatus, buttons, debugToggle);
   card.append(title, message, stack, actions);
   overlay.append(card);
   document.body.append(overlay);
@@ -207,6 +216,19 @@ const initErrorOverlay = (
     } catch (error) {
       reportCaughtError(error);
       copyStatus.textContent = 'Не удалось скопировать.';
+    }
+    window.setTimeout(() => {
+      copyStatus.textContent = '';
+    }, 4000);
+  });
+
+  dumpButton.addEventListener('click', () => {
+    try {
+      onDumpUiState();
+      copyStatus.textContent = 'UI state dumped.';
+    } catch (error) {
+      reportCaughtError(error);
+      copyStatus.textContent = 'Не удалось снять дамп.';
     }
     window.setTimeout(() => {
       copyStatus.textContent = '';
@@ -434,8 +456,12 @@ let lastFatalEntry: DiagnosticsEntry | null = null;
 try {
   diagnostics.pushBreadcrumb('boot: start');
   diagnostics.pushBreadcrumb('boot: load_config');
-  const overlayController = initErrorOverlay(diagnostics, () =>
-    diagnostics.copy()
+  const overlayController = initErrorOverlay(
+    diagnostics,
+    () => diagnostics.copy(),
+    () => {
+      diagnostics.dumpUiState('manual');
+    }
   );
   const mutedErrorBanner = initMutedErrorBanner(diagnostics, () =>
     diagnostics.copy()
@@ -605,7 +631,13 @@ try {
     showErrorOverlay(error);
   } else {
     const entry = diagnostics.captureError(error, 'bootstrap');
-    initErrorOverlay(diagnostics, () => diagnostics.copy()).showError(entry);
+    initErrorOverlay(
+      diagnostics,
+      () => diagnostics.copy(),
+      () => {
+        diagnostics.dumpUiState('manual');
+      }
+    ).showError(entry);
   }
   renderFatalError(error);
 }

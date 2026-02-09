@@ -77,6 +77,8 @@ type DiagnosticsState = {
   panel: HTMLDetailsElement | null;
   list: HTMLUListElement | null;
   overlay: DiagnosticsOverlayState;
+  uiStateDump: UiStateDump | null;
+  lastAutoUiDumpAt: number;
 };
 
 type NetworkFailure = {
@@ -87,6 +89,34 @@ type NetworkFailure = {
   method?: string;
   ts: string;
   type: 'resource' | 'fetch';
+};
+
+type UiElementStyleSnapshot = {
+  exists: boolean;
+  display: string;
+  visibility: string;
+  opacity: string;
+  pointerEvents: string;
+  filter: string;
+  backdropFilter: string;
+};
+
+type OverlaySnapshot = {
+  className: string;
+  pointerEvents: string;
+  zIndex: string;
+  isBackdrop: boolean;
+};
+
+export type UiStateDump = {
+  ts: string;
+  source: 'manual' | 'hotkey' | 'auto' | 'copy';
+  bodyClassName: string;
+  bodyOverflow: string;
+  app: UiElementStyleSnapshot;
+  overlayContainer: UiElementStyleSnapshot;
+  overlays: OverlaySnapshot[];
+  uiBlocked: boolean;
 };
 
 const ERROR_ID_PROP = '__lsDiagnosticsErrorId';
@@ -258,7 +288,8 @@ const collectFailedResources = (): NetworkFailure[] => {
 const buildReport = (
   entries: DiagnosticsEntry[],
   networkFailures: NetworkFailure[],
-  overlay: DiagnosticsOverlayState
+  overlay: DiagnosticsOverlayState,
+  uiStateDump: UiStateDump | null
 ) => {
   const root = document.getElementById('app');
   const lastEntry = entries.length ? entries[entries.length - 1] : null;
@@ -284,6 +315,7 @@ const buildReport = (
         .find((entry) => entry.kind === 'breadcrumb')?.message ?? null,
     rootChildCount: root ? root.childElementCount : null,
     rootHTMLLength: root ? root.innerHTML.length : null,
+    uiStateDump,
     network: {
       failedResources: collectFailedResources(),
       failedFetches: networkFailures
@@ -294,10 +326,11 @@ const buildReport = (
 const copyDiagnostics = async (
   entries: DiagnosticsEntry[],
   networkFailures: NetworkFailure[],
-  overlay: DiagnosticsOverlayState
+  overlay: DiagnosticsOverlayState,
+  uiStateDump: UiStateDump | null
 ): Promise<boolean> => {
   const content = JSON.stringify(
-    buildReport(entries, networkFailures, overlay),
+    buildReport(entries, networkFailures, overlay, uiStateDump),
     null,
     2
   );
@@ -378,7 +411,8 @@ const showCopyStatus = (
 
 const createPanel = (
   state: DiagnosticsState,
-  onCopy: () => Promise<boolean>
+  onCopy: () => Promise<boolean>,
+  onDump: () => UiStateDump | null
 ): HTMLDetailsElement => {
   const panel = document.createElement('details');
   panel.className = 'diagnostics-panel';
@@ -393,6 +427,9 @@ const createPanel = (
   const copyStatus = document.createElement('span');
   copyStatus.className = 'diagnostics-panel__status';
 
+  const buttons = document.createElement('div');
+  buttons.className = 'diagnostics-panel__buttons';
+
   const copyButton = document.createElement('button');
   copyButton.type = 'button';
   copyButton.className = 'button small';
@@ -402,7 +439,22 @@ const createPanel = (
     showCopyStatus(copyStatus, ok);
   });
 
-  actions.append(copyStatus, copyButton);
+  const dumpButton = document.createElement('button');
+  dumpButton.type = 'button';
+  dumpButton.className = 'button small';
+  dumpButton.textContent = 'Dump UI state';
+  dumpButton.addEventListener('click', () => {
+    const dump = onDump();
+    copyStatus.textContent = dump
+      ? 'UI state dumped.'
+      : 'Не удалось снять дамп.';
+    window.setTimeout(() => {
+      copyStatus.textContent = '';
+    }, 4000);
+  });
+
+  buttons.append(copyButton, dumpButton);
+  actions.append(copyStatus, buttons);
 
   const list = document.createElement('ul');
   list.className = 'diagnostics-panel__list';
@@ -675,6 +727,7 @@ const fromBreadcrumb = (message: string): DiagnosticsEntry => {
 export type DiagnosticsController = {
   getEntries: () => DiagnosticsEntry[];
   copy: () => Promise<boolean>;
+  dumpUiState: (source?: UiStateDump['source']) => UiStateDump | null;
   onEntry: (callback: (entry: DiagnosticsEntry) => void) => void;
   captureError: (error: unknown, source?: string) => DiagnosticsEntry;
   captureOverlayInvocation: (
@@ -694,10 +747,97 @@ export const initDiagnostics = (): DiagnosticsController => {
     entries: loadStoredEntries(),
     panel: null,
     list: null,
-    overlay: DEFAULT_OVERLAY_STATE
+    overlay: DEFAULT_OVERLAY_STATE,
+    uiStateDump: null,
+    lastAutoUiDumpAt: 0
   };
   const networkFailures: NetworkFailure[] = [];
   const entryListeners = new Set<(entry: DiagnosticsEntry) => void>();
+  const autoUiDumpIntervalMs = 4000;
+
+  const getElementStyleSnapshot = (element: Element | null): UiElementStyleSnapshot => {
+    if (!element || !(element instanceof Element)) {
+      return {
+        exists: false,
+        display: 'missing',
+        visibility: 'missing',
+        opacity: 'missing',
+        pointerEvents: 'missing',
+        filter: 'missing',
+        backdropFilter: 'missing'
+      };
+    }
+    const style = window.getComputedStyle(element);
+    return {
+      exists: true,
+      display: style.display,
+      visibility: style.visibility,
+      opacity: style.opacity,
+      pointerEvents: style.pointerEvents,
+      filter: style.filter,
+      backdropFilter: style.backdropFilter || style.getPropertyValue('backdrop-filter')
+    };
+  };
+
+  const collectUiStateDump = (
+    source: UiStateDump['source']
+  ): UiStateDump => {
+    const bodyStyle = window.getComputedStyle(document.body);
+    const overlays = Array.from(
+      document.querySelectorAll<HTMLElement>(
+        '[role="dialog"], .overlay, .modal, .backdrop'
+      )
+    ).map((element) => {
+      const style = window.getComputedStyle(element);
+      const rawClassName =
+        typeof element.className === 'string'
+          ? element.className
+          : element.getAttribute('class') ?? '';
+      const className = rawClassName.trim();
+      return {
+        className,
+        pointerEvents: style.pointerEvents,
+        zIndex: style.zIndex,
+        isBackdrop: element.classList.contains('backdrop')
+      };
+    });
+    const overlayBlocks = overlays.some(
+      (overlay) => overlay.isBackdrop && overlay.pointerEvents !== 'none'
+    );
+    const overflowHidden =
+      bodyStyle.overflow === 'hidden' ||
+      bodyStyle.overflowX === 'hidden' ||
+      bodyStyle.overflowY === 'hidden';
+    return {
+      ts: new Date().toISOString(),
+      source,
+      bodyClassName: document.body.className,
+      bodyOverflow: bodyStyle.overflow,
+      app: getElementStyleSnapshot(document.getElementById('app')),
+      overlayContainer: getElementStyleSnapshot(
+        document.querySelector('.overlay-container, #overlay-container')
+      ),
+      overlays,
+      uiBlocked: overflowHidden || overlayBlocks
+    };
+  };
+
+  const recordUiStateDump = (source: UiStateDump['source']) => {
+    state.uiStateDump = collectUiStateDump(source);
+    return state.uiStateDump;
+  };
+
+  const maybeAutoDumpUiState = () => {
+    const now = Date.now();
+    if (now - state.lastAutoUiDumpAt < autoUiDumpIntervalMs) return;
+    const root = document.getElementById('app');
+    const rootChildCount = root ? root.childElementCount : 0;
+    if (rootChildCount <= 0 || state.overlay.visible) return;
+    const dump = collectUiStateDump('auto');
+    if (!dump.uiBlocked) return;
+    state.uiStateDump = dump;
+    state.lastAutoUiDumpAt = now;
+  };
 
   const pushEntry = (entry: DiagnosticsEntry) => {
     state.entries = [...state.entries, entry].slice(-MAX_ENTRIES);
@@ -848,15 +988,57 @@ export const initDiagnostics = (): DiagnosticsController => {
   wrapConsole('error');
   wrapFetch();
 
-  const panel = createPanel(state, () => {
-    return copyDiagnostics(state.entries, networkFailures, state.overlay);
-  });
+  const panel = createPanel(
+    state,
+    () => copyDiagnostics(
+      state.entries,
+      networkFailures,
+      state.overlay,
+      recordUiStateDump('copy')
+    ),
+    () => recordUiStateDump('manual')
+  );
   document.body.append(panel);
   updatePanel(state);
 
+  window.setInterval(() => {
+    try {
+      maybeAutoDumpUiState();
+    } catch (error) {
+      reportCaughtError(error);
+    }
+  }, autoUiDumpIntervalMs);
+
+  window.addEventListener('keydown', (event) => {
+    const target = event.target;
+    if (
+      target instanceof HTMLElement &&
+      (target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable)
+    ) {
+      return;
+    }
+    if (!(event.ctrlKey || event.metaKey) || !event.shiftKey) {
+      return;
+    }
+    if (event.key.toLowerCase() !== 'd') {
+      return;
+    }
+    event.preventDefault();
+    recordUiStateDump('hotkey');
+  });
+
   return {
     getEntries: () => state.entries,
-    copy: () => copyDiagnostics(state.entries, networkFailures, state.overlay),
+    copy: () =>
+      copyDiagnostics(
+        state.entries,
+        networkFailures,
+        state.overlay,
+        recordUiStateDump('copy')
+      ),
+    dumpUiState: (source = 'manual') => recordUiStateDump(source),
     onEntry: (callback) => {
       entryListeners.add(callback);
     },
@@ -899,6 +1081,11 @@ export const initDiagnostics = (): DiagnosticsController => {
     },
     setOverlayState: (overlay) => {
       state.overlay = overlay;
+      try {
+        maybeAutoDumpUiState();
+      } catch (error) {
+        reportCaughtError(error);
+      }
     }
   };
 };
