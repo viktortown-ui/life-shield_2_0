@@ -2,7 +2,7 @@ import { createIslandPage } from './islandPage';
 import { createSettingsScreen } from './settings';
 import { createShieldScreen } from './shield';
 import { IslandId } from '../core/types';
-import { safeClear } from '../core/storage';
+import { panicReset } from '../core/pwaUpdate';
 import { reportCaughtError } from '../core/reportError';
 import { buildInfo } from '../core/buildInfo';
 
@@ -86,11 +86,7 @@ export const initRouter = (root: HTMLElement) => {
       `;
       const resetButton = root.querySelector<HTMLButtonElement>('[data-reset]');
       resetButton?.addEventListener('click', () => {
-        try {
-          safeClear();
-        } finally {
-          window.location.reload();
-        }
+        void panicReset();
       });
     }
   };

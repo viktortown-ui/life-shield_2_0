@@ -7,6 +7,7 @@ import {
   panicReset
 } from '../core/pwaUpdate';
 import { reportCaughtError } from '../core/reportError';
+import { safeClear } from '../core/storage';
 
 export const createSettingsScreen = () => {
   const container = document.createElement('div');
@@ -164,20 +165,16 @@ export const createSettingsScreen = () => {
 
     if (action === 'reset') {
       const confirmed = window.confirm(
-        'Сбросить кэш и данные приложения? Действие нельзя отменить.'
+        'Сбросить данные приложения? Действие нельзя отменить.'
       );
       if (!confirmed) {
         return;
       }
-      localStorage.clear();
-      if ('caches' in window) {
-        const cacheKeys = await caches.keys();
-        await Promise.all(cacheKeys.map((key) => caches.delete(key)));
-      }
+      safeClear();
       resetState();
       textarea.value = '';
       hint.textContent = 'Данные сброшены.';
-      maintenanceHint.textContent = 'Кэш очищен. Перезапустите приложение.';
+      maintenanceHint.textContent = 'Данные очищены. Перезапустите приложение.';
     }
   });
 

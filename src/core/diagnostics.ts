@@ -1,6 +1,7 @@
 import { safeGetItem, safeSetItem } from './storage';
 import { reportCaughtError } from './reportError';
 import { buildInfo } from './buildInfo';
+import { shouldShowFatalOverlay } from './diagnosticsOverlay';
 
 const DIAGNOSTICS_KEY = 'lifeShieldV2:diagnostics';
 const MAX_ENTRIES = 50;
@@ -56,6 +57,7 @@ export type DiagnosticsEntry = {
   suspectedMuted?: boolean;
   scriptInventory?: ScriptInventoryEntry[];
   externalScripts?: ScriptInventoryEntry[];
+  scriptResourceEntries?: ScriptResourceEntry[];
   lastBreadcrumb?: string | null;
 };
 
@@ -63,6 +65,11 @@ type ScriptInventoryEntry = {
   src: string;
   origin: string;
   sameOrigin: boolean;
+};
+
+type ScriptResourceEntry = {
+  name: string;
+  initiatorType?: string;
 };
 
 type DiagnosticsState = {
@@ -175,6 +182,9 @@ const formatEntryDetails = (entry: DiagnosticsEntry): string => {
   const externalScripts = entry.externalScripts
     ? `External scripts: ${JSON.stringify(entry.externalScripts)}`
     : '';
+  const scriptResources = entry.scriptResourceEntries
+    ? `Script resources: ${JSON.stringify(entry.scriptResourceEntries)}`
+    : '';
   const jsonPreview = entry.jsonPreview ? `Data: ${entry.jsonPreview}` : '';
   return [
     errorId,
@@ -191,6 +201,7 @@ const formatEntryDetails = (entry: DiagnosticsEntry): string => {
     lastBreadcrumb,
     scriptInventory,
     externalScripts,
+    scriptResources,
     jsonPreview
   ]
     .filter(Boolean)
@@ -255,6 +266,11 @@ const buildReport = (
   userAgent: navigator.userAgent,
   entries,
   overlay,
+  lastFatalEntry:
+    entries
+      .slice()
+      .reverse()
+      .find((entry) => shouldShowFatalOverlay(entry)) ?? null,
   lastBreadcrumb:
     entries
       .slice()
@@ -422,6 +438,21 @@ const collectScriptInventory = (): {
   });
   const externalScripts = allScripts.filter((entry) => !entry.sameOrigin);
   return { allScripts, externalScripts };
+};
+
+const collectScriptResources = (): ScriptResourceEntry[] => {
+  if (!('performance' in window) || !performance.getEntriesByType) {
+    return [];
+  }
+  const resources = performance.getEntriesByType(
+    'resource'
+  ) as PerformanceResourceTiming[];
+  return resources
+    .filter((entry) => entry.initiatorType === 'script')
+    .map((entry) => ({
+      name: entry.name,
+      initiatorType: entry.initiatorType || undefined
+    }));
 };
 
 const getLastBreadcrumb = (entries: DiagnosticsEntry[]): string | null =>
@@ -650,12 +681,13 @@ export const initDiagnostics = (): DiagnosticsController => {
     if (event instanceof ErrorEvent) {
       const entry = fromErrorEvent(event);
       if (entry) {
+        const { allScripts, externalScripts } = collectScriptInventory();
+        entry.scriptInventory = allScripts;
+        entry.externalScripts = externalScripts;
+        entry.scriptResourceEntries = collectScriptResources();
         if (isMutedScriptError(event)) {
-          const { allScripts, externalScripts } = collectScriptInventory();
           entry.suspectedMuted = true;
           entry.level = 'warn';
-          entry.scriptInventory = allScripts;
-          entry.externalScripts = externalScripts;
           entry.lastBreadcrumb = getLastBreadcrumb(state.entries);
         }
         pushEntry(entry);

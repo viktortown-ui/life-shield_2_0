@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { shouldShowFatalOverlay } from './diagnosticsOverlay';
+import { isMutedScriptErrorEntry, shouldShowFatalOverlay } from './diagnosticsOverlay';
 import type { DiagnosticsEntry } from './diagnostics';
 
 const buildEntry = (overrides: Partial<DiagnosticsEntry>): DiagnosticsEntry => ({
@@ -37,5 +37,23 @@ describe('shouldShowFatalOverlay', () => {
     expect(
       shouldShowFatalOverlay(buildEntry({ kind: 'error', suspectedMuted: true }))
     ).toBe(false);
+  });
+
+  it('flags script error without location as muted', () => {
+    const entry = buildEntry({ kind: 'error', message: 'Script error.' });
+    expect(isMutedScriptErrorEntry(entry)).toBe(true);
+    expect(shouldShowFatalOverlay(entry)).toBe(false);
+  });
+
+  it('allows script error with location to be fatal', () => {
+    const entry = buildEntry({
+      kind: 'error',
+      message: 'Script error.',
+      filename: 'https://example.com/assets/app.js',
+      lineno: 10,
+      colno: 4
+    });
+    expect(isMutedScriptErrorEntry(entry)).toBe(false);
+    expect(shouldShowFatalOverlay(entry)).toBe(true);
   });
 });
