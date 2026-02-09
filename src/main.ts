@@ -171,6 +171,15 @@ const initErrorOverlay = (
     const { message: msg, stack: stackText } = formatInlineError(error);
     const invoker = new Error('overlay shown');
     const reason = getReasonInfo(error);
+    diagnostics.captureOverlayProbe(
+      'overlay_shown',
+      {
+        reasonKind: reason.kind,
+        reasonMessage: reason.message,
+        buildId: buildInfo.id
+      },
+      { force: true }
+    );
     message.textContent = msg || 'Неизвестная ошибка.';
     stack.textContent = stackText;
     diagnostics.captureEvent({
