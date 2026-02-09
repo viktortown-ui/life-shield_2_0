@@ -184,7 +184,7 @@ export const panicReset = async () => {
   }
   safeClear();
   try {
-    window.location.reload();
+    window.location.reload.call(window.location);
   } catch (error) {
     reportCaughtError(error);
   }
