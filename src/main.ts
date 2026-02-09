@@ -201,15 +201,20 @@ const initErrorOverlay = (
   };
 
   copyButton.addEventListener('click', async () => {
-    const ok = await onCopyDiagnostics();
-    copyStatus.textContent = ok ? 'Скопировано.' : 'Не удалось скопировать.';
+    try {
+      const ok = await onCopyDiagnostics();
+      copyStatus.textContent = ok ? 'Скопировано.' : 'Не удалось скопировать.';
+    } catch (error) {
+      reportCaughtError(error);
+      copyStatus.textContent = 'Не удалось скопировать.';
+    }
     window.setTimeout(() => {
       copyStatus.textContent = '';
     }, 4000);
   });
 
   resetButton.addEventListener('click', () => {
-    void panicReset();
+    void panicReset().catch(reportCaughtError);
   });
 
   return {
@@ -252,8 +257,13 @@ const initMutedErrorBanner = (
   ) as HTMLButtonElement;
 
   copyButton.addEventListener('click', async () => {
-    const ok = await onCopyDiagnostics();
-    status.textContent = ok ? 'Скопировано.' : 'Не удалось скопировать.';
+    try {
+      const ok = await onCopyDiagnostics();
+      status.textContent = ok ? 'Скопировано.' : 'Не удалось скопировать.';
+    } catch (error) {
+      reportCaughtError(error);
+      status.textContent = 'Не удалось скопировать.';
+    }
     window.setTimeout(() => {
       status.textContent = '';
     }, 4000);
@@ -264,7 +274,7 @@ const initMutedErrorBanner = (
       'Сбросить сервис-воркер и весь Cache Storage? Приложение перезагрузится.'
     );
     if (!confirmed) return;
-    void panicReset();
+    void panicReset().catch(reportCaughtError);
   });
 
   const show = (entry: DiagnosticsEntry) => {
@@ -304,7 +314,7 @@ const renderFatalError = (error: unknown) => {
   `;
   const resetButton = root.querySelector<HTMLButtonElement>('[data-reset]');
   resetButton?.addEventListener('click', () => {
-    void panicReset();
+    void panicReset().catch(reportCaughtError);
   });
 };
 
@@ -540,9 +550,13 @@ try {
 
   bannerButton.addEventListener('click', () => {
     if (needsPanicReset) {
-      void panicReset();
+      void panicReset().catch(reportCaughtError);
     } else {
-      applyUpdate();
+      try {
+        applyUpdate();
+      } catch (error) {
+        reportCaughtError(error);
+      }
     }
   });
 

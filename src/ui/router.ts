@@ -86,7 +86,7 @@ export const initRouter = (root: HTMLElement) => {
       `;
       const resetButton = root.querySelector<HTMLButtonElement>('[data-reset]');
       resetButton?.addEventListener('click', () => {
-        void panicReset();
+        void panicReset().catch(reportCaughtError);
       });
     }
   };
