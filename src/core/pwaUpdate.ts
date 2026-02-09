@@ -1,5 +1,6 @@
 import { registerSW } from 'virtual:pwa-register';
 import { reportCaughtError } from './reportError';
+import { safeClear } from './storage';
 
 type UpdateState = {
   ready: boolean;
@@ -170,14 +171,20 @@ export const panicReset = async () => {
       const registrations = await navigator.serviceWorker.getRegistrations();
       await Promise.all(registrations.map((registration) => registration.unregister()));
     }
-  } finally {
+  } catch (error) {
+    reportCaughtError(error);
+  }
+  try {
     if ('caches' in window) {
       const cacheKeys = await caches.keys();
       await Promise.all(cacheKeys.map((key) => caches.delete(key)));
     }
-    const reload = window.location.reload as (forcedReload?: boolean) => void;
-    reload(true);
+  } catch (error) {
+    reportCaughtError(error);
   }
+  safeClear();
+  const reload = window.location.reload as (forcedReload?: boolean) => void;
+  reload(true);
 };
 
 export const getUpdateState = (): UpdateState => ({

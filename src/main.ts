@@ -5,7 +5,10 @@ import {
   type DiagnosticsEntry
 } from './core/diagnostics';
 import { buildInfo } from './core/buildInfo';
-import { shouldShowFatalOverlay } from './core/diagnosticsOverlay';
+import {
+  isMutedScriptErrorEntry,
+  shouldShowFatalOverlay
+} from './core/diagnosticsOverlay';
 import { ensureState } from './core/store';
 import {
   applyUpdate,
@@ -13,7 +16,6 @@ import {
   onUpdateState,
   panicReset
 } from './core/pwaUpdate';
-import { safeClear } from './core/storage';
 import { reportCaughtError } from './core/reportError';
 import { initRouter } from './ui/router';
 
@@ -207,13 +209,7 @@ const initErrorOverlay = (
   });
 
   resetButton.addEventListener('click', () => {
-    try {
-      safeClear();
-    } catch (error) {
-      reportCaughtError(error);
-    } finally {
-      window.location.reload();
-    }
+    void panicReset();
   });
 
   return {
@@ -221,6 +217,77 @@ const initErrorOverlay = (
     hideOverlay,
     isVisible: () => !overlay.classList.contains('hidden')
   };
+};
+
+const initMutedErrorBanner = (
+  diagnostics: ReturnType<typeof initDiagnostics>,
+  onCopyDiagnostics: () => Promise<boolean>
+) => {
+  const banner = document.createElement('div');
+  banner.className = 'muted-error-banner hidden';
+  banner.innerHTML = `
+    <div class="muted-error-banner__content">
+      <strong>Произошла ошибка без деталей.</strong>
+      <span class="muted-error-banner__message"></span>
+    </div>
+    <div class="muted-error-banner__actions">
+      <button class="button small" data-copy>Скопировать диагностику</button>
+      <button class="button small" data-reset>Сбросить кэш (SW)</button>
+    </div>
+    <span class="muted-error-banner__status"></span>
+  `;
+  document.body.prepend(banner);
+
+  const message = banner.querySelector(
+    '.muted-error-banner__message'
+  ) as HTMLSpanElement;
+  const status = banner.querySelector(
+    '.muted-error-banner__status'
+  ) as HTMLSpanElement;
+  const copyButton = banner.querySelector(
+    '[data-copy]'
+  ) as HTMLButtonElement;
+  const resetButton = banner.querySelector(
+    '[data-reset]'
+  ) as HTMLButtonElement;
+
+  copyButton.addEventListener('click', async () => {
+    const ok = await onCopyDiagnostics();
+    status.textContent = ok ? 'Скопировано.' : 'Не удалось скопировать.';
+    window.setTimeout(() => {
+      status.textContent = '';
+    }, 4000);
+  });
+
+  resetButton.addEventListener('click', () => {
+    const confirmed = window.confirm(
+      'Сбросить сервис-воркер и весь Cache Storage? Приложение перезагрузится.'
+    );
+    if (!confirmed) return;
+    void panicReset();
+  });
+
+  const show = (entry: DiagnosticsEntry) => {
+    const location = entry.filename
+      ? `${entry.filename}${entry.lineno ? `:${entry.lineno}` : ''}${
+          entry.colno ? `:${entry.colno}` : ''
+        }`
+      : '';
+    message.textContent = location ? `${entry.message} (${location})` : entry.message;
+    diagnostics.captureEvent({
+      kind: 'overlay_shown',
+      message: 'muted_error_banner_shown',
+      rawType: 'muted_error_banner',
+      jsonPreview: JSON.stringify({
+        reasonKind: entry.kind,
+        reasonMessage: entry.message,
+        buildId: buildInfo.id
+      })
+    });
+    banner.classList.remove('hidden');
+  };
+
+  return { show };
 };
 
 const renderFatalError = (error: unknown) => {
@@ -237,11 +304,7 @@ const renderFatalError = (error: unknown) => {
   `;
   const resetButton = root.querySelector<HTMLButtonElement>('[data-reset]');
   resetButton?.addEventListener('click', () => {
-    try {
-      safeClear();
-    } finally {
-      window.location.reload();
-    }
+    void panicReset();
   });
 };
 
@@ -364,6 +427,9 @@ try {
   const overlayController = initErrorOverlay(diagnostics, () =>
     diagnostics.copy()
   );
+  const mutedErrorBanner = initMutedErrorBanner(diagnostics, () =>
+    diagnostics.copy()
+  );
   const enforceOverlayInvariant = (reason: string) => {
     if (overlayController.isVisible() && !lastFatalEntry) {
       overlayController.hideOverlay(reason);
@@ -393,6 +459,11 @@ try {
         enforceOverlayInvariant('service_worker_entry');
         return;
       }
+      if (isMutedScriptErrorEntry(error)) {
+        mutedErrorBanner.show(error);
+        enforceOverlayInvariant('muted_script_error_entry');
+        return;
+      }
       if (!shouldShowFatalOverlay(error)) {
         enforceOverlayInvariant('non_fatal_entry');
         return;
@@ -414,6 +485,11 @@ try {
     overlayController.showError(displayEntry);
   };
   diagnostics.onEntry((entry) => {
+    if (isMutedScriptErrorEntry(entry)) {
+      mutedErrorBanner.show(entry);
+      enforceOverlayInvariant('muted_script_error_diagnostics_entry');
+      return;
+    }
     if (!shouldShowFatalOverlay(entry)) {
       enforceOverlayInvariant('non_fatal_diagnostics_entry');
       return;
