@@ -25,6 +25,38 @@ describe('shouldShowFatalOverlay', () => {
     ).toBe(false);
   });
 
+  it('shows overlay for resource failures', () => {
+    expect(
+      shouldShowFatalOverlay(
+        buildEntry({ kind: 'resource', message: 'resource', rawType: 'resource' })
+      )
+    ).toBe(true);
+  });
+
+  it('shows overlay for blank screen detection', () => {
+    expect(
+      shouldShowFatalOverlay(
+        buildEntry({
+          kind: 'blank_screen_detected',
+          message: 'blank screen',
+          rawType: 'blank_screen_detected'
+        })
+      )
+    ).toBe(true);
+  });
+
+  it('shows overlay for console errors', () => {
+    expect(
+      shouldShowFatalOverlay(
+        buildEntry({
+          kind: 'console_error',
+          message: 'console error',
+          rawType: 'console_error'
+        })
+      )
+    ).toBe(true);
+  });
+
   it('skips overlay for breadcrumbs', () => {
     expect(
       shouldShowFatalOverlay(
