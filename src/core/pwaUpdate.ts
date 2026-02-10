@@ -16,12 +16,47 @@ type ServiceWorkerLogEntry = {
   details?: Record<string, unknown>;
 };
 
+type ServiceWorkerEventLogger = (entry: ServiceWorkerLogEntry) => void;
+
 let updateReady = false;
 let offlineReady = false;
 let panicMode = false;
 let registerError: unknown | null = null;
 let updateAction: ((reloadPage?: boolean) => void) | null = null;
+let serviceWorkerEventLogger: ServiceWorkerEventLogger | undefined;
 const listeners = new Set<Listener>();
+const PWA_UPDATE_SOURCE_FILE = 'src/core/pwaUpdate.ts';
+
+const normalizeErrorDetails = (error: unknown) => {
+  if (error instanceof Error) {
+    return {
+      message: error.message || error.name || 'Unknown error',
+      stack: error.stack,
+      rawType: error.name || 'Error'
+    };
+  }
+  return {
+    message: typeof error === 'string' ? error : String(error),
+    stack: undefined,
+    rawType: error === null ? 'null' : typeof error
+  };
+};
+
+const logPwaError = (stage: string, error: unknown) => {
+  const normalized = normalizeErrorDetails(error);
+  reportCaughtError(error);
+  serviceWorkerEventLogger?.({
+    message: `pwa_update_error:${stage}:${normalized.message}`,
+    source: PWA_UPDATE_SOURCE_FILE,
+    details: {
+      stage,
+      errorMessage: normalized.message,
+      stack: normalized.stack,
+      rawType: normalized.rawType,
+      sourceFile: PWA_UPDATE_SOURCE_FILE
+    }
+  });
+};
 
 const notify = () => {
   const state = getUpdateState();
@@ -64,6 +99,7 @@ const triggerPanic = () => {
 export const initPwaUpdate = (
   onServiceWorkerEvent?: (entry: ServiceWorkerLogEntry) => void
 ) => {
+  serviceWorkerEventLogger = onServiceWorkerEvent;
   try {
     updateAction = registerSW({
       onNeedRefresh() {
@@ -112,12 +148,13 @@ export const initPwaUpdate = (
       },
       onRegisterError(error) {
         registerError = error;
+        logPwaError('register_sw_callback', error);
         console.warn('PWA registerSW failed:', error);
         notify();
       }
     });
   } catch (error) {
-    reportCaughtError(error);
+    logPwaError('init_register_sw', error);
     registerError = error;
     console.warn('PWA registerSW failed:', error);
     notify();
@@ -155,13 +192,21 @@ export const onUpdateState = (listener: Listener) => {
 
 export const checkForUpdate = () => {
   if (updateAction) {
-    updateAction(false);
+    try {
+      updateAction(false);
+    } catch (error) {
+      logPwaError('check_for_update', error);
+    }
   }
 };
 
 export const applyUpdate = () => {
   if (updateAction) {
-    updateAction(true);
+    try {
+      updateAction(true);
+    } catch (error) {
+      logPwaError('apply_update', error);
+    }
   }
 };
 
@@ -172,7 +217,7 @@ export const panicReset = async () => {
       await Promise.all(registrations.map((registration) => registration.unregister()));
     }
   } catch (error) {
-    reportCaughtError(error);
+    logPwaError('panic_reset_unregister_sw', error);
   }
   try {
     if ('caches' in window) {
@@ -180,13 +225,13 @@ export const panicReset = async () => {
       await Promise.all(cacheKeys.map((key) => caches.delete(key)));
     }
   } catch (error) {
-    reportCaughtError(error);
+    logPwaError('panic_reset_clear_caches', error);
   }
   safeClear();
   try {
     window.location.reload();
   } catch (error) {
-    reportCaughtError(error);
+    logPwaError('panic_reset_reload', error);
   }
 };
 
