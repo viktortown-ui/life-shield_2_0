@@ -28,14 +28,14 @@ const pickTopAction = (report: IslandReport) => {
 };
 
 const getIslandStatus = (lastRunAt: string | null, hasReport: boolean) => {
-  if (!hasReport) return { label: 'not started', tone: 'status--new' };
-  if (!lastRunAt) return { label: 'computed', tone: 'status--fresh' };
+  if (!hasReport) return { label: 'Нет данных', tone: 'status--new' };
+  if (!lastRunAt) return { label: 'Есть данные', tone: 'status--fresh' };
   const diffDays =
     (Date.now() - new Date(lastRunAt).getTime()) / (1000 * 60 * 60 * 24);
   if (diffDays >= STALE_AFTER_DAYS) {
     return { label: 'stale', tone: 'status--stale' };
   }
-  return { label: 'computed', tone: 'status--fresh' };
+  return { label: 'Есть данные', tone: 'status--fresh' };
 };
 
 export const createShieldScreen = () => {
@@ -171,7 +171,7 @@ export const createShieldScreen = () => {
   const verdictTile = document.createElement('div');
   verdictTile.className = 'shield-tile shield-tile--verdict';
   verdictTile.innerHTML = `
-      <span class="tile-status status--fresh">вердикт дня</span>
+      <span class="tile-status status--fresh">Вердикт дня</span>
       <div class="tile-score">${clampMetric(verdict.globalScore)}</div>
       <div class="tile-confidence">${clampMetric(verdict.globalConfidence)}%</div>
       <div class="tile-headline">${verdict.mood}</div>

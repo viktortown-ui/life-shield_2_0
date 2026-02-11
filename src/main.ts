@@ -18,6 +18,7 @@ import {
 } from './core/pwaUpdate';
 import { reportCaughtError } from './core/reportError';
 import { initRouter } from './ui/router';
+import { isDebugEnabled } from './core/debug';
 
 const isDiagnosticsEntry = (error: unknown): error is DiagnosticsEntry =>
   typeof error === 'object' &&
@@ -91,17 +92,17 @@ const initErrorOverlay = (
   const copyButton = document.createElement('button');
   copyButton.type = 'button';
   copyButton.className = 'button small';
-  copyButton.textContent = 'Copy diagnostics';
+  copyButton.textContent = 'Скопировать отчёт';
 
   const dumpButton = document.createElement('button');
   dumpButton.type = 'button';
   dumpButton.className = 'button small';
-  dumpButton.textContent = 'Dump UI state';
+  dumpButton.textContent = 'Снять UI-дамп';
 
   const resetButton = document.createElement('button');
   resetButton.type = 'button';
   resetButton.className = 'button small';
-  resetButton.textContent = 'Reset app data';
+  resetButton.textContent = 'Сбросить данные';
 
   const debugToggle = document.createElement('label');
   debugToggle.className = 'error-overlay__debug';
@@ -110,7 +111,7 @@ const initErrorOverlay = (
   debugCheckbox.type = 'checkbox';
 
   const debugLabel = document.createElement('span');
-  debugLabel.textContent = 'Debug';
+  debugLabel.textContent = 'Показать детали';
 
   debugToggle.append(debugCheckbox, debugLabel);
   const buttons = document.createElement('div');
@@ -122,16 +123,16 @@ const initErrorOverlay = (
   document.body.append(overlay);
 
   const isProd = import.meta.env.PROD;
-  let debugEnabled = !isProd;
+  let debugEnabled = isDebugEnabled() || !isProd;
 
   if (!isProd) {
     debugToggle.classList.add('hidden');
   } else {
-    debugCheckbox.checked = false;
+    debugCheckbox.checked = isDebugEnabled();
   }
 
   const updateStackVisibility = () => {
-    debugEnabled = !isProd || debugCheckbox.checked;
+    debugEnabled = !isProd || debugCheckbox.checked || isDebugEnabled();
     stack.classList.toggle('hidden', !debugEnabled);
   };
 
@@ -569,7 +570,7 @@ try {
   document.body.prepend(swBanner);
 
   const swStack = swBanner.querySelector('pre') as HTMLPreElement;
-  const isDebug = !import.meta.env.PROD;
+  const isDebug = isDebugEnabled() || !import.meta.env.PROD;
 
   const banner = document.createElement('div');
   banner.className = 'update-banner hidden';

@@ -1,7 +1,8 @@
-import { safeGetItem, safeSetItem } from './storage';
+import { safeGetItem, safeRemoveItem, safeSetItem } from './storage';
 import { reportCaughtError } from './reportError';
 import { buildInfo } from './buildInfo';
 import { shouldShowFatalOverlay } from './diagnosticsOverlay';
+import { isDebugEnabled } from './debug';
 
 const DIAGNOSTICS_KEY = 'lifeShieldV2:diagnostics';
 const MAX_ENTRIES = 50;
@@ -312,8 +313,10 @@ const loadStoredEntries = (): DiagnosticsEntry[] => {
     }
   } catch (error) {
     reportCaughtError(error);
+    safeRemoveItem(DIAGNOSTICS_KEY);
     return [];
   }
+  safeRemoveItem(DIAGNOSTICS_KEY);
   return [];
 };
 
@@ -387,17 +390,84 @@ const buildReport = (
   };
 };
 
+const buildReportJson = (
+  entries: DiagnosticsEntry[],
+  networkFailures: NetworkFailure[],
+  overlay: DiagnosticsOverlayState,
+  uiStateDump: UiStateDump | null
+): string =>
+  JSON.stringify(
+    buildReport(entries, networkFailures, overlay, uiStateDump),
+    null,
+    2
+  );
+
+const openCopyFallbackModal = (content: string): boolean => {
+  try {
+    const overlay = document.createElement('div');
+    overlay.className = 'error-overlay';
+
+    const card = document.createElement('div');
+    card.className = 'error-overlay__card';
+
+    const title = document.createElement('h2');
+    title.textContent = 'Скопируйте отчёт вручную';
+
+    const text = document.createElement('p');
+    text.className = 'error-overlay__message';
+    text.textContent = 'Автоматическое копирование недоступно. Выделите текст и отправьте отчёт.';
+
+    const textarea = document.createElement('textarea');
+    textarea.value = content;
+    textarea.readOnly = true;
+    textarea.className = 'settings-textarea';
+    textarea.style.minHeight = '220px';
+
+    const actions = document.createElement('div');
+    actions.className = 'error-overlay__buttons';
+
+    const selectAllButton = document.createElement('button');
+    selectAllButton.type = 'button';
+    selectAllButton.className = 'button small';
+    selectAllButton.textContent = 'Выделить всё';
+    selectAllButton.addEventListener('click', () => {
+      textarea.focus();
+      textarea.select();
+      textarea.setSelectionRange(0, textarea.value.length);
+    });
+
+    const closeButton = document.createElement('button');
+    closeButton.type = 'button';
+    closeButton.className = 'button small';
+    closeButton.textContent = 'Закрыть';
+
+    const closeModal = () => overlay.remove();
+    closeButton.addEventListener('click', closeModal);
+    overlay.addEventListener('click', (event) => {
+      if (event.target === overlay) closeModal();
+    });
+
+    actions.append(selectAllButton, closeButton);
+    card.append(title, text, textarea, actions);
+    overlay.append(card);
+    document.body.append(overlay);
+
+    textarea.focus();
+    textarea.select();
+    return true;
+  } catch (error) {
+    reportCaughtError(error);
+    return false;
+  }
+};
+
 const copyDiagnostics = async (
   entries: DiagnosticsEntry[],
   networkFailures: NetworkFailure[],
   overlay: DiagnosticsOverlayState,
   uiStateDump: UiStateDump | null
 ): Promise<boolean> => {
-  const content = JSON.stringify(
-    buildReport(entries, networkFailures, overlay, uiStateDump),
-    null,
-    2
-  );
+  const content = buildReportJson(entries, networkFailures, overlay, uiStateDump);
   if (!content) return false;
   try {
     if (navigator.clipboard?.writeText) {
@@ -406,8 +476,8 @@ const copyDiagnostics = async (
     }
   } catch (error) {
     reportCaughtError(error);
-    // ignore
   }
+
   const textarea = document.createElement('textarea');
   textarea.value = content;
   textarea.style.position = 'fixed';
@@ -422,16 +492,10 @@ const copyDiagnostics = async (
     }
   } catch (error) {
     reportCaughtError(error);
-    // ignore
   }
   textarea.remove();
-  try {
-    window.prompt('Copy diagnostics', content);
-    return true;
-  } catch (error) {
-    reportCaughtError(error);
-    return false;
-  }
+
+  return openCopyFallbackModal(content);
 };
 
 const renderEntry = (entry: DiagnosticsEntry) => {
@@ -476,7 +540,8 @@ const showCopyStatus = (
 const createPanel = (
   state: DiagnosticsState,
   onCopy: () => Promise<boolean>,
-  onDump: () => UiStateDump | null
+  onDump: () => UiStateDump | null,
+  onDownload: () => void
 ): HTMLDetailsElement => {
   const panel = document.createElement('details');
   panel.className = 'diagnostics-panel';
@@ -497,7 +562,7 @@ const createPanel = (
   const copyButton = document.createElement('button');
   copyButton.type = 'button';
   copyButton.className = 'button small';
-  copyButton.textContent = 'Copy diagnostics';
+  copyButton.textContent = 'Скопировать отчёт';
   copyButton.addEventListener('click', async () => {
     const ok = await onCopy();
     showCopyStatus(copyStatus, ok);
@@ -506,18 +571,30 @@ const createPanel = (
   const dumpButton = document.createElement('button');
   dumpButton.type = 'button';
   dumpButton.className = 'button small';
-  dumpButton.textContent = 'Dump UI state';
+  dumpButton.textContent = 'Снять UI-дамп';
   dumpButton.addEventListener('click', () => {
     const dump = onDump();
     copyStatus.textContent = dump
-      ? 'UI state dumped.'
+      ? 'UI-дамп сохранён.'
       : 'Не удалось снять дамп.';
     window.setTimeout(() => {
       copyStatus.textContent = '';
     }, 4000);
   });
 
-  buttons.append(copyButton, dumpButton);
+  const downloadButton = document.createElement('button');
+  downloadButton.type = 'button';
+  downloadButton.className = 'button small';
+  downloadButton.textContent = 'Скачать JSON';
+  downloadButton.addEventListener('click', () => {
+    onDownload();
+    copyStatus.textContent = 'JSON скачан.';
+    window.setTimeout(() => {
+      copyStatus.textContent = '';
+    }, 4000);
+  });
+
+  buttons.append(copyButton, dumpButton, downloadButton);
   actions.append(copyStatus, buttons);
 
   const list = document.createElement('ul');
@@ -1292,9 +1369,27 @@ export const initDiagnostics = (): DiagnosticsController => {
       state.overlay,
       recordUiStateDump('copy')
     ),
-    () => recordUiStateDump('manual')
+    () => recordUiStateDump('manual'),
+    () => {
+      const dump = recordUiStateDump('manual');
+      const report = buildReportJson(
+        state.entries,
+        networkFailures,
+        state.overlay,
+        dump
+      );
+      const encoded = encodeURIComponent(report);
+      const link = document.createElement('a');
+      link.href = `data:application/json;charset=utf-8,${encoded}`;
+      link.download = `life-shield-diagnostics-${Date.now()}.json`;
+      document.body.append(link);
+      link.click();
+      link.remove();
+    }
   );
-  document.body.append(panel);
+  if (isDebugEnabled()) {
+    document.body.append(panel);
+  }
   updatePanel(state);
   startOverlayMutationObserver();
 
