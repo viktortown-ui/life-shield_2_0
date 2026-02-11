@@ -5,6 +5,7 @@ import { IslandId } from '../core/types';
 import { panicReset } from '../core/pwaUpdate';
 import { reportCaughtError } from '../core/reportError';
 import { buildInfo } from '../core/buildInfo';
+import { isDebugEnabled } from '../core/debug';
 
 const parseRoute = () => {
   const hash = window.location.hash.replace('#', '') || '/';
@@ -38,7 +39,7 @@ const createBottomNav = (
 };
 
 const createBuildFooter = () => {
-  const footer = document.createElement('footer');
+  const footer = document.createElement('div');
   footer.className = 'build-footer';
   footer.innerHTML = `
     <span>Build ${buildInfo.id}</span>
@@ -47,26 +48,50 @@ const createBuildFooter = () => {
   return footer;
 };
 
+
+const createAppShell = (
+  screen: HTMLElement,
+  route: { name: 'shield' } | { name: 'settings' } | { name: 'island'; id: IslandId },
+  showBuildInfo: boolean
+) => {
+  const shell = document.createElement('div');
+  shell.className = 'app-shell';
+
+  const main = document.createElement('main');
+  main.className = 'app-main';
+  main.append(screen);
+
+  const footer = document.createElement('footer');
+  footer.className = 'app-footer';
+
+  if (showBuildInfo) {
+    footer.append(createBuildFooter());
+  }
+
+  footer.append(createBottomNav(route));
+  shell.append(main, footer);
+  return shell;
+};
+
 export const initRouter = (root: HTMLElement) => {
   const render = () => {
     try {
       root.innerHTML = '';
       const route = parseRoute();
+      const showBuildInfo = isDebugEnabled();
       if (route.name === 'island') {
-        root.appendChild(createIslandPage(route.id));
-        root.appendChild(createBottomNav(route));
-        root.appendChild(createBuildFooter());
+        root.appendChild(
+          createAppShell(createIslandPage(route.id), route, showBuildInfo)
+        );
         return;
       }
       if (route.name === 'settings') {
-        root.appendChild(createSettingsScreen());
-        root.appendChild(createBottomNav(route));
-        root.appendChild(createBuildFooter());
+        root.appendChild(
+          createAppShell(createSettingsScreen(), route, showBuildInfo)
+        );
         return;
       }
-      root.appendChild(createShieldScreen());
-      root.appendChild(createBottomNav(route));
-      root.appendChild(createBuildFooter());
+      root.appendChild(createAppShell(createShieldScreen(), route, showBuildInfo));
     } catch (error) {
       reportCaughtError(error);
       if (typeof window.reportError === 'function') {
