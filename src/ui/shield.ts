@@ -33,7 +33,7 @@ const getIslandStatus = (lastRunAt: string | null, hasReport: boolean) => {
   const diffDays =
     (Date.now() - new Date(lastRunAt).getTime()) / (1000 * 60 * 60 * 24);
   if (diffDays >= STALE_AFTER_DAYS) {
-    return { label: 'stale', tone: 'status--stale' };
+    return { label: 'Нужно обновить', tone: 'status--stale' };
   }
   return { label: 'Есть данные', tone: 'status--fresh' };
 };
@@ -171,13 +171,13 @@ export const createShieldScreen = () => {
   const verdictTile = document.createElement('div');
   verdictTile.className = 'shield-tile shield-tile--verdict';
   verdictTile.innerHTML = `
-      <span class="tile-status status--fresh">Вердикт дня</span>
+      <span class="tile-status status--fresh">Итог дня</span>
       <div class="tile-score">${clampMetric(verdict.globalScore)}</div>
       <div class="tile-confidence">${clampMetric(verdict.globalConfidence)}%</div>
       <div class="tile-headline">${verdict.mood}</div>
       <div class="tile-progress">
-        <span>Rank: ${verdict.rank}</span>
-        <span>Chaos: ${Math.round(verdict.chaos * 100)}%</span>
+        <span>Уровень: ${verdict.rank}</span>
+        <span>Риск-хаос: ${Math.round(verdict.chaos * 100)}%</span>
       </div>
       <div class="tile-next">${
         verdict.isHighRisk || verdict.isHighUncertainty
