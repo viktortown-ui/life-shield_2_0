@@ -66,6 +66,7 @@ const formatInlineError = (error: unknown) => {
 const initErrorOverlay = (
   diagnostics: ReturnType<typeof initDiagnostics>,
   onCopyDiagnostics: () => Promise<boolean>,
+  onDownloadDiagnostics: () => void,
   onDumpUiState: () => void
 ) => {
   const overlay = document.createElement('div');
@@ -114,30 +115,33 @@ const initErrorOverlay = (
   debugLabel.textContent = 'Показать детали';
 
   debugToggle.append(debugCheckbox, debugLabel);
+
+  const downloadButton = document.createElement('button');
+  downloadButton.type = 'button';
+  downloadButton.className = 'button small';
+  downloadButton.textContent = 'Скачать JSON отчёта';
+
   const buttons = document.createElement('div');
   buttons.className = 'error-overlay__buttons';
-  buttons.append(copyButton, dumpButton, resetButton);
+  buttons.append(copyButton, downloadButton, dumpButton, resetButton);
   actions.append(copyStatus, buttons, debugToggle);
   card.append(title, message, stack, actions);
   overlay.append(card);
   document.body.append(overlay);
 
-  const isProd = import.meta.env.PROD;
-  let debugEnabled = isDebugEnabled() || !isProd;
-
-  if (!isProd) {
-    debugToggle.classList.add('hidden');
-  } else {
-    debugCheckbox.checked = isDebugEnabled();
-  }
+  const overlayDebugEnabled = isDebugEnabled();
+  debugCheckbox.checked = overlayDebugEnabled;
 
   const updateStackVisibility = () => {
-    debugEnabled = !isProd || debugCheckbox.checked || isDebugEnabled();
-    stack.classList.toggle('hidden', !debugEnabled);
+    const showDetails = overlayDebugEnabled && debugCheckbox.checked;
+    stack.classList.toggle('hidden', !showDetails);
   };
 
-  updateStackVisibility();
+  if (!overlayDebugEnabled) {
+    debugToggle.classList.add('hidden');
+  }
 
+  updateStackVisibility();
   debugCheckbox.addEventListener('change', updateStackVisibility);
 
   const getReasonInfo = (error: unknown) => {
@@ -226,6 +230,19 @@ const initErrorOverlay = (
     } catch (error) {
       reportCaughtError(error);
       copyStatus.textContent = 'Не удалось скопировать.';
+    }
+    window.setTimeout(() => {
+      copyStatus.textContent = '';
+    }, 4000);
+  });
+
+  downloadButton.addEventListener('click', () => {
+    try {
+      onDownloadDiagnostics();
+      copyStatus.textContent = 'JSON скачан.';
+    } catch (error) {
+      reportCaughtError(error);
+      copyStatus.textContent = 'Не удалось скачать JSON.';
     }
     window.setTimeout(() => {
       copyStatus.textContent = '';
@@ -460,7 +477,7 @@ const initDomMutationObserver = (
 };
 
 let showErrorOverlay: ((error: unknown) => void) | null = null;
-const diagnostics = initDiagnostics();
+const diagnostics = initDiagnostics(isDebugEnabled());
 let lastFatalEntry: DiagnosticsEntry | null = null;
 
 try {
@@ -469,6 +486,7 @@ try {
   const overlayController = initErrorOverlay(
     diagnostics,
     () => diagnostics.copy(),
+    () => diagnostics.downloadReport(),
     () => {
       diagnostics.dumpUiState('manual');
     }

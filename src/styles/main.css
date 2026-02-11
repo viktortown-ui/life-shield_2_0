@@ -4,6 +4,7 @@
   background: #0b1220;
   color: #e8edf6;
   --footer-stack-height: 88px;
+  --bottom-nav-inset: 116px;
 }
 
 * {
@@ -290,6 +291,7 @@ body {
   margin: 0 auto;
   min-height: 100vh;
   height: 100dvh;
+  padding-bottom: calc(var(--bottom-nav-inset, 116px) + env(safe-area-inset-bottom, 0px));
 }
 
 .app-shell {
@@ -1098,7 +1100,7 @@ body {
 
 @media (min-width: 431px) {
   #app {
-    padding: 24px 24px calc(124px + env(safe-area-inset-bottom));
+    padding: 24px 24px calc(var(--bottom-nav-inset, 116px) + env(safe-area-inset-bottom, 0px));
   }
 
   .bottom-nav {

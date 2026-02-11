@@ -3,24 +3,31 @@ import { safeGetItem } from './storage';
 const DEBUG_QUERY_PARAM = 'debug';
 const DEBUG_STORAGE_KEY = 'ls_debug';
 
-const normalizeFlag = (value: string | null): boolean => {
-  if (!value) return false;
-  const normalized = value.trim().toLowerCase();
-  return normalized === '1' || normalized === 'true' || normalized === 'yes';
+const isEnabledFlag = (value: string | null): boolean => value?.trim() === '1';
+
+const hasDebugInHash = (): boolean => {
+  const hash = window.location.hash || '';
+  if (!hash.includes('debug=')) return false;
+  const [, queryLike = ''] = hash.split('?');
+  if (!queryLike) return false;
+  return isEnabledFlag(new URLSearchParams(queryLike).get(DEBUG_QUERY_PARAM));
 };
 
 export const isDebugEnabled = (): boolean => {
   try {
-    const queryFlag = new URLSearchParams(window.location.search).get(
-      DEBUG_QUERY_PARAM
-    );
-    if (normalizeFlag(queryFlag)) {
+    if (
+      isEnabledFlag(
+        new URLSearchParams(window.location.search).get(DEBUG_QUERY_PARAM)
+      )
+    ) {
+      return true;
+    }
+    if (hasDebugInHash()) {
       return true;
     }
   } catch {
     // ignore malformed URL cases
   }
 
-  return normalizeFlag(safeGetItem(DEBUG_STORAGE_KEY));
+  return isEnabledFlag(safeGetItem(DEBUG_STORAGE_KEY));
 };
-

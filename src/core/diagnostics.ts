@@ -306,18 +306,38 @@ const formatEntryDetails = (entry: DiagnosticsEntry): string => {
 const loadStoredEntries = (): DiagnosticsEntry[] => {
   const raw = safeGetItem(DIAGNOSTICS_KEY);
   if (!raw) return [];
+
+  const isValidEntry = (value: unknown): value is DiagnosticsEntry => {
+    if (!value || typeof value !== 'object') return false;
+    const candidate = value as Partial<DiagnosticsEntry>;
+    return (
+      typeof candidate.id === 'string' &&
+      typeof candidate.errorId === 'string' &&
+      typeof candidate.ts === 'string' &&
+      typeof candidate.kind === 'string' &&
+      typeof candidate.message === 'string' &&
+      typeof candidate.rawType === 'string'
+    );
+  };
+
   try {
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) {
-      return parsed.slice(-MAX_ENTRIES) as DiagnosticsEntry[];
+    if (!Array.isArray(parsed)) {
+      safeRemoveItem(DIAGNOSTICS_KEY);
+      return [];
     }
+
+    if (!parsed.every(isValidEntry)) {
+      safeRemoveItem(DIAGNOSTICS_KEY);
+      return [];
+    }
+
+    return parsed.slice(-MAX_ENTRIES);
   } catch (error) {
     reportCaughtError(error);
     safeRemoveItem(DIAGNOSTICS_KEY);
     return [];
   }
-  safeRemoveItem(DIAGNOSTICS_KEY);
-  return [];
 };
 
 const persistEntries = (entries: DiagnosticsEntry[]) => {
@@ -401,6 +421,16 @@ const buildReportJson = (
     null,
     2
   );
+
+const downloadDiagnosticsReport = (content: string) => {
+  const encoded = encodeURIComponent(content);
+  const link = document.createElement('a');
+  link.href = `data:application/json;charset=utf-8,${encoded}`;
+  link.download = `life-shield-diagnostics-${Date.now()}.json`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+};
 
 const openCopyFallbackModal = (content: string): boolean => {
   try {
@@ -886,9 +916,10 @@ export type DiagnosticsController = {
   ) => DiagnosticsEntry;
   pushBreadcrumb: (step: string) => DiagnosticsEntry;
   setOverlayState: (overlay: DiagnosticsOverlayState) => void;
+  downloadReport: () => void;
 };
 
-export const initDiagnostics = (): DiagnosticsController => {
+export const initDiagnostics = (uiEnabled = isDebugEnabled()): DiagnosticsController => {
   const state: DiagnosticsState = {
     entries: loadStoredEntries(),
     panel: null,
@@ -1378,16 +1409,10 @@ export const initDiagnostics = (): DiagnosticsController => {
         state.overlay,
         dump
       );
-      const encoded = encodeURIComponent(report);
-      const link = document.createElement('a');
-      link.href = `data:application/json;charset=utf-8,${encoded}`;
-      link.download = `life-shield-diagnostics-${Date.now()}.json`;
-      document.body.append(link);
-      link.click();
-      link.remove();
+      downloadDiagnosticsReport(report);
     }
   );
-  if (isDebugEnabled()) {
+  if (uiEnabled) {
     document.body.append(panel);
   }
   updatePanel(state);
@@ -1480,6 +1505,16 @@ export const initDiagnostics = (): DiagnosticsController => {
       } catch (error) {
         reportCaughtError(error);
       }
+    },
+    downloadReport: () => {
+      const dump = recordUiStateDump('manual');
+      const report = buildReportJson(
+        state.entries,
+        networkFailures,
+        state.overlay,
+        dump
+      );
+      downloadDiagnosticsReport(report);
     }
   };
 };
