@@ -1,4 +1,5 @@
 import { islandRegistry } from '../core/registry';
+import { baseIslandIds, getIslandCatalogItem } from '../core/islandsCatalog';
 import { AppState, IslandReport } from '../core/types';
 import { getState } from '../core/store';
 import { buildGlobalVerdict } from '../core/verdict';
@@ -240,12 +241,13 @@ export const createShieldScreen = () => {
     const score = clampMetric(report?.score ?? 0);
     const confidence = clampMetric(report?.confidence ?? 0);
     const progress = islandState.progress;
+    const catalog = getIslandCatalogItem(island.id);
     const nextStepLabel = report?.actions?.[0]?.title ?? 'Открыть остров и запустить анализ';
     const status = getIslandStatus(progress.lastRunAt, Boolean(report));
 
     tile.innerHTML = `
       <span class="tile-status ${status.tone}">${status.label}</span>
-      <div class="tile-score">${island.title}</div>
+      <div class="tile-score">${catalog.displayName}</div>
       <div class="tile-progress">
         <span>Индекс: ${score}</span>
         <span>Доверие: ${confidence}%</span>
@@ -268,7 +270,7 @@ export const createShieldScreen = () => {
   const latestRuns = islandRegistry
     .map((island) => ({
       id: island.id,
-      title: island.title,
+      title: getIslandCatalogItem(island.id).displayName,
       lastRunAt: state.islands[island.id].progress.lastRunAt,
       trail: getHistoryTail(state, island.id).join(' → ') || '—'
     }))
@@ -298,6 +300,19 @@ export const createShieldScreen = () => {
   }
   historyGroup.appendChild(historyList);
 
+
+
+  const nextBaseGroup = document.createElement('section');
+  nextBaseGroup.className = 'shield-group';
+  nextBaseGroup.innerHTML = '<h2 class="group-title">Что дальше?</h2>';
+
+  const nextBaseLinks = document.createElement('div');
+  nextBaseLinks.className = 'screen-actions';
+  nextBaseLinks.innerHTML = baseIslandIds
+    .map((id) => `<a class="button ghost" href="#/island/${id}">${getIslandCatalogItem(id).displayName}</a>`)
+    .join('');
+  nextBaseGroup.appendChild(nextBaseLinks);
+
   const actions = document.createElement('div');
   actions.className = 'screen-actions';
   actions.innerHTML = `
@@ -313,6 +328,7 @@ export const createShieldScreen = () => {
     todayGroup,
     islandsGroup,
     historyGroup,
+    nextBaseGroup,
     actions
   );
   return container;
