@@ -1,5 +1,6 @@
 import { downloadReport } from '../core/diagnostics';
 import { islandRegistry } from '../core/registry';
+import { AppState, IslandId } from '../core/types';
 import { getState } from '../core/store';
 import { reportCaughtError } from '../core/reportError';
 import {
@@ -38,9 +39,89 @@ const copyText = async (text: string) => {
   }
 };
 
+const buildExecutiveSummary = (state: AppState) => {
+  const reports = islandRegistry
+    .map((island) => state.islands[island.id].lastReport)
+    .filter(Boolean);
+  const totalRuns = islandRegistry.reduce(
+    (sum, island) => sum + state.islands[island.id].progress.runsCount,
+    0
+  );
+
+  if (!reports.length || totalRuns === 0) {
+    return [
+      'Пока нет запусков, поэтому итог строится только на вводе данных.',
+      'Начните с одного острова и получите первый ориентир уже после первого расчёта.',
+      'После этого отчёт покажет слабые места и конкретные действия на неделю.'
+    ];
+  }
+
+  const avgScore = Math.round(
+    reports.reduce((sum, report) => sum + report.score, 0) / reports.length
+  );
+  const avgConfidence = Math.round(
+    reports.reduce((sum, report) => sum + report.confidence, 0) / reports.length
+  );
+  const weakest = [...reports].sort((a, b) => a.score - b.score)[0];
+
+  return [
+    `Сейчас средний индекс устойчивости: ${avgScore} из 100 по ${reports.length} островам.`,
+    `Надёжность выводов на уровне ${avgConfidence}%, значит данные уже полезны для решений.`,
+    `Главная зона роста на неделю — «${weakest.headline}»: усилив её, вы быстрее поднимете общий результат.`
+  ];
+};
+
+const pickWeakestIsland = (state: AppState): IslandId | null => {
+  const weakest = islandRegistry
+    .map((island) => ({ id: island.id, report: state.islands[island.id].lastReport }))
+    .filter((item) => Boolean(item.report))
+    .sort((a, b) => (a.report?.score ?? 0) - (b.report?.score ?? 0))[0];
+  return weakest?.id ?? null;
+};
+
+const buildWeeklyLevers = (state: AppState) => {
+  const levers: string[] = [];
+  const weakestIsland = pickWeakestIsland(state);
+
+  if (weakestIsland) {
+    const title = islandRegistry.find((island) => island.id === weakestIsland)?.title;
+    levers.push(`Сделайте 1 дополнительный запуск в «${title}» и доведите индекс острова минимум до +5 пунктов.`);
+  }
+
+  const lowConfidenceIsland = islandRegistry
+    .map((island) => ({ id: island.id, report: state.islands[island.id].lastReport }))
+    .filter((item) => Boolean(item.report) && (item.report?.confidence ?? 0) < 65)
+    .sort((a, b) => (a.report?.confidence ?? 0) - (b.report?.confidence ?? 0))[0];
+
+  if (lowConfidenceIsland) {
+    const title = islandRegistry.find((island) => island.id === lowConfidenceIsland.id)?.title;
+    levers.push(`Обновите исходные данные в «${title}», чтобы поднять доверие модели выше 65%.`);
+  }
+
+  if (state.streakDays < 3) {
+    levers.push('Закрепите ритм: запланируйте минимум 2 запуска в разные дни этой недели.');
+  }
+
+  const totalRuns = islandRegistry.reduce(
+    (sum, island) => sum + state.islands[island.id].progress.runsCount,
+    0
+  );
+  if (totalRuns < 3) {
+    levers.push('Наберите базу: выполните ещё 3 запуска в ключевых островах для устойчивого тренда.');
+  }
+
+  while (levers.length < 3) {
+    levers.push('Проверьте отчёт в конце недели и зафиксируйте один шаг, который дал наибольший прирост.');
+  }
+
+  return levers.slice(0, 3);
+};
+
 const buildReportText = () => {
   const state = getState();
   const summary = getReportSummary(state);
+  const executive = buildExecutiveSummary(state);
+  const levers = buildWeeklyLevers(state);
 
   const islandBlocks = islandRegistry.map((island) => {
     const islandState = state.islands[island.id];
@@ -58,6 +139,9 @@ const buildReportText = () => {
   return [
     'Life-Shield 2.0 — Последний отчёт',
     summary.text,
+    ...executive,
+    '3 рычага на неделю:',
+    ...levers.map((lever, index) => `${index + 1}. ${lever}`),
     ...islandBlocks
   ].join('\n\n');
 };
@@ -65,6 +149,8 @@ const buildReportText = () => {
 export const createReportScreen = () => {
   const state = getState();
   const summary = getReportSummary(state);
+  const executive = buildExecutiveSummary(state);
+  const levers = buildWeeklyLevers(state);
 
   const container = document.createElement('div');
   container.className = 'screen report-screen';
@@ -76,6 +162,19 @@ export const createReportScreen = () => {
       <h1>Последний отчёт</h1>
       <p>${summary.text}</p>
     </div>
+  `;
+
+  const executiveCard = document.createElement('section');
+  executiveCard.className = 'quest-card';
+  executiveCard.innerHTML = `
+    <div class="quest-title">Резюме</div>
+    <div class="tile-headline">${executive[0]}</div>
+    <div class="tile-headline">${executive[1]}</div>
+    <div class="tile-headline">${executive[2]}</div>
+    <div class="quest-title">3 рычага на неделю</div>
+    <ol class="report-metrics">
+      ${levers.map((lever) => `<li>${lever}</li>`).join('')}
+    </ol>
   `;
 
   const actions = document.createElement('div');
@@ -128,18 +227,20 @@ export const createReportScreen = () => {
       <div class="tile-headline">${report?.headline ?? 'Нет данных'}</div>
       <ul class="report-metrics">
         ${getTopMetrics(report)
+          .slice(0, 2)
           .map((metric) => `<li>${metric}</li>`)
           .join('')}
       </ul>
-      <div class="tile-next">Что делать дальше: ${getNextAction(report)}</div>
       <div class="tile-progress">
         <span>Последний запуск: ${formatLastRun(islandState.progress.lastRunAt)}</span>
+        <span>Запусков: ${islandState.progress.runsCount}</span>
       </div>
+      <div class="tile-next">Следующий шаг: ${getNextAction(report)}</div>
       <div class="tile-sparkline">${buildSparklineSvg(islandState.progress.history)}</div>
     `;
     grid.appendChild(card);
   });
 
-  container.append(header, actions, grid);
+  container.append(header, executiveCard, actions, grid);
   return container;
 };

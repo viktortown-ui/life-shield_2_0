@@ -9,12 +9,30 @@ import {
 } from './reportUtils';
 
 const whyByIsland: Record<string, string> = {
-  bayes: 'Оценить риск и буфер на ближайшие месяцы.',
-  hmm: 'Понять текущее состояние и куда ведёт динамика.',
-  timeseries: 'Увидеть краткий прогноз тренда и волатильности.',
-  optimization: 'Выбрать лучший план в рамках ограничений.',
-  decisionTree: 'Сравнить варианты решений и их последствия.',
-  causalDag: 'Разобрать причинно-следственные связи и рычаги.'
+  bayes: 'Понять, хватит ли финансового буфера на ближайшие месяцы.',
+  hmm: 'Оценить, стабильная сейчас ситуация или растёт риск стресса.',
+  timeseries: 'Увидеть ожидаемый тренд дохода и колебания на горизонте 3 месяцев.',
+  optimization: 'Выбрать реалистичный план действий под ваши ограничения.',
+  decisionTree: 'Сравнить варианты решения и вероятные последствия.',
+  causalDag: 'Разобраться, какие причины сильнее всего влияют на итог.'
+};
+
+const inputByIsland: Record<string, string> = {
+  bayes: 'Доходы, расходы, резерв и период наблюдений.',
+  hmm: 'Последовательность состояний или индикаторов по периодам.',
+  timeseries: 'Ряд значений по месяцам/неделям в хронологическом порядке.',
+  optimization: 'Доступные опции, бюджет, ограничения и обязательные условия.',
+  decisionTree: 'Варианты действий, вероятности исходов и эффект каждого исхода.',
+  causalDag: 'Список факторов и связи между ними (что на что влияет).'
+};
+
+const outputByIsland: Record<string, string> = {
+  bayes: 'Оценку риска, доверительный диапазон и конкретные шаги снижения риска.',
+  hmm: 'Текущее состояние, вероятность смены режима и ранние сигналы.',
+  timeseries: 'Краткосрочный прогноз с диапазоном и оценкой волатильности.',
+  optimization: 'Лучший набор действий с ожидаемой пользой и стоимостью.',
+  decisionTree: 'Рейтинг вариантов и ожидаемую ценность каждого решения.',
+  causalDag: 'Ключевые рычаги влияния и точки, где менять ситуацию проще всего.'
 };
 
 export const createIslandsHubScreen = () => {
@@ -28,7 +46,7 @@ export const createIslandsHubScreen = () => {
   header.innerHTML = `
     <div>
       <h1>Острова</h1>
-      <p>Выберите модуль и сделайте следующий шаг.</p>
+      <p>Выберите модуль и двигайтесь шаг за шагом.</p>
       <p class="hub-meta">Результатов: ${summary.total} · Ср. индекс: ${summary.avgScore} · Последний запуск: ${formatLastRun(summary.latestRun)}</p>
     </div>
   `;
@@ -49,11 +67,12 @@ export const createIslandsHubScreen = () => {
     card.innerHTML = `
       <span class="tile-status ${status.tone}">${status.label}</span>
       <div class="tile-score">${island.title}</div>
-      <div class="tile-headline">${islandState.lastReport?.headline ?? (whyByIsland[island.id] ?? island.description)}</div>
+      <div class="tile-headline"><strong>Зачем это:</strong> ${whyByIsland[island.id] ?? island.description}</div>
+      <div class="tile-headline"><strong>Что нужно ввести:</strong> ${inputByIsland[island.id] ?? 'Ваши исходные данные по модулю.'}</div>
+      <div class="tile-headline"><strong>Что получишь:</strong> ${outputByIsland[island.id] ?? 'Короткий отчёт и следующий шаг.'}</div>
       <div class="tile-progress">
         <span>Запусков: ${islandState.progress.runsCount}</span>
-        <span>Лучший: ${islandState.progress.bestScore}</span>
-        <span>Последний: ${formatLastRun(islandState.progress.lastRunAt)}</span>
+        <span>Последний запуск: ${formatLastRun(islandState.progress.lastRunAt)}</span>
       </div>
       <div class="tile-next">Динамика: ${trend}</div>
       <div class="tile-sparkline">${buildSparklineSvg(islandState.progress.history)}</div>
