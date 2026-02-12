@@ -20,6 +20,7 @@ import {
 import { reportCaughtError } from './core/reportError';
 import { initRouter } from './ui/router';
 import { isDebugEnabled } from './core/debug';
+import { initWebVitalsTelemetry } from './core/perfVitals';
 
 const isDiagnosticsEntry = (error: unknown): error is DiagnosticsEntry =>
   typeof error === 'object' &&
@@ -479,6 +480,7 @@ const initDomMutationObserver = (
 
 let showErrorOverlay: ((error: unknown) => void) | null = null;
 const diagnostics = initDiagnostics(isDebugEnabled());
+initWebVitalsTelemetry(diagnostics);
 let lastFatalEntry: DiagnosticsEntry | null = null;
 
 try {
