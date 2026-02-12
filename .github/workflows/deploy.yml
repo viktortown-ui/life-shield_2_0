@@ -42,6 +42,9 @@ jobs:
       - name: Ensure production index (no /src/main.ts)
         run: '! rg -n "/src/main.ts" dist/index.html'
 
+      - name: Preview smoke (no debug diagnostics/footer)
+        run: npm run smoke:preview
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:

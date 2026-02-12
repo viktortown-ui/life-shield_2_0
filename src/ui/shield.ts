@@ -4,12 +4,14 @@ import { buildGlobalVerdict } from '../core/verdict';
 import { IslandReport } from '../core/types';
 import { reportCaughtError } from '../core/reportError';
 import { createAvatar } from './avatar';
+import {
+  buildSparklineSvg,
+  clampMetric,
+  getHistoryTail,
+  getIslandStatus
+} from './reportUtils';
 
 const XP_PER_LEVEL = 120;
-const STALE_AFTER_DAYS = 7;
-
-const clampMetric = (value: number) =>
-  Math.min(100, Math.max(0, Math.round(value)));
 
 const normalizeReport = (report: IslandReport): IslandReport => ({
   ...report,
@@ -25,17 +27,6 @@ const pickTopAction = (report: IslandReport) => {
       score: action.impact / Math.max(1, action.effort)
     }))
     .sort((a, b) => b.score - a.score)[0]?.action;
-};
-
-const getIslandStatus = (lastRunAt: string | null, hasReport: boolean) => {
-  if (!hasReport) return { label: 'Нет данных', tone: 'status--new' };
-  if (!lastRunAt) return { label: 'Есть данные', tone: 'status--fresh' };
-  const diffDays =
-    (Date.now() - new Date(lastRunAt).getTime()) / (1000 * 60 * 60 * 24);
-  if (diffDays >= STALE_AFTER_DAYS) {
-    return { label: 'Нужно обновить', tone: 'status--stale' };
-  }
-  return { label: 'Есть данные', tone: 'status--fresh' };
 };
 
 export const createShieldScreen = () => {
@@ -225,7 +216,9 @@ export const createShieldScreen = () => {
       <div class="tile-progress">
         <span>Лучший: ${progress.bestScore}</span>
         <span>Запусков: ${progress.runsCount}</span>
+        <span>3 последних: ${getHistoryTail(state, island.id).join(' → ') || '—'}</span>
       </div>
+      <div class="tile-sparkline">${buildSparklineSvg(progress.history)}</div>
       <div class="tile-next">Следующий шаг: ${nextStepLabel}</div>
     `;
 
@@ -236,6 +229,7 @@ export const createShieldScreen = () => {
   actions.className = 'screen-actions';
   actions.innerHTML = `
     <a class="button ghost" href="#/islands">Все острова</a>
+    <a class="button ghost" href="#/report">Отчёт</a>
     <a class="button" href="#/settings">Настройки</a>
   `;
 

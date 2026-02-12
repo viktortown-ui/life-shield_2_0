@@ -1,6 +1,6 @@
 import { AppState } from './types';
 
-export const schemaVersion = 3;
+export const schemaVersion = 4;
 
 export type Migration = (state: AppState) => AppState;
 
@@ -20,7 +20,8 @@ export const migrations: Migration[] = [
           progress: island.progress ?? {
             lastRunAt: null,
             runsCount: 0,
-            bestScore: 0
+            bestScore: 0,
+            history: []
           }
         }
       ])
@@ -33,6 +34,24 @@ export const migrations: Migration[] = [
       onboarded: state.flags?.onboarded ?? false,
       demoLoaded: state.flags?.demoLoaded ?? false
     }
+  }),
+  (state) => ({
+    ...state,
+    schemaVersion: 4,
+    islands: Object.fromEntries(
+      Object.entries(state.islands).map(([key, island]) => [
+        key,
+        {
+          ...island,
+          progress: {
+            ...island.progress,
+            history: Array.isArray(island.progress?.history)
+              ? island.progress.history
+              : []
+          }
+        }
+      ])
+    )
   })
 ];
 

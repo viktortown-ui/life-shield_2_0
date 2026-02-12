@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "smoke:preview": "bash ./scripts/smokePreview.sh"
   },
   "devDependencies": {
     "@types/node": "^22.10.1",
