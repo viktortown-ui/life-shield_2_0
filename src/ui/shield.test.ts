@@ -59,7 +59,7 @@ describe('resolvePrimaryPath', () => {
   it('returns "Заполнить данные" when there is no input and no runs', () => {
     const path = resolvePrimaryPath(makeState());
     expect(path.label).toBe('Заполнить данные');
-    expect(path.href).toBe('#/island/snapshot');
+    expect(path.href).toBe('#/finance');
   });
 
   it('returns "Запустить анализ" when onboarded but runs are missing', () => {

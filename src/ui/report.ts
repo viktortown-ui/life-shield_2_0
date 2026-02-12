@@ -131,8 +131,9 @@ const buildReportText = () => {
     return [
       `${getIslandCatalogItem(island.id).displayName}`,
       `Статус: ${report?.headline ?? 'нет данных'}`,
-      `Метрики: ${metrics}`,
+      `Почему: ${report?.summary ?? 'недостаточно данных для объяснения'}`,
       `Что делать: ${getNextAction(report)}`,
+      `Метрики: ${metrics}`,
       `Последний запуск: ${formatLastRun(islandState.progress.lastRunAt)}`
     ].join('\n');
   });
@@ -245,11 +246,12 @@ export const createReportScreen = () => {
           .map((metric) => `<li>${metric}</li>`)
           .join('')}
       </ul>
+      ${baseIslandIds.includes(island.id) ? `<div class="tile-headline">Почему: ${report?.summary ?? 'Запустите анализ, чтобы получить объяснение.'}</div><div class="tile-next">Что сделать: ${getNextAction(report)}</div>` : ''}
       <div class="tile-progress">
         <span>Последний запуск: ${formatLastRun(islandState.progress.lastRunAt)}</span>
         <span>Запусков: ${islandState.progress.runsCount}</span>
       </div>
-      <div class="tile-next">Следующий шаг: ${getNextAction(report)}</div>
+      ${baseIslandIds.includes(island.id) ? '' : `<div class="tile-next">Следующий шаг: ${getNextAction(report)}</div>`}
       <div class="tile-sparkline">${buildSparklineSvg(islandState.progress.history)}</div>
     `;
     grid.appendChild(card);

@@ -281,6 +281,43 @@ export const updateIslandInput = (id: IslandId, input: string) => {
   });
 };
 
+export const saveFinanceInput = (finance: FinanceInputData) => {
+  const state = getState();
+  const serializedFinance = serializeFinanceInput(finance);
+
+  updateState({
+    ...state,
+    inputData: {
+      ...state.inputData,
+      finance
+    },
+    islands: {
+      ...state.islands,
+      snapshot: {
+        ...state.islands.snapshot,
+        input: serializedFinance
+      },
+      stressTest: {
+        ...state.islands.stressTest,
+        input: serializedFinance
+      },
+      incomePortfolio: {
+        ...state.islands.incomePortfolio,
+        input: serializedFinance
+      }
+    }
+  });
+};
+
+export const runBaseFinanceAnalysis = (finance: FinanceInputData) => {
+  saveFinanceInput(finance);
+  const serializedFinance = serializeFinanceInput(finance);
+
+  updateIslandReport('snapshot', getSnapshotReport(serializedFinance));
+  updateIslandReport('stressTest', getStressTestReport(serializedFinance));
+  updateIslandReport('incomePortfolio', getIncomePortfolioReport(serializedFinance));
+};
+
 export const updateIslandReport = (id: IslandId, report: IslandReport) => {
   const state = getState();
   const now = new Date().toISOString();

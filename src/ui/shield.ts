@@ -4,6 +4,7 @@ import { AppState, IslandReport } from '../core/types';
 import { getState } from '../core/store';
 import { buildGlobalVerdict } from '../core/verdict';
 import { createAvatar } from './avatar';
+import { deriveShieldTiles } from '../core/shieldModel';
 import {
   buildSparklineSvg,
   clampMetric,
@@ -60,7 +61,7 @@ export const resolvePrimaryPath = (state: AppState) => {
 
   return {
     label: 'Заполнить данные',
-    href: '#/island/snapshot',
+    href: '#/finance',
     hint: 'Начните с базовых данных, чтобы получить первый результат.'
   };
 };
@@ -204,6 +205,28 @@ export const createShieldScreen = () => {
   `;
   todayGroup.appendChild(quests);
 
+
+  const shieldTilesGroup = document.createElement('section');
+  shieldTilesGroup.className = 'shield-group';
+  shieldTilesGroup.innerHTML = '<h2 class="group-title">6 плиток Щита</h2>';
+
+  const shieldTilesGrid = document.createElement('section');
+  shieldTilesGrid.className = 'shield-grid';
+  const shieldTiles = deriveShieldTiles(state);
+  shieldTilesGrid.innerHTML = shieldTiles
+    .map(
+      (tile) => `
+        <article class="shield-tile">
+          <span class="tile-status status--fresh">${tile.source}</span>
+          <div class="tile-score">${tile.title}</div>
+          <div class="tile-progress"><span>Индекс: ${tile.score}</span></div>
+          <div class="tile-next">${tile.summary}</div>
+        </article>
+      `
+    )
+    .join('');
+  shieldTilesGroup.appendChild(shieldTilesGrid);
+
   const islandsGroup = document.createElement('section');
   islandsGroup.className = 'shield-group';
   islandsGroup.innerHTML = '<h2 class="group-title">Острова</h2>';
@@ -340,6 +363,7 @@ export const createShieldScreen = () => {
   const actions = document.createElement('div');
   actions.className = 'screen-actions';
   actions.innerHTML = `
+    <a class="button ghost" href="#/finance">Финансы</a>
     <a class="button ghost" href="#/islands">Все острова</a>
     <a class="button ghost" href="#/report">Отчёт</a>
     <a class="button" href="#/settings">Настройки</a>
@@ -350,6 +374,7 @@ export const createShieldScreen = () => {
     nextStep,
     statusGroup,
     todayGroup,
+    shieldTilesGroup,
     islandsGroup,
     historyGroup,
     nextBaseGroup,

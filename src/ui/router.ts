@@ -10,6 +10,7 @@ import { getState } from '../core/store';
 import { createOnboardingModal } from './onboarding';
 import { createIslandsHubScreen } from './islandsHub';
 import { createReportScreen } from './report';
+import { createFinanceScreen } from './finance';
 
 const parseRoute = () => {
   const hash = window.location.hash.replace('#', '') || '/';
@@ -26,6 +27,9 @@ const parseRoute = () => {
   if ((parts[0] === 'shield' && parts[1] === 'report') || parts[0] === 'report') {
     return { name: 'report' };
   }
+  if (parts[0] === 'finance') {
+    return { name: 'finance' };
+  }
   return { name: 'shield' };
 };
 
@@ -34,7 +38,8 @@ type Route =
   | { name: 'settings' }
   | { name: 'island'; id: IslandId }
   | { name: 'islands' }
-  | { name: 'report' };
+  | { name: 'report' }
+  | { name: 'finance' };
 
 const createBottomNav = (route: Route) => {
   const nav = document.createElement('nav');
@@ -44,6 +49,7 @@ const createBottomNav = (route: Route) => {
   nav.innerHTML = `
     <a class="bottom-nav-link ${route.name === 'shield' ? 'active' : ''}" href="#/">Щит</a>
     <a class="bottom-nav-link ${route.name === 'island' || route.name === 'islands' ? 'active' : ''}" href="#/islands">Острова</a>
+    <a class="bottom-nav-link ${route.name === 'finance' ? 'active' : ''}" href="#/finance">Финансы</a>
     <a class="bottom-nav-link ${route.name === 'report' ? 'active' : ''}" href="#/report">Отчёт</a>
     <a class="bottom-nav-link ${route.name === 'settings' ? 'active' : ''}" href="#/settings">Настройки</a>
   `;
@@ -132,6 +138,8 @@ export const initRouter = (root: HTMLElement) => {
         );
       } else if (route.name === 'report') {
         root.appendChild(createAppShell(createReportScreen(), route, showBuildInfo));
+      } else if (route.name === 'finance') {
+        root.appendChild(createAppShell(createFinanceScreen(), route, showBuildInfo));
       } else {
         root.appendChild(createAppShell(createShieldScreen(), route, showBuildInfo));
       }
