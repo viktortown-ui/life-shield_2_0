@@ -13,14 +13,41 @@ export interface IslandCatalogItem {
 }
 
 export const islandsCatalog: Record<IslandId, IslandCatalogItem> = {
+  snapshot: {
+    id: 'snapshot',
+    displayName: 'Снимок',
+    shortWhy: 'Понять финансовую устойчивость на текущий момент по ключевым метрикам.',
+    inputHint: 'monthlyIncome, monthlyExpenses, reserveCash, monthlyDebtPayment, incomeSourcesCount.',
+    outputHint: 'Runway, долговую нагрузку, покрытие и итоговый индекс 0–100.',
+    group: 'base',
+    badge: 'База'
+  },
+  stressTest: {
+    id: 'stressTest',
+    displayName: 'Стресс-тест',
+    shortWhy: 'Проверить, что будет при просадке дохода и росте расходов.',
+    inputHint: 'Те же финполя, что и в «Снимке».',
+    outputHint: 'Runway по сценариям, зоны риска и короткие подсказки действий.',
+    group: 'base',
+    badge: 'База'
+  },
+  incomePortfolio: {
+    id: 'incomePortfolio',
+    displayName: 'Портфель доходов',
+    shortWhy: 'Оценить концентрацию доходов и устойчивость источников.',
+    inputHint: 'Список источников (amount, stability) или top1/top3 + число источников.',
+    outputHint: 'HHI, долю top-1, стабильность и совет по диверсификации.',
+    group: 'base',
+    badge: 'База'
+  },
   bayes: {
     id: 'bayes',
     displayName: 'Снимок',
     shortWhy: 'Быстро понять, хватает ли текущего запаса прочности.',
     inputHint: 'Доход, расходы, резерв и горизонт в месяцах.',
     outputHint: 'Оценку риска и первый набор действий на ближайший период.',
-    group: 'base',
-    badge: 'База'
+    group: 'lab',
+    badge: 'Лаборатория'
   },
   hmm: {
     id: 'hmm',
@@ -28,8 +55,8 @@ export const islandsCatalog: Record<IslandId, IslandCatalogItem> = {
     shortWhy: 'Показать, в каком режиме вы сейчас: стабильно или с риском стресса.',
     inputHint: 'Последовательность сигналов/состояний по периодам.',
     outputHint: 'Текущий режим и вероятность его смены.',
-    group: 'base',
-    badge: 'База'
+    group: 'lab',
+    badge: 'Лаборатория'
   },
   timeseries: {
     id: 'timeseries',
@@ -37,8 +64,8 @@ export const islandsCatalog: Record<IslandId, IslandCatalogItem> = {
     shortWhy: 'Увидеть, куда движутся показатели в ближайшие месяцы.',
     inputHint: 'Хронологический ряд значений по неделям или месяцам.',
     outputHint: 'Краткосрочный прогноз, диапазон и волатильность.',
-    group: 'base',
-    badge: 'База'
+    group: 'lab',
+    badge: 'Лаборатория'
   },
   optimization: {
     id: 'optimization',

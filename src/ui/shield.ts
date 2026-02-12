@@ -60,7 +60,7 @@ export const resolvePrimaryPath = (state: AppState) => {
 
   return {
     label: 'Заполнить данные',
-    href: '#/island/bayes',
+    href: '#/island/snapshot',
     hint: 'Начните с базовых данных, чтобы получить первый результат.'
   };
 };

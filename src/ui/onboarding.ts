@@ -29,7 +29,7 @@ export const createOnboardingModal = () => {
       window.location.hash = '#/';
     } else if (action === 'quick') {
       setOnboarded(true);
-      window.location.hash = '#/island/bayes';
+      window.location.hash = '#/island/snapshot';
     } else {
       setOnboarded(true);
       window.location.hash = '#/';

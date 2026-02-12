@@ -1,6 +1,7 @@
 import { migrate, schemaVersion } from './migrations';
 import {
   AppState,
+  FinanceInputData,
   IslandId,
   IslandReport,
   IslandRunHistoryEntry,
@@ -9,11 +10,13 @@ import {
 import { safeGetItem, safeRemoveItem, safeSetItem } from './storage';
 import { reportCaughtError } from './reportError';
 import {
-  BayesInput,
-  buildBayesReport,
-  defaultBayesInput,
-  serializeBayesInput
-} from '../islands/bayes';
+  defaultFinanceInput,
+  parseFinanceInput,
+  serializeFinanceInput
+} from '../islands/finance';
+import { getSnapshotReport } from '../islands/snapshot';
+import { getStressTestReport } from '../islands/stressTest';
+import { getIncomePortfolioReport } from '../islands/incomePortfolio';
 
 const STORAGE_KEY = 'lifeShieldV2';
 const XP_PER_LEVEL = 120;
@@ -42,7 +45,13 @@ const makeEmptyState = (): AppState => ({
     onboarded: false,
     demoLoaded: false
   },
+  inputData: {
+    finance: { ...defaultFinanceInput }
+  },
   islands: {
+    snapshot: { input: '', lastReport: null, progress: makeIslandProgress() },
+    stressTest: { input: '', lastReport: null, progress: makeIslandProgress() },
+    incomePortfolio: { input: '', lastReport: null, progress: makeIslandProgress() },
     bayes: { input: '', lastReport: null, progress: makeIslandProgress() },
     hmm: { input: '', lastReport: null, progress: makeIslandProgress() },
     timeseries: { input: '', lastReport: null, progress: makeIslandProgress() },
@@ -143,6 +152,7 @@ const mergeWithDefaults = (
   }
   const islands = isRecord(incoming.islands) ? incoming.islands : {};
   const incomingFlags = isRecord(incoming.flags) ? incoming.flags : {};
+  const incomingInputData = isRecord(incoming.inputData) ? incoming.inputData : {};
   return {
     ...base,
     schemaVersion: safeNumber(incoming.schemaVersion, base.schemaVersion),
@@ -160,7 +170,21 @@ const mergeWithDefaults = (
           ? incomingFlags.demoLoaded
           : base.flags.demoLoaded
     },
+    inputData: {
+      finance: {
+        ...base.inputData.finance,
+        ...(isRecord(incomingInputData.finance)
+          ? (incomingInputData.finance as Partial<FinanceInputData>)
+          : {})
+      }
+    },
     islands: {
+      snapshot: mergeIslandState(base.islands.snapshot, islands.snapshot),
+      stressTest: mergeIslandState(base.islands.stressTest, islands.stressTest),
+      incomePortfolio: mergeIslandState(
+        base.islands.incomePortfolio,
+        islands.incomePortfolio
+      ),
       bayes: mergeIslandState(base.islands.bayes, islands.bayes),
       hmm: mergeIslandState(base.islands.hmm, islands.hmm),
       timeseries: mergeIslandState(base.islands.timeseries, islands.timeseries),
@@ -237,8 +261,16 @@ const computeLevel = (xp: number) =>
 
 export const updateIslandInput = (id: IslandId, input: string) => {
   const state = getState();
+  const nextFinanceInput =
+    id === 'snapshot' || id === 'stressTest' || id === 'incomePortfolio'
+      ? parseFinanceInput(input)
+      : state.inputData.finance;
   updateState({
     ...state,
+    inputData: {
+      ...state.inputData,
+      finance: nextFinanceInput
+    },
     islands: {
       ...state.islands,
       [id]: {
@@ -315,36 +347,24 @@ export const setOnboarded = (value = true) => {
 export const loadDemoData = () => {
   const state = getState();
   const now = new Date().toISOString();
-  const demoInput: BayesInput = {
-    ...defaultBayesInput,
-    months: 6,
-    reserve: 420000,
-    incomeMean: 210000,
-    incomeSd: 25000,
-    expensesMean: 130000,
-    expensesSd: 18000,
-    observationMonths: 9,
-    observationFailures: 1,
-    simulationRuns: 1500,
-    mcmcSamples: 1500
+  const financeDemoInput = {
+    monthlyIncome: 210000,
+    monthlyExpenses: 130000,
+    reserveCash: 420000,
+    monthlyDebtPayment: 27000,
+    incomeSourcesCount: 3,
+    top1Share: 0.58,
+    top3Share: 0.94,
+    incomeSources: [
+      { amount: 122000, stability: 5 },
+      { amount: 52000, stability: 4 },
+      { amount: 36000, stability: 3 }
+    ]
   };
-  const serialized = serializeBayesInput(demoInput);
-  const bayesReport = buildBayesReport(demoInput, {
-    posterior: {
-      mean: 0.17,
-      ciLow: 0.09,
-      ciHigh: 0.26,
-      quantiles: [0.1, 0.16, 0.24]
-    },
-    riskProbability: 0.18,
-    reserveQuantiles: [140000, 300000, 470000],
-    posteriorSvg: '<div class="muted">Демо-результат: риск в контролируемой зоне.</div>',
-    effectiveSampleSize: 980,
-    acceptanceRate: 0.34,
-    sampleCount: 1500,
-    observationMonths: demoInput.observationMonths,
-    observationFailures: demoInput.observationFailures
-  });
+  const serializedFinance = serializeFinanceInput(financeDemoInput);
+  const snapshotReport = getSnapshotReport(serializedFinance);
+  const stressReport = getStressTestReport(serializedFinance);
+  const portfolioReport = getIncomePortfolioReport(serializedFinance);
 
   const withHistory = (
     id: IslandId,
@@ -365,6 +385,15 @@ export const loadDemoData = () => {
       })
     }
   });
+
+  const bayesReport: IslandReport = {
+    id: 'bayes',
+    score: 73,
+    confidence: 69,
+    headline: 'Bayes: риск в контролируемой зоне',
+    summary: 'Лабораторная оценка риска подтверждает умеренный уровень неопределённости.',
+    details: ['Апостериорный риск около 18%.', 'Нужно обновить наблюдения через месяц.']
+  };
 
   const hmmReport: IslandReport = {
     id: 'hmm',
@@ -415,9 +444,16 @@ export const loadDemoData = () => {
       onboarded: true,
       demoLoaded: true
     },
+    inputData: {
+      ...state.inputData,
+      finance: financeDemoInput
+    },
     islands: {
       ...state.islands,
-      bayes: withHistory('bayes', bayesReport, serialized),
+      snapshot: withHistory('snapshot', snapshotReport, serializedFinance),
+      stressTest: withHistory('stressTest', stressReport, serializedFinance),
+      incomePortfolio: withHistory('incomePortfolio', portfolioReport, serializedFinance),
+      bayes: withHistory('bayes', bayesReport),
       hmm: withHistory('hmm', hmmReport),
       timeseries: withHistory('timeseries', timeseriesReport)
     }

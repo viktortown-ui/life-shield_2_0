@@ -12,6 +12,9 @@ const makeProgress = () => ({
 
 const makeIslands = () =>
   ({
+    snapshot: { input: '', lastReport: null, progress: makeProgress() },
+    stressTest: { input: '', lastReport: null, progress: makeProgress() },
+    incomePortfolio: { input: '', lastReport: null, progress: makeProgress() },
     bayes: { input: '', lastReport: null, progress: makeProgress() },
     hmm: { input: '', lastReport: null, progress: makeProgress() },
     timeseries: { input: '', lastReport: null, progress: makeProgress() },
@@ -27,6 +30,15 @@ const makeState = (overrides: Partial<AppState> = {}): AppState => ({
   level: 1,
   streakDays: 0,
   flags: { onboarded: false, demoLoaded: false },
+  inputData: {
+    finance: {
+      monthlyIncome: 180000,
+      monthlyExpenses: 120000,
+      reserveCash: 360000,
+      monthlyDebtPayment: 25000,
+      incomeSourcesCount: 1
+    }
+  },
   islands: makeIslands(),
   ...overrides
 });
@@ -99,9 +111,9 @@ describe('onboarding flags', () => {
     const state = store.getState();
     expect(state.flags.onboarded).toBe(true);
     expect(state.flags.demoLoaded).toBe(true);
-    expect(state.islands.bayes.lastReport?.score).toBeGreaterThan(0);
-    expect(state.islands.hmm.lastReport?.score).toBeGreaterThan(0);
-    expect(state.islands.timeseries.lastReport?.score).toBeGreaterThan(0);
+    expect(state.islands.snapshot.lastReport?.score).toBeGreaterThan(0);
+    expect(state.islands.stressTest.lastReport?.score).toBeGreaterThan(0);
+    expect(state.islands.incomePortfolio.lastReport?.score).toBeGreaterThan(0);
   });
 });
 
