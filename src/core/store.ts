@@ -2,6 +2,12 @@ import { migrate, schemaVersion } from './migrations';
 import { AppState, IslandId, IslandReport, ValidationResult } from './types';
 import { safeGetItem, safeRemoveItem, safeSetItem } from './storage';
 import { reportCaughtError } from './reportError';
+import {
+  BayesInput,
+  buildBayesReport,
+  defaultBayesInput,
+  serializeBayesInput
+} from '../islands/bayes';
 
 const STORAGE_KEY = 'lifeShieldV2';
 const XP_PER_LEVEL = 120;
@@ -24,6 +30,10 @@ const makeEmptyState = (): AppState => ({
   xp: 0,
   level: 1,
   streakDays: 0,
+  flags: {
+    onboarded: false,
+    demoLoaded: false
+  },
   islands: {
     bayes: { input: '', lastReport: null, progress: makeIslandProgress() },
     hmm: { input: '', lastReport: null, progress: makeIslandProgress() },
@@ -92,6 +102,7 @@ const mergeWithDefaults = (
     return base;
   }
   const islands = isRecord(incoming.islands) ? incoming.islands : {};
+  const incomingFlags = isRecord(incoming.flags) ? incoming.flags : {};
   return {
     ...base,
     schemaVersion: safeNumber(incoming.schemaVersion, base.schemaVersion),
@@ -99,6 +110,16 @@ const mergeWithDefaults = (
     xp: safeNumber(incoming.xp, base.xp),
     level: safeNumber(incoming.level, base.level),
     streakDays: safeNumber(incoming.streakDays, base.streakDays),
+    flags: {
+      onboarded:
+        typeof incomingFlags.onboarded === 'boolean'
+          ? incomingFlags.onboarded
+          : base.flags.onboarded,
+      demoLoaded:
+        typeof incomingFlags.demoLoaded === 'boolean'
+          ? incomingFlags.demoLoaded
+          : base.flags.demoLoaded
+    },
     islands: {
       bayes: mergeIslandState(base.islands.bayes, islands.bayes),
       hmm: mergeIslandState(base.islands.hmm, islands.hmm),
@@ -230,6 +251,74 @@ export const updateIslandReport = (id: IslandId, report: IslandReport) => {
         ...state.islands[id],
         lastReport: report,
         progress: nextProgress
+      }
+    }
+  });
+};
+
+export const setOnboarded = (value = true) => {
+  const state = getState();
+  updateState({
+    ...state,
+    flags: {
+      ...state.flags,
+      onboarded: value
+    }
+  });
+};
+
+export const loadDemoData = () => {
+  const state = getState();
+  const demoInput: BayesInput = {
+    ...defaultBayesInput,
+    months: 6,
+    reserve: 420000,
+    incomeMean: 210000,
+    incomeSd: 25000,
+    expensesMean: 130000,
+    expensesSd: 18000,
+    observationMonths: 9,
+    observationFailures: 1,
+    simulationRuns: 1500,
+    mcmcSamples: 1500
+  };
+  const serialized = serializeBayesInput(demoInput);
+  const report = buildBayesReport(demoInput, {
+    posterior: {
+      mean: 0.17,
+      ciLow: 0.09,
+      ciHigh: 0.26,
+      quantiles: [0.1, 0.16, 0.24]
+    },
+    riskProbability: 0.18,
+    reserveQuantiles: [140000, 300000, 470000],
+    posteriorSvg: '<div class="muted">Демо-результат: риск в контролируемой зоне.</div>',
+    effectiveSampleSize: 980,
+    acceptanceRate: 0.34,
+    sampleCount: 1500,
+    observationMonths: demoInput.observationMonths,
+    observationFailures: demoInput.observationFailures
+  });
+
+  updateState({
+    ...state,
+    flags: {
+      ...state.flags,
+      onboarded: true,
+      demoLoaded: true
+    },
+    islands: {
+      ...state.islands,
+      bayes: {
+        ...state.islands.bayes,
+        input: serialized,
+        lastReport: report,
+        progress: {
+          ...state.islands.bayes.progress,
+          lastRunAt: new Date().toISOString(),
+          runsCount: Math.max(1, state.islands.bayes.progress.runsCount),
+          bestScore: Math.max(state.islands.bayes.progress.bestScore, report.score)
+        }
       }
     }
   });

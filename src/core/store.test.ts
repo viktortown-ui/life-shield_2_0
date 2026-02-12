@@ -25,6 +25,7 @@ const makeState = (overrides: Partial<AppState> = {}): AppState => ({
   xp: 0,
   level: 1,
   streakDays: 0,
+  flags: { onboarded: false, demoLoaded: false },
   islands: makeIslands(),
   ...overrides
 });
@@ -85,5 +86,18 @@ describe('import/export', () => {
 
     const state = storeReloaded.getState();
     expect(state.islands.hmm.input).toBe('roundtrip');
+  });
+});
+
+
+describe('onboarding flags', () => {
+  it('loads demo and sets onboarding flags', async () => {
+    const store = await loadStore();
+    store.loadDemoData();
+
+    const state = store.getState();
+    expect(state.flags.onboarded).toBe(true);
+    expect(state.flags.demoLoaded).toBe(true);
+    expect(state.islands.bayes.lastReport?.score).toBeGreaterThan(0);
   });
 });
