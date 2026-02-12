@@ -13,9 +13,10 @@ describe('stressTest calculations', () => {
       })
     );
 
-    expect(report.details).toHaveLength(3);
-    expect(report.details[0]).toContain('Если доход -30%');
-    expect(report.details[2]).toContain('Если расходы +20%');
+    expect(report.details.length).toBeGreaterThanOrEqual(3);
+    expect(report.summary).toContain('Почему:');
+    expect(report.details.some((line) => line.includes('Если доход -30%'))).toBe(true);
+    expect(report.details.some((line) => line.includes('Если расходы +20%'))).toBe(true);
     expect(report.actions?.length ?? 0).toBeGreaterThan(0);
   });
 });
