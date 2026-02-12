@@ -1,4 +1,7 @@
 import { IslandId } from './types';
+import { getSnapshotReport } from '../islands/snapshot';
+import { getStressTestReport } from '../islands/stressTest';
+import { getIncomePortfolioReport } from '../islands/incomePortfolio';
 import { getBayesReport } from '../islands/bayes';
 import { getHmmReport } from '../islands/hmm';
 import { getTimeseriesReport } from '../islands/timeseries';
@@ -17,6 +20,31 @@ export interface IslandDefinition {
 }
 
 export const islandRegistry: IslandDefinition[] = [
+  {
+    id: 'snapshot',
+    title: getIslandCatalogItem('snapshot').displayName,
+    description: getIslandCatalogItem('snapshot').shortWhy,
+    inputLabel: 'Финансовые данные (JSON или строки key:value)',
+    placeholder: 'monthlyIncome: 210000\nmonthlyExpenses: 130000\nreserveCash: 420000',
+    getReport: getSnapshotReport
+  },
+  {
+    id: 'stressTest',
+    title: getIslandCatalogItem('stressTest').displayName,
+    description: getIslandCatalogItem('stressTest').shortWhy,
+    inputLabel: 'Те же финансовые данные',
+    placeholder: 'monthlyIncome: 210000\nmonthlyExpenses: 130000\nreserveCash: 420000',
+    getReport: getStressTestReport
+  },
+  {
+    id: 'incomePortfolio',
+    title: getIslandCatalogItem('incomePortfolio').displayName,
+    description: getIslandCatalogItem('incomePortfolio').shortWhy,
+    inputLabel: 'Доли/источники доходов',
+    placeholder:
+      '{"monthlyIncome":210000,"incomeSourcesCount":3,"top1Share":0.55,"top3Share":0.92}',
+    getReport: getIncomePortfolioReport
+  },
   {
     id: 'bayes',
     title: getIslandCatalogItem('bayes').displayName,

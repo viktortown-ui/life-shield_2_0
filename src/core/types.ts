@@ -1,10 +1,29 @@
 export type IslandId =
+  | 'snapshot'
+  | 'stressTest'
+  | 'incomePortfolio'
   | 'bayes'
   | 'hmm'
   | 'timeseries'
   | 'optimization'
   | 'decisionTree'
   | 'causalDag';
+
+export interface IncomeSource {
+  amount: number;
+  stability: number;
+}
+
+export interface FinanceInputData {
+  monthlyIncome: number;
+  monthlyExpenses: number;
+  reserveCash: number;
+  monthlyDebtPayment: number;
+  incomeSourcesCount: number;
+  top1Share?: number;
+  top3Share?: number;
+  incomeSources?: IncomeSource[];
+}
 
 export interface IslandReport {
   id: IslandId;
@@ -76,6 +95,9 @@ export interface AppState {
   flags: {
     onboarded: boolean;
     demoLoaded: boolean;
+  };
+  inputData: {
+    finance: FinanceInputData;
   };
   islands: Record<IslandId, IslandState>;
 }

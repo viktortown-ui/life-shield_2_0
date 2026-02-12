@@ -1,6 +1,6 @@
 import { AppState } from './types';
 
-export const schemaVersion = 4;
+export const schemaVersion = 5;
 
 export type Migration = (state: AppState) => AppState;
 
@@ -52,6 +52,21 @@ export const migrations: Migration[] = [
         }
       ])
     )
+  }),
+  (state) => ({
+    ...state,
+    schemaVersion: 5,
+    inputData: {
+      finance: {
+        monthlyIncome: state.inputData?.finance?.monthlyIncome ?? 180000,
+        monthlyExpenses: state.inputData?.finance?.monthlyExpenses ?? 120000,
+        reserveCash: state.inputData?.finance?.reserveCash ?? 360000,
+        monthlyDebtPayment: state.inputData?.finance?.monthlyDebtPayment ?? 25000,
+        incomeSourcesCount: state.inputData?.finance?.incomeSourcesCount ?? 1,
+        top1Share: state.inputData?.finance?.top1Share ?? 0.8,
+        top3Share: state.inputData?.finance?.top3Share ?? 1
+      }
+    }
   })
 ];
 

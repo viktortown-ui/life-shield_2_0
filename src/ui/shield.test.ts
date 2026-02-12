@@ -10,7 +10,7 @@ const makeProgress = () => ({
 });
 
 const makeState = (): AppState => ({
-  schemaVersion: 3,
+  schemaVersion: 5,
   updatedAt: '2026-01-01T00:00:00.000Z',
   xp: 0,
   level: 1,
@@ -19,7 +19,19 @@ const makeState = (): AppState => ({
     onboarded: false,
     demoLoaded: false
   },
+  inputData: {
+    finance: {
+      monthlyIncome: 180000,
+      monthlyExpenses: 120000,
+      reserveCash: 360000,
+      monthlyDebtPayment: 25000,
+      incomeSourcesCount: 1
+    }
+  },
   islands: {
+    snapshot: { input: '', lastReport: null, progress: makeProgress() },
+    stressTest: { input: '', lastReport: null, progress: makeProgress() },
+    incomePortfolio: { input: '', lastReport: null, progress: makeProgress() },
     bayes: { input: '', lastReport: null, progress: makeProgress() },
     hmm: { input: '', lastReport: null, progress: makeProgress() },
     timeseries: { input: '', lastReport: null, progress: makeProgress() },
@@ -47,7 +59,7 @@ describe('resolvePrimaryPath', () => {
   it('returns "Заполнить данные" when there is no input and no runs', () => {
     const path = resolvePrimaryPath(makeState());
     expect(path.label).toBe('Заполнить данные');
-    expect(path.href).toBe('#/island/bayes');
+    expect(path.href).toBe('#/island/snapshot');
   });
 
   it('returns "Запустить анализ" when onboarded but runs are missing', () => {
