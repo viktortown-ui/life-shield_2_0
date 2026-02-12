@@ -46,7 +46,7 @@ export const createShieldScreen = () => {
   header.className = 'screen-header';
 
   const title = document.createElement('div');
-  title.innerHTML = '<h1>Щит</h1><p>Обзор островов и ключевых сигналов.</p>';
+  title.innerHTML = '<h1>Щит</h1><p>Ваш текущий индекс устойчивости и ближайшие действия.</p>';
   header.appendChild(title);
 
   const state = getState();
@@ -93,6 +93,29 @@ export const createShieldScreen = () => {
 
   header.appendChild(createAvatar(verdict, state.level));
 
+  const hasAnyReport = islandRegistry.some(
+    (island) => Boolean(state.islands[island.id].lastReport)
+  );
+  const nextStep = document.createElement('section');
+  nextStep.className = 'next-step';
+  nextStep.innerHTML = hasAnyReport
+    ? `
+      <h2>Что дальше?</h2>
+      <p>Продолжайте путь: проверьте устойчивость к рискам и диверсификацию.</p>
+      <div class="next-step-actions">
+        <a class="button" href="#/island/hmm">Запустить стресс-тест</a>
+        <a class="button ghost" href="#/island/optimization">Портфель доходов</a>
+      </div>
+    `
+    : `
+      <h2>Что дальше?</h2>
+      <p>Сначала заполните базовые данные, чтобы получить первый осмысленный индекс.</p>
+      <div class="next-step-actions">
+        <a class="button" href="#/island/bayes">Заполнить базовые данные</a>
+        <a class="button ghost" href="#/islands">Открыть острова</a>
+      </div>
+    `;
+
   const summary = document.createElement('section');
   summary.className = 'shield-summary';
   summary.innerHTML = `
@@ -127,20 +150,12 @@ export const createShieldScreen = () => {
     <div class="xp-bar">
       <div class="xp-bar-fill" style="width: ${levelPercent}%"></div>
     </div>
-    <div class="xp-hints">
-      <span>+XP за:</span>
-      <ul>
-        <li>Запуск анализа острова.</li>
-        <li>Заполнение входных данных.</li>
-        <li>Рост confidence в отчёте.</li>
-      </ul>
-    </div>
   `;
 
   const quests = document.createElement('section');
   quests.className = 'shield-quests';
   quests.innerHTML = `
-    <h2>Квест дня</h2>
+    <h2>Следующая задача</h2>
     <div class="quest-list">
       ${
         dailyQuest
@@ -151,14 +166,14 @@ export const createShieldScreen = () => {
           <div class="quest-action">${dailyQuest.action}</div>
           <div class="quest-footer">
             <span>+${dailyQuest.rewardXp} XP</span>
-            <a class="button small" href="#/island/${dailyQuest.sourceId}">Выполнить квест</a>
+            <a class="button small" href="#/island/${dailyQuest.sourceId}">Открыть остров</a>
           </div>
         </div>
       `
           : `
         <div class="quest-card">
-          <div class="quest-title">Нет доступных квестов</div>
-          <div class="quest-action">Добавьте данные на островах, чтобы получить задание.</div>
+          <div class="quest-title">Пока нет данных</div>
+          <div class="quest-action">Откройте остров и заполните базовую форму.</div>
         </div>
       `
       }
@@ -171,7 +186,7 @@ export const createShieldScreen = () => {
   const verdictTile = document.createElement('div');
   verdictTile.className = 'shield-tile shield-tile--verdict';
   verdictTile.innerHTML = `
-      <span class="tile-status status--fresh">Итог дня</span>
+      <span class="tile-status status--fresh">Индекс дня</span>
       <div class="tile-score">${clampMetric(verdict.globalScore)}</div>
       <div class="tile-confidence">${clampMetric(verdict.globalConfidence)}%</div>
       <div class="tile-headline">${verdict.mood}</div>
@@ -181,8 +196,8 @@ export const createShieldScreen = () => {
       </div>
       <div class="tile-next">${
         verdict.isHighRisk || verdict.isHighUncertainty
-          ? 'Фокус: снизить неопределённость.'
-          : 'Фокус: удержать темп.'
+          ? 'Сфокусируйтесь на снижении неопределённости.'
+          : 'Поддерживайте текущий темп и обновляйте данные.'
       }</div>
     `;
   grid.appendChild(verdictTile);
@@ -198,8 +213,8 @@ export const createShieldScreen = () => {
     const confidence = clampMetric(report?.confidence ?? 0);
     const headline = report?.headline ?? island.title;
     const progress = islandState.progress;
-    const nextStep =
-      report?.actions?.[0]?.title ?? 'Запустить расчёт и сохранить результат';
+    const nextStepLabel =
+      report?.actions?.[0]?.title ?? 'Открыть модуль и запустить расчёт';
     const status = getIslandStatus(progress.lastRunAt, Boolean(report));
 
     tile.innerHTML = `
@@ -211,7 +226,7 @@ export const createShieldScreen = () => {
         <span>Лучший: ${progress.bestScore}</span>
         <span>Запусков: ${progress.runsCount}</span>
       </div>
-      <div class="tile-next">Следующий шаг: ${nextStep}</div>
+      <div class="tile-next">Следующий шаг: ${nextStepLabel}</div>
     `;
 
     grid.appendChild(tile);
@@ -220,9 +235,10 @@ export const createShieldScreen = () => {
   const actions = document.createElement('div');
   actions.className = 'screen-actions';
   actions.innerHTML = `
+    <a class="button ghost" href="#/islands">Все острова</a>
     <a class="button" href="#/settings">Настройки</a>
   `;
 
-  container.append(header, summary, xpBlock, quests, grid, actions);
+  container.append(header, nextStep, summary, xpBlock, quests, grid, actions);
   return container;
 };

@@ -1,6 +1,6 @@
 import { AppState } from './types';
 
-export const schemaVersion = 2;
+export const schemaVersion = 3;
 
 export type Migration = (state: AppState) => AppState;
 
@@ -25,6 +25,14 @@ export const migrations: Migration[] = [
         }
       ])
     )
+  }),
+  (state) => ({
+    ...state,
+    schemaVersion: 3,
+    flags: {
+      onboarded: state.flags?.onboarded ?? false,
+      demoLoaded: state.flags?.demoLoaded ?? false
+    }
   })
 ];
 
@@ -34,7 +42,9 @@ export const migrate = (state: AppState): AppState => {
   }
 
   let nextState = { ...state };
-  for (const migration of migrations) {
+  for (let index = state.schemaVersion; index < schemaVersion; index += 1) {
+    const migration = migrations[index];
+    if (!migration) continue;
     nextState = migration(nextState);
   }
 

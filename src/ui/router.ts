@@ -6,6 +6,9 @@ import { panicReset } from '../core/pwaUpdate';
 import { reportCaughtError } from '../core/reportError';
 import { buildInfo } from '../core/buildInfo';
 import { isDebugEnabled } from '../core/debug';
+import { getState } from '../core/store';
+import { createOnboardingModal } from './onboarding';
+import { createIslandsHubScreen } from './islandsHub';
 
 const parseRoute = () => {
   const hash = window.location.hash.replace('#', '') || '/';
@@ -16,22 +19,26 @@ const parseRoute = () => {
   if (parts[0] === 'settings') {
     return { name: 'settings' };
   }
+  if (parts[0] === 'islands') {
+    return { name: 'islands' };
+  }
   return { name: 'shield' };
 };
 
-const createBottomNav = (
-  route: { name: 'shield' } | { name: 'settings' } | { name: 'island'; id: IslandId }
-) => {
+type Route =
+  | { name: 'shield' }
+  | { name: 'settings' }
+  | { name: 'island'; id: IslandId }
+  | { name: 'islands' };
+
+const createBottomNav = (route: Route) => {
   const nav = document.createElement('nav');
   nav.className = 'bottom-nav';
   nav.setAttribute('aria-label', 'Нижняя навигация');
 
-  const islandTarget =
-    route.name === 'island' ? route.id : ('bayes' as IslandId);
-
   nav.innerHTML = `
     <a class="bottom-nav-link ${route.name === 'shield' ? 'active' : ''}" href="#/">Щит</a>
-    <a class="bottom-nav-link ${route.name === 'island' ? 'active' : ''}" href="#/island/${islandTarget}">Острова</a>
+    <a class="bottom-nav-link ${route.name === 'island' || route.name === 'islands' ? 'active' : ''}" href="#/islands">Острова</a>
     <a class="bottom-nav-link ${route.name === 'settings' ? 'active' : ''}" href="#/settings">Настройки</a>
   `;
 
@@ -47,7 +54,6 @@ const createBuildFooter = () => {
   `;
   return footer;
 };
-
 
 const updateBottomNavInset = (root: HTMLElement) => {
   const nav = root.querySelector<HTMLElement>('.bottom-nav');
@@ -76,7 +82,7 @@ const initBottomNavInsetSync = (root: HTMLElement) => {
 
 const createAppShell = (
   screen: HTMLElement,
-  route: { name: 'shield' } | { name: 'settings' } | { name: 'island'; id: IslandId },
+  route: Route,
   showBuildInfo: boolean
 ) => {
   const shell = document.createElement('div');
@@ -110,17 +116,21 @@ export const initRouter = (root: HTMLElement) => {
         root.appendChild(
           createAppShell(createIslandPage(route.id), route, showBuildInfo)
         );
-        syncBottomNavInset();
-        return;
-      }
-      if (route.name === 'settings') {
+      } else if (route.name === 'settings') {
         root.appendChild(
           createAppShell(createSettingsScreen(), route, showBuildInfo)
         );
-        syncBottomNavInset();
-        return;
+      } else if (route.name === 'islands') {
+        root.appendChild(
+          createAppShell(createIslandsHubScreen(), route, showBuildInfo)
+        );
+      } else {
+        root.appendChild(createAppShell(createShieldScreen(), route, showBuildInfo));
       }
-      root.appendChild(createAppShell(createShieldScreen(), route, showBuildInfo));
+
+      if (!getState().flags.onboarded) {
+        root.appendChild(createOnboardingModal());
+      }
       syncBottomNavInset();
     } catch (error) {
       reportCaughtError(error);

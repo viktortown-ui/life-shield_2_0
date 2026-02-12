@@ -66,6 +66,10 @@ export interface AppState {
   xp: number;
   level: number;
   streakDays: number;
+  flags: {
+    onboarded: boolean;
+    demoLoaded: boolean;
+  };
   islands: Record<IslandId, IslandState>;
 }
 

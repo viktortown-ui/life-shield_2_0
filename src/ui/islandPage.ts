@@ -100,90 +100,98 @@ export const createIslandPage = (id: IslandId) => {
     const initialInput: BayesInput = { ...defaultBayesInput, ...parsedInput };
 
     form.innerHTML = `
+      <div class="island-intro">
+        <p>Быстрый ввод: только ключевые поля для первого результата.</p>
+      </div>
       <div class="bayes-grid">
         <label>
-          Горизонт, мес
-          <input name="months" type="number" min="1" step="1" value="${initialInput.months}" />
+          Доход в месяц
+          <input name="incomeMean" type="number" min="0" step="1000" value="${initialInput.incomeMean}" />
+        </label>
+        <label>
+          Расходы в месяц
+          <input name="expensesMean" type="number" min="0" step="1000" value="${initialInput.expensesMean}" />
         </label>
         <label>
           Резерв
           <input name="reserve" type="number" min="0" step="1000" value="${initialInput.reserve}" />
         </label>
         <label>
-          Провал дохода, %
-          <input name="shockSeverity" type="number" min="0" max="1" step="0.05" value="${initialInput.shockSeverity}" />
-        </label>
-        <label>
-          Income mean
-          <input name="incomeMean" type="number" min="0" step="1000" value="${initialInput.incomeMean}" />
-        </label>
-        <label>
-          Income sd
-          <input name="incomeSd" type="number" min="0" step="1000" value="${initialInput.incomeSd}" />
-        </label>
-        <label>
-          Income distribution
-          <select name="incomeDistribution">
-            <option value="lognormal" ${
-              initialInput.incomeDistribution === 'lognormal' ? 'selected' : ''
-            }>lognormal</option>
-            <option value="normal" ${
-              initialInput.incomeDistribution === 'normal' ? 'selected' : ''
-            }>normal</option>
-          </select>
-        </label>
-        <label>
-          Expenses mean
-          <input name="expensesMean" type="number" min="0" step="1000" value="${initialInput.expensesMean}" />
-        </label>
-        <label>
-          Expenses sd
-          <input name="expensesSd" type="number" min="0" step="1000" value="${initialInput.expensesSd}" />
-        </label>
-        <label>
-          Expenses distribution
-          <select name="expensesDistribution">
-            <option value="lognormal" ${
-              initialInput.expensesDistribution === 'lognormal' ? 'selected' : ''
-            }>lognormal</option>
-            <option value="normal" ${
-              initialInput.expensesDistribution === 'normal' ? 'selected' : ''
-            }>normal</option>
-          </select>
-        </label>
-        <label>
-          Prior a
-          <input name="priorA" type="number" min="0.1" step="0.1" value="${initialInput.priorA}" />
-        </label>
-        <label>
-          Prior b
-          <input name="priorB" type="number" min="0.1" step="0.1" value="${initialInput.priorB}" />
-        </label>
-        <label>
-          Наблюдений, мес
-          <input name="observationMonths" type="number" min="1" step="1" value="${initialInput.observationMonths}" />
-        </label>
-        <label>
-          Провалов в данных
-          <input name="observationFailures" type="number" min="0" step="1" value="${initialInput.observationFailures}" />
-        </label>
-        <label>
-          MCMC samples
-          <input name="mcmcSamples" type="number" min="500" step="100" value="${initialInput.mcmcSamples}" />
-        </label>
-        <label>
-          Burn-in
-          <input name="mcmcBurnIn" type="number" min="100" step="50" value="${initialInput.mcmcBurnIn}" />
-        </label>
-        <label>
-          Step size
-          <input name="mcmcStep" type="number" min="0.1" step="0.05" value="${initialInput.mcmcStep}" />
-        </label>
-        <label>
-          Симуляций
-          <input name="simulationRuns" type="number" min="500" step="100" value="${initialInput.simulationRuns}" />
+          Горизонт, мес
+          <input name="months" type="number" min="1" step="1" value="${initialInput.months}" />
         </label>
       </div>
+      <details class="island-advanced">
+        <summary>Расширенные настройки</summary>
+        <div class="bayes-grid">
+          <label>
+            Провал дохода, %
+            <input name="shockSeverity" type="number" min="0" max="1" step="0.05" value="${initialInput.shockSeverity}" />
+          </label>
+          <label>
+            Income sd
+            <input name="incomeSd" type="number" min="0" step="1000" value="${initialInput.incomeSd}" />
+          </label>
+          <label>
+            Income distribution
+            <select name="incomeDistribution">
+              <option value="lognormal" ${
+                initialInput.incomeDistribution === 'lognormal' ? 'selected' : ''
+              }>lognormal</option>
+              <option value="normal" ${
+                initialInput.incomeDistribution === 'normal' ? 'selected' : ''
+              }>normal</option>
+            </select>
+          </label>
+          <label>
+            Expenses sd
+            <input name="expensesSd" type="number" min="0" step="1000" value="${initialInput.expensesSd}" />
+          </label>
+          <label>
+            Expenses distribution
+            <select name="expensesDistribution">
+              <option value="lognormal" ${
+                initialInput.expensesDistribution === 'lognormal' ? 'selected' : ''
+              }>lognormal</option>
+              <option value="normal" ${
+                initialInput.expensesDistribution === 'normal' ? 'selected' : ''
+              }>normal</option>
+            </select>
+          </label>
+          <label>
+            Prior a
+            <input name="priorA" type="number" min="0.1" step="0.1" value="${initialInput.priorA}" />
+          </label>
+          <label>
+            Prior b
+            <input name="priorB" type="number" min="0.1" step="0.1" value="${initialInput.priorB}" />
+          </label>
+          <label>
+            Наблюдений, мес
+            <input name="observationMonths" type="number" min="1" step="1" value="${initialInput.observationMonths}" />
+          </label>
+          <label>
+            Провалов в данных
+            <input name="observationFailures" type="number" min="0" step="1" value="${initialInput.observationFailures}" />
+          </label>
+          <label>
+            MCMC samples
+            <input name="mcmcSamples" type="number" min="500" step="100" value="${initialInput.mcmcSamples}" />
+          </label>
+          <label>
+            Burn-in
+            <input name="mcmcBurnIn" type="number" min="100" step="50" value="${initialInput.mcmcBurnIn}" />
+          </label>
+          <label>
+            Step size
+            <input name="mcmcStep" type="number" min="0.05" max="1" step="0.01" value="${initialInput.mcmcStep}" />
+          </label>
+          <label>
+            Симуляций
+            <input name="simulationRuns" type="number" min="500" step="100" value="${initialInput.simulationRuns}" />
+          </label>
+        </div>
+      </details>
       <div class="bayes-controls">
         <button class="button" type="submit">Запустить</button>
         <button class="button ghost" type="button" data-stop>Stop</button>
