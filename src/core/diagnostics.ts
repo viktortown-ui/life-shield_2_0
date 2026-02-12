@@ -422,11 +422,11 @@ const buildReportJson = (
     2
   );
 
-const downloadDiagnosticsReport = (content: string) => {
+export const downloadReport = (content: string, filenamePrefix = 'life-shield-diagnostics') => {
   const encoded = encodeURIComponent(content);
   const link = document.createElement('a');
   link.href = `data:application/json;charset=utf-8,${encoded}`;
-  link.download = `life-shield-diagnostics-${Date.now()}.json`;
+  link.download = `${filenamePrefix}-${Date.now()}.json`;
   document.body.append(link);
   link.click();
   link.remove();
@@ -1409,7 +1409,7 @@ export const initDiagnostics = (uiEnabled = isDebugEnabled()): DiagnosticsContro
         state.overlay,
         dump
       );
-      downloadDiagnosticsReport(report);
+      downloadReport(report);
     }
   );
   if (uiEnabled) {
@@ -1514,7 +1514,7 @@ export const initDiagnostics = (uiEnabled = isDebugEnabled()): DiagnosticsContro
         state.overlay,
         dump
       );
-      downloadDiagnosticsReport(report);
+      downloadReport(report);
     }
   };
 };

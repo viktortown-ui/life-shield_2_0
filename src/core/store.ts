@@ -1,5 +1,11 @@
 import { migrate, schemaVersion } from './migrations';
-import { AppState, IslandId, IslandReport, ValidationResult } from './types';
+import {
+  AppState,
+  IslandId,
+  IslandReport,
+  IslandRunHistoryEntry,
+  ValidationResult
+} from './types';
 import { safeGetItem, safeRemoveItem, safeSetItem } from './storage';
 import { reportCaughtError } from './reportError';
 import {
@@ -11,6 +17,7 @@ import {
 
 const STORAGE_KEY = 'lifeShieldV2';
 const XP_PER_LEVEL = 120;
+const RUN_HISTORY_LIMIT = 10;
 
 interface ExportPayload {
   schemaVersion: number;
@@ -21,7 +28,8 @@ interface ExportPayload {
 const makeIslandProgress = () => ({
   lastRunAt: null,
   runsCount: 0,
-  bestScore: 0
+  bestScore: 0,
+  history: []
 });
 
 const makeEmptyState = (): AppState => ({
@@ -63,6 +71,33 @@ const safeNumber = (value: unknown, fallback: number): number =>
 const safeString = (value: unknown, fallback: string): string =>
   typeof value === 'string' ? value : fallback;
 
+const safeHistoryEntry = (
+  value: unknown
+): IslandRunHistoryEntry | null => {
+  if (!isRecord(value)) {
+    return null;
+  }
+  if (typeof value.at !== 'string') {
+    return null;
+  }
+  return {
+    at: value.at,
+    score: safeNumber(value.score, 0),
+    confidence: safeNumber(value.confidence, 0)
+  };
+};
+
+const appendHistory = (
+  history: IslandRunHistoryEntry[],
+  entry: IslandRunHistoryEntry
+) => {
+  const next = [...history, entry];
+  if (next.length <= RUN_HISTORY_LIMIT) {
+    return next;
+  }
+  return next.slice(next.length - RUN_HISTORY_LIMIT);
+};
+
 const mergeProgress = (
   base: AppState['islands'][IslandId]['progress'],
   incoming: unknown
@@ -70,13 +105,18 @@ const mergeProgress = (
   if (!isRecord(incoming)) {
     return base;
   }
+  const incomingHistory = Array.isArray(incoming.history)
+    ? incoming.history.map(safeHistoryEntry).filter(Boolean)
+    : [];
+
   return {
     lastRunAt:
       incoming.lastRunAt === null || typeof incoming.lastRunAt === 'string'
         ? incoming.lastRunAt
         : base.lastRunAt,
     runsCount: safeNumber(incoming.runsCount, base.runsCount),
-    bestScore: safeNumber(incoming.bestScore, base.bestScore)
+    bestScore: safeNumber(incoming.bestScore, base.bestScore),
+    history: incomingHistory.slice(-RUN_HISTORY_LIMIT) as IslandRunHistoryEntry[]
   };
 };
 
@@ -218,7 +258,12 @@ export const updateIslandReport = (id: IslandId, report: IslandReport) => {
   const nextProgress = {
     lastRunAt: now,
     runsCount: previousProgress.runsCount + 1,
-    bestScore: updatedBestScore
+    bestScore: updatedBestScore,
+    history: appendHistory(previousProgress.history, {
+      at: now,
+      score: report.score,
+      confidence: report.confidence
+    })
   };
 
   const previousRunDay = getDayKey(previousProgress.lastRunAt);
@@ -269,6 +314,7 @@ export const setOnboarded = (value = true) => {
 
 export const loadDemoData = () => {
   const state = getState();
+  const now = new Date().toISOString();
   const demoInput: BayesInput = {
     ...defaultBayesInput,
     months: 6,
@@ -283,7 +329,7 @@ export const loadDemoData = () => {
     mcmcSamples: 1500
   };
   const serialized = serializeBayesInput(demoInput);
-  const report = buildBayesReport(demoInput, {
+  const bayesReport = buildBayesReport(demoInput, {
     posterior: {
       mean: 0.17,
       ciLow: 0.09,
@@ -300,6 +346,68 @@ export const loadDemoData = () => {
     observationFailures: demoInput.observationFailures
   });
 
+  const withHistory = (
+    id: IslandId,
+    report: IslandReport,
+    input = state.islands[id].input
+  ) => ({
+    input,
+    lastReport: report,
+    progress: {
+      ...state.islands[id].progress,
+      lastRunAt: now,
+      runsCount: Math.max(1, state.islands[id].progress.runsCount),
+      bestScore: Math.max(state.islands[id].progress.bestScore, report.score),
+      history: appendHistory(state.islands[id].progress.history, {
+        at: now,
+        score: report.score,
+        confidence: report.confidence
+      })
+    }
+  });
+
+  const hmmReport: IslandReport = {
+    id: 'hmm',
+    score: 76,
+    confidence: 71,
+    headline: 'Состояние: стабильный рост',
+    summary:
+      'Модель оценивает вероятность удержания устойчивого режима на 68% в ближайшие 2 периода.',
+    details: [
+      'Вероятность перехода в стресс-режим: 22%.',
+      'Ключевой сигнал — рост доли обязательных расходов.'
+    ],
+    actions: [
+      {
+        title: 'Поддерживать буфер на 5.5 месяцев',
+        impact: 8,
+        effort: 3,
+        description: 'Пополняйте резерв до 560 000 ₽ в течение 2 месяцев.'
+      }
+    ]
+  };
+
+  const timeseriesReport: IslandReport = {
+    id: 'timeseries',
+    score: 81,
+    confidence: 74,
+    headline: 'Прогноз дохода: умеренный ап-тренд',
+    summary:
+      'Ожидаемый средний доход на 3 месяца: 214 000 ₽ с диапазоном 196 000–236 000 ₽.',
+    details: [
+      'Волатильность снизилась на 11% к прошлому кварталу.',
+      'Пиковая просадка оценивается как управляемая.'
+    ],
+    actions: [
+      {
+        title: 'Обновить прогноз через 30 дней',
+        impact: 6,
+        effort: 2,
+        description: 'Добавьте фактические данные по доходу за текущий месяц.'
+      }
+    ]
+  };
+
   updateState({
     ...state,
     flags: {
@@ -309,17 +417,9 @@ export const loadDemoData = () => {
     },
     islands: {
       ...state.islands,
-      bayes: {
-        ...state.islands.bayes,
-        input: serialized,
-        lastReport: report,
-        progress: {
-          ...state.islands.bayes.progress,
-          lastRunAt: new Date().toISOString(),
-          runsCount: Math.max(1, state.islands.bayes.progress.runsCount),
-          bestScore: Math.max(state.islands.bayes.progress.bestScore, report.score)
-        }
-      }
+      bayes: withHistory('bayes', bayesReport, serialized),
+      hmm: withHistory('hmm', hmmReport),
+      timeseries: withHistory('timeseries', timeseriesReport)
     }
   });
 };

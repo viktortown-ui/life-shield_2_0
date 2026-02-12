@@ -54,10 +54,17 @@ export interface IslandState {
   progress: IslandProgress;
 }
 
+export interface IslandRunHistoryEntry {
+  at: string;
+  score: number;
+  confidence: number;
+}
+
 export interface IslandProgress {
   lastRunAt: string | null;
   runsCount: number;
   bestScore: number;
+  history: IslandRunHistoryEntry[];
 }
 
 export interface AppState {

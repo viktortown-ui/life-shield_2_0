@@ -6,7 +6,8 @@ import { migrate, schemaVersion } from './migrations';
 const makeProgress = () => ({
   lastRunAt: null,
   runsCount: 0,
-  bestScore: 0
+  bestScore: 0,
+  history: []
 });
 
 const makeIslands = () =>
@@ -99,5 +100,30 @@ describe('onboarding flags', () => {
     expect(state.flags.onboarded).toBe(true);
     expect(state.flags.demoLoaded).toBe(true);
     expect(state.islands.bayes.lastReport?.score).toBeGreaterThan(0);
+    expect(state.islands.hmm.lastReport?.score).toBeGreaterThan(0);
+    expect(state.islands.timeseries.lastReport?.score).toBeGreaterThan(0);
+  });
+});
+
+
+describe('history tracking', () => {
+  it('stores only the last 10 runs for each island', async () => {
+    const store = await loadStore();
+    for (let index = 0; index < 12; index += 1) {
+      store.updateIslandReport('bayes', {
+        id: 'bayes',
+        score: 40 + index,
+        confidence: 60,
+        headline: 'test',
+        summary: 'test',
+        details: []
+      });
+    }
+
+    const state = store.getState();
+    const history = state.islands.bayes.progress.history;
+    expect(history).toHaveLength(10);
+    expect(history[0]?.score).toBe(42);
+    expect(history.at(-1)?.score).toBe(51);
   });
 });
