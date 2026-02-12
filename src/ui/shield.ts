@@ -1,12 +1,13 @@
 import { islandRegistry } from '../core/registry';
+import { AppState, IslandReport } from '../core/types';
 import { getState } from '../core/store';
 import { buildGlobalVerdict } from '../core/verdict';
-import { IslandReport } from '../core/types';
 import { reportCaughtError } from '../core/reportError';
 import { createAvatar } from './avatar';
 import {
   buildSparklineSvg,
   clampMetric,
+  formatLastRun,
   getHistoryTail,
   getIslandStatus
 } from './reportUtils';
@@ -29,6 +30,41 @@ const pickTopAction = (report: IslandReport) => {
     .sort((a, b) => b.score - a.score)[0]?.action;
 };
 
+const getTotalRuns = (state: AppState) =>
+  islandRegistry.reduce(
+    (sum, island) => sum + state.islands[island.id].progress.runsCount,
+    0
+  );
+
+const hasAnyInput = (state: AppState) =>
+  islandRegistry.some((island) => state.islands[island.id].input.trim().length > 0);
+
+export const resolvePrimaryPath = (state: AppState) => {
+  const totalRuns = getTotalRuns(state);
+
+  if (totalRuns > 0) {
+    return {
+      label: 'Открыть отчёт',
+      href: '#/report',
+      hint: 'Все ключевые выводы и следующие шаги уже готовы.'
+    };
+  }
+
+  if (state.flags.onboarded || state.flags.demoLoaded || hasAnyInput(state)) {
+    return {
+      label: 'Запустить анализ',
+      href: '#/islands',
+      hint: 'Данные есть. Запустите первый расчёт в любом острове.'
+    };
+  }
+
+  return {
+    label: 'Заполнить данные',
+    href: '#/island/bayes',
+    hint: 'Начните с базовых данных, чтобы получить первый результат.'
+  };
+};
+
 export const createShieldScreen = () => {
   const container = document.createElement('div');
   container.className = 'screen shield';
@@ -37,7 +73,7 @@ export const createShieldScreen = () => {
   header.className = 'screen-header';
 
   const title = document.createElement('div');
-  title.innerHTML = '<h1>Щит</h1><p>Ваш текущий индекс устойчивости и ближайшие действия.</p>';
+  title.innerHTML = '<h1>Щит</h1><p>Понятный статус, приоритет на сегодня и один следующий шаг.</p>';
   header.appendChild(title);
 
   const state = getState();
@@ -84,28 +120,20 @@ export const createShieldScreen = () => {
 
   header.appendChild(createAvatar(verdict, state.level));
 
-  const hasAnyReport = islandRegistry.some(
-    (island) => Boolean(state.islands[island.id].lastReport)
-  );
+  const primaryPath = resolvePrimaryPath(state);
   const nextStep = document.createElement('section');
   nextStep.className = 'next-step';
-  nextStep.innerHTML = hasAnyReport
-    ? `
-      <h2>Что дальше?</h2>
-      <p>Продолжайте путь: проверьте устойчивость к рискам и диверсификацию.</p>
+  nextStep.innerHTML = `
+      <h2>Главный путь</h2>
+      <p>${primaryPath.hint}</p>
       <div class="next-step-actions">
-        <a class="button" href="#/island/hmm">Запустить стресс-тест</a>
-        <a class="button ghost" href="#/island/optimization">Портфель доходов</a>
-      </div>
-    `
-    : `
-      <h2>Что дальше?</h2>
-      <p>Сначала заполните базовые данные, чтобы получить первый осмысленный индекс.</p>
-      <div class="next-step-actions">
-        <a class="button" href="#/island/bayes">Заполнить базовые данные</a>
-        <a class="button ghost" href="#/islands">Открыть острова</a>
+        <a class="button button-primary-large" href="${primaryPath.href}">${primaryPath.label}</a>
       </div>
     `;
+
+  const statusGroup = document.createElement('section');
+  statusGroup.className = 'shield-group';
+  statusGroup.innerHTML = '<h2 class="group-title">Статус</h2>';
 
   const summary = document.createElement('section');
   summary.className = 'shield-summary';
@@ -133,7 +161,7 @@ export const createShieldScreen = () => {
     Math.round((levelProgress / XP_PER_LEVEL) * 100)
   );
   xpBlock.innerHTML = `
-    <h2>XP прогресс</h2>
+    <h3>Прогресс уровня</h3>
     <div class="xp-meta">
       <span>Level ${state.level}</span>
       <span>${levelProgress}/${XP_PER_LEVEL} XP</span>
@@ -142,37 +170,6 @@ export const createShieldScreen = () => {
       <div class="xp-bar-fill" style="width: ${levelPercent}%"></div>
     </div>
   `;
-
-  const quests = document.createElement('section');
-  quests.className = 'shield-quests';
-  quests.innerHTML = `
-    <h2>Следующая задача</h2>
-    <div class="quest-list">
-      ${
-        dailyQuest
-          ? `
-        <div class="quest-card">
-          <div class="quest-title">${dailyQuest.title}</div>
-          <div class="quest-why">${dailyQuest.why}</div>
-          <div class="quest-action">${dailyQuest.action}</div>
-          <div class="quest-footer">
-            <span>+${dailyQuest.rewardXp} XP</span>
-            <a class="button small" href="#/island/${dailyQuest.sourceId}">Открыть остров</a>
-          </div>
-        </div>
-      `
-          : `
-        <div class="quest-card">
-          <div class="quest-title">Пока нет данных</div>
-          <div class="quest-action">Откройте остров и заполните базовую форму.</div>
-        </div>
-      `
-      }
-    </div>
-  `;
-
-  const grid = document.createElement('section');
-  grid.className = 'shield-grid';
 
   const verdictTile = document.createElement('div');
   verdictTile.className = 'shield-tile shield-tile--verdict';
@@ -191,7 +188,47 @@ export const createShieldScreen = () => {
           : 'Поддерживайте текущий темп и обновляйте данные.'
       }</div>
     `;
-  grid.appendChild(verdictTile);
+
+  statusGroup.append(summary, xpBlock, verdictTile);
+
+  const todayGroup = document.createElement('section');
+  todayGroup.className = 'shield-group';
+  todayGroup.innerHTML = '<h2 class="group-title">Сегодня</h2>';
+
+  const quests = document.createElement('section');
+  quests.className = 'shield-quests';
+  quests.innerHTML = `
+    <div class="quest-list">
+      ${
+        dailyQuest
+          ? `
+        <div class="quest-card">
+          <div class="quest-title">${dailyQuest.title}</div>
+          <div class="quest-why">Зачем: ${dailyQuest.why}</div>
+          <div class="quest-action">Что сделать: ${dailyQuest.action}</div>
+          <div class="quest-footer">
+            <span>+${dailyQuest.rewardXp} XP</span>
+            <a class="button small" href="#/island/${dailyQuest.sourceId}">Открыть</a>
+          </div>
+        </div>
+      `
+          : `
+        <div class="quest-card">
+          <div class="quest-title">Пока нет данных</div>
+          <div class="quest-action">Откройте остров и заполните базовую форму.</div>
+        </div>
+      `
+      }
+    </div>
+  `;
+  todayGroup.appendChild(quests);
+
+  const islandsGroup = document.createElement('section');
+  islandsGroup.className = 'shield-group';
+  islandsGroup.innerHTML = '<h2 class="group-title">Острова</h2>';
+
+  const grid = document.createElement('section');
+  grid.className = 'shield-grid';
 
   islandRegistry.forEach((island) => {
     const tile = document.createElement('a');
@@ -202,21 +239,17 @@ export const createShieldScreen = () => {
     const report = reportById.get(island.id) ?? islandState.lastReport;
     const score = clampMetric(report?.score ?? 0);
     const confidence = clampMetric(report?.confidence ?? 0);
-    const headline = report?.headline ?? island.title;
     const progress = islandState.progress;
-    const nextStepLabel =
-      report?.actions?.[0]?.title ?? 'Открыть модуль и запустить расчёт';
+    const nextStepLabel = report?.actions?.[0]?.title ?? 'Открыть остров и запустить анализ';
     const status = getIslandStatus(progress.lastRunAt, Boolean(report));
 
     tile.innerHTML = `
       <span class="tile-status ${status.tone}">${status.label}</span>
-      <div class="tile-score">${score}</div>
-      <div class="tile-confidence">${confidence}%</div>
-      <div class="tile-headline">${headline}</div>
+      <div class="tile-score">${island.title}</div>
       <div class="tile-progress">
-        <span>Лучший: ${progress.bestScore}</span>
+        <span>Индекс: ${score}</span>
+        <span>Доверие: ${confidence}%</span>
         <span>Запусков: ${progress.runsCount}</span>
-        <span>3 последних: ${getHistoryTail(state, island.id).join(' → ') || '—'}</span>
       </div>
       <div class="tile-sparkline">${buildSparklineSvg(progress.history)}</div>
       <div class="tile-next">Следующий шаг: ${nextStepLabel}</div>
@@ -224,6 +257,46 @@ export const createShieldScreen = () => {
 
     grid.appendChild(tile);
   });
+  islandsGroup.appendChild(grid);
+
+  const historyGroup = document.createElement('section');
+  historyGroup.className = 'shield-group';
+  historyGroup.innerHTML = '<h2 class="group-title">История</h2>';
+
+  const historyList = document.createElement('div');
+  historyList.className = 'quest-list';
+  const latestRuns = islandRegistry
+    .map((island) => ({
+      id: island.id,
+      title: island.title,
+      lastRunAt: state.islands[island.id].progress.lastRunAt,
+      trail: getHistoryTail(state, island.id).join(' → ') || '—'
+    }))
+    .filter((item) => Boolean(item.lastRunAt))
+    .sort((a, b) => (b.lastRunAt ?? '').localeCompare(a.lastRunAt ?? ''))
+    .slice(0, 4);
+
+  if (latestRuns.length === 0) {
+    historyList.innerHTML = `
+      <article class="quest-card">
+        <div class="quest-title">Запусков пока нет</div>
+        <div class="quest-action">После первого анализа здесь появится короткая история изменений.</div>
+      </article>
+    `;
+  } else {
+    historyList.innerHTML = latestRuns
+      .map(
+        (item) => `
+          <article class="quest-card">
+            <div class="quest-title">${item.title}</div>
+            <div class="quest-action">Последний запуск: ${formatLastRun(item.lastRunAt)}</div>
+            <div class="tile-next">Динамика: ${item.trail}</div>
+          </article>
+        `
+      )
+      .join('');
+  }
+  historyGroup.appendChild(historyList);
 
   const actions = document.createElement('div');
   actions.className = 'screen-actions';
@@ -233,6 +306,14 @@ export const createShieldScreen = () => {
     <a class="button" href="#/settings">Настройки</a>
   `;
 
-  container.append(header, nextStep, summary, xpBlock, quests, grid, actions);
+  container.append(
+    header,
+    nextStep,
+    statusGroup,
+    todayGroup,
+    islandsGroup,
+    historyGroup,
+    actions
+  );
   return container;
 };

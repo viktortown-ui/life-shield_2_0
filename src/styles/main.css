@@ -330,12 +330,24 @@ body {
   margin: 0 0 4px;
   font-size: 24px;
   line-height: 1.2;
+  color: #f5f8ff;
 }
 
 .screen-header p {
   margin: 0;
   font-size: 15px;
-  color: #b8c5dd;
+  color: #c8d4ea;
+}
+
+.shield-group {
+  display: grid;
+  gap: 10px;
+}
+
+.group-title {
+  margin: 0;
+  font-size: 20px;
+  color: #f5f8ff;
 }
 
 .avatar {
@@ -442,6 +454,11 @@ body {
 }
 
 .shield-xp h2 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.shield-xp h3 {
   margin: 0;
   font-size: 17px;
 }
@@ -1175,6 +1192,12 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.button-primary-large {
+  min-height: 52px;
+  width: 100%;
+  font-size: 17px;
 }
 
 .island-intro {
