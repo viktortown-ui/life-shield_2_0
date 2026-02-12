@@ -1,5 +1,6 @@
 import { downloadReport } from '../core/diagnostics';
 import { islandRegistry } from '../core/registry';
+import { baseIslandIds, getIslandCatalogItem } from '../core/islandsCatalog';
 import { AppState, IslandId } from '../core/types';
 import { getState } from '../core/store';
 import { reportCaughtError } from '../core/reportError';
@@ -84,7 +85,7 @@ const buildWeeklyLevers = (state: AppState) => {
   const weakestIsland = pickWeakestIsland(state);
 
   if (weakestIsland) {
-    const title = islandRegistry.find((island) => island.id === weakestIsland)?.title;
+    const title = getIslandCatalogItem(weakestIsland).displayName;
     levers.push(`Сделайте 1 дополнительный запуск в «${title}» и доведите индекс острова минимум до +5 пунктов.`);
   }
 
@@ -94,7 +95,7 @@ const buildWeeklyLevers = (state: AppState) => {
     .sort((a, b) => (a.report?.confidence ?? 0) - (b.report?.confidence ?? 0))[0];
 
   if (lowConfidenceIsland) {
-    const title = islandRegistry.find((island) => island.id === lowConfidenceIsland.id)?.title;
+    const title = getIslandCatalogItem(lowConfidenceIsland.id).displayName;
     levers.push(`Обновите исходные данные в «${title}», чтобы поднять доверие модели выше 65%.`);
   }
 
@@ -128,7 +129,7 @@ const buildReportText = () => {
     const report = islandState.lastReport;
     const metrics = getTopMetrics(report).join('; ');
     return [
-      `${island.title}`,
+      `${getIslandCatalogItem(island.id).displayName}`,
       `Статус: ${report?.headline ?? 'нет данных'}`,
       `Метрики: ${metrics}`,
       `Что делать: ${getNextAction(report)}`,
@@ -214,6 +215,18 @@ export const createReportScreen = () => {
     }
   });
 
+
+
+  const nextBaseGroup = document.createElement('section');
+  nextBaseGroup.className = 'quest-card';
+  nextBaseGroup.innerHTML = `
+    <div class="quest-title">Что дальше?</div>
+    <div class="tile-headline">Начните или продолжайте базовые острова, чтобы держать стабильный прогресс.</div>
+    <div class="screen-actions">
+      ${baseIslandIds.map((id) => `<a class="button ghost" href="#/island/${id}">${getIslandCatalogItem(id).displayName}</a>`).join('')}
+    </div>
+  `;
+
   const grid = document.createElement('section');
   grid.className = 'shield-grid';
 
@@ -223,7 +236,8 @@ export const createReportScreen = () => {
     const card = document.createElement('article');
     card.className = 'shield-tile report-card';
     card.innerHTML = `
-      <div class="tile-score">${island.title}</div>
+      <div class="tile-score">${getIslandCatalogItem(island.id).displayName}</div>
+      <div class="tile-headline">${getIslandCatalogItem(island.id).shortWhy}</div>
       <div class="tile-headline">${report?.headline ?? 'Нет данных'}</div>
       <ul class="report-metrics">
         ${getTopMetrics(report)
@@ -241,6 +255,6 @@ export const createReportScreen = () => {
     grid.appendChild(card);
   });
 
-  container.append(header, executiveCard, actions, grid);
+  container.append(header, executiveCard, actions, nextBaseGroup, grid);
   return container;
 };

@@ -5,6 +5,7 @@ import { getTimeseriesReport } from '../islands/timeseries';
 import { getOptimizationReport } from '../islands/optimization';
 import { getDecisionTreeReport } from '../islands/decisionTree';
 import { getCausalDagReport } from '../islands/causalDag';
+import { getIslandCatalogItem } from './islandsCatalog';
 
 export interface IslandDefinition {
   id: IslandId;
@@ -18,48 +19,48 @@ export interface IslandDefinition {
 export const islandRegistry: IslandDefinition[] = [
   {
     id: 'bayes',
-    title: 'Байесовский остров',
-    description: 'Гипотезы, вероятности и апостериорные оценки.',
+    title: getIslandCatalogItem('bayes').displayName,
+    description: getIslandCatalogItem('bayes').shortWhy,
     inputLabel: 'Наблюдения',
     placeholder: 'Опишите исходные предположения...',
     getReport: getBayesReport
   },
   {
     id: 'hmm',
-    title: 'Остров скрытых состояний',
-    description: 'Markov-подход для динамики состояний.',
+    title: getIslandCatalogItem('hmm').displayName,
+    description: getIslandCatalogItem('hmm').shortWhy,
     inputLabel: 'Сигналы',
     placeholder: 'Какие события вы наблюдаете?',
     getReport: getHmmReport
   },
   {
     id: 'timeseries',
-    title: 'Остров временных рядов',
-    description: 'Тренды, сезонность и шум.',
+    title: getIslandCatalogItem('timeseries').displayName,
+    description: getIslandCatalogItem('timeseries').shortWhy,
     inputLabel: 'Данные ряда',
     placeholder: 'Опишите тенденции или показатели...',
     getReport: getTimeseriesReport
   },
   {
     id: 'optimization',
-    title: 'Остров оптимизации',
-    description: 'Поиск лучшего сценария.',
+    title: getIslandCatalogItem('optimization').displayName,
+    description: getIslandCatalogItem('optimization').shortWhy,
     inputLabel: 'Цель и ограничения',
     placeholder: 'Что нужно максимизировать/минимизировать?',
     getReport: getOptimizationReport
   },
   {
     id: 'decisionTree',
-    title: 'Остров решений',
-    description: 'Дерево выборов и рисков.',
+    title: getIslandCatalogItem('decisionTree').displayName,
+    description: getIslandCatalogItem('decisionTree').shortWhy,
     inputLabel: 'Варианты решений',
     placeholder: 'Опишите возможные ветки...',
     getReport: getDecisionTreeReport
   },
   {
     id: 'causalDag',
-    title: 'Остров причинности',
-    description: 'DAG для причинных связей.',
+    title: getIslandCatalogItem('causalDag').displayName,
+    description: getIslandCatalogItem('causalDag').shortWhy,
     inputLabel: 'Причины и следствия',
     placeholder: 'Какие факторы влияют на исход?',
     getReport: getCausalDagReport
