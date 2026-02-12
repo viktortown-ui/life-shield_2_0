@@ -31,7 +31,8 @@ export type DiagnosticsEntry = {
     | 'blank_screen_detected'
     | 'dom_mutation'
     | 'breadcrumb'
-    | 'service_worker';
+    | 'service_worker'
+    | 'perf';
   message: string;
   stack?: string;
   name?: string;
@@ -62,6 +63,13 @@ export type DiagnosticsEntry = {
   externalScripts?: ScriptInventoryEntry[];
   scriptResourceEntries?: ScriptResourceEntry[];
   lastBreadcrumb?: string | null;
+  perfMetric?: {
+    name: 'LCP' | 'INP' | 'CLS';
+    value: number;
+    rating: 'good' | 'needs-improvement' | 'poor';
+    delta?: number;
+    navigationType?: string;
+  };
 };
 
 type ScriptInventoryEntry = {
@@ -379,6 +387,11 @@ const buildReport = (
   uiStateDump: UiStateDump | null
 ) => {
   const root = document.getElementById('app');
+  const perf: Partial<Record<'LCP' | 'INP' | 'CLS', DiagnosticsEntry['perfMetric']>> = {};
+  entries.forEach((entry) => {
+    if (entry.kind !== 'perf' || !entry.perfMetric) return;
+    perf[entry.perfMetric.name] = entry.perfMetric;
+  });
   const lastEntry = entries.length ? entries[entries.length - 1] : null;
   return {
     generatedAt: new Date().toISOString(),
@@ -403,6 +416,7 @@ const buildReport = (
     rootChildCount: root ? root.childElementCount : null,
     rootHTMLLength: root ? root.innerHTML.length : null,
     uiStateDump,
+    perf,
     network: {
       failedResources: collectFailedResources(),
       failedFetches: networkFailures
@@ -571,7 +585,8 @@ const createPanel = (
   state: DiagnosticsState,
   onCopy: () => Promise<boolean>,
   onDump: () => UiStateDump | null,
-  onDownload: () => void
+  onDownload: () => void,
+  onDownloadPerf: () => void
 ): HTMLDetailsElement => {
   const panel = document.createElement('details');
   panel.className = 'diagnostics-panel';
@@ -624,7 +639,19 @@ const createPanel = (
     }, 4000);
   });
 
-  buttons.append(copyButton, dumpButton, downloadButton);
+  const downloadPerfButton = document.createElement('button');
+  downloadPerfButton.type = 'button';
+  downloadPerfButton.className = 'button small';
+  downloadPerfButton.textContent = 'Скачать perf JSON';
+  downloadPerfButton.addEventListener('click', () => {
+    onDownloadPerf();
+    copyStatus.textContent = 'Perf JSON скачан.';
+    window.setTimeout(() => {
+      copyStatus.textContent = '';
+    }, 4000);
+  });
+
+  buttons.append(copyButton, dumpButton, downloadButton, downloadPerfButton);
   actions.append(copyStatus, buttons);
 
   const list = document.createElement('ul');
@@ -892,6 +919,22 @@ const fromBreadcrumb = (message: string): DiagnosticsEntry => {
     kind: 'breadcrumb',
     message,
     rawType: 'breadcrumb'
+  };
+};
+
+const buildPerfReport = (entries: DiagnosticsEntry[]) => {
+  const metrics: Partial<Record<'LCP' | 'INP' | 'CLS', NonNullable<DiagnosticsEntry['perfMetric']>>> =
+    {};
+  entries.forEach((entry) => {
+    if (entry.kind !== 'perf' || !entry.perfMetric) return;
+    metrics[entry.perfMetric.name] = entry.perfMetric;
+  });
+  return {
+    generatedAt: new Date().toISOString(),
+    build: buildInfo,
+    url: window.location.href,
+    currentRoute: window.location.hash,
+    metrics
   };
 };
 
@@ -1410,6 +1453,12 @@ export const initDiagnostics = (uiEnabled = isDebugEnabled()): DiagnosticsContro
         dump
       );
       downloadReport(report);
+    },
+    () => {
+      downloadReport(
+        JSON.stringify(buildPerfReport(state.entries), null, 2),
+        'life-shield-perf'
+      );
     }
   );
   if (uiEnabled) {

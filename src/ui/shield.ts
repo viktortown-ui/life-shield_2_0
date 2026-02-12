@@ -3,7 +3,6 @@ import { baseIslandIds, getIslandCatalogItem } from '../core/islandsCatalog';
 import { AppState, IslandReport } from '../core/types';
 import { getState } from '../core/store';
 import { buildGlobalVerdict } from '../core/verdict';
-import { reportCaughtError } from '../core/reportError';
 import { createAvatar } from './avatar';
 import {
   buildSparklineSvg,
@@ -78,31 +77,12 @@ export const createShieldScreen = () => {
   header.appendChild(title);
 
   const state = getState();
-  const reports = islandRegistry.map((island) => {
-    const islandState = state.islands[island.id];
-    if (islandState.lastReport) return islandState.lastReport;
-    try {
-      return island.getReport(islandState.input);
-    } catch (error) {
-      reportCaughtError(error);
-      return {
-        id: island.id,
-        score: 0,
-        confidence: 0,
-        headline: 'Ошибка острова',
-        summary:
-          error instanceof Error
-            ? error.message
-            : 'Остров не смог сформировать отчёт.',
-        details: ['Попробуйте обновить страницу или повторить ввод.']
-      };
-    }
-  });
+  const reports = islandRegistry
+    .map((island) => state.islands[island.id].lastReport)
+    .filter((report): report is IslandReport => Boolean(report));
   const normalizedReports = reports.map((report) => normalizeReport(report));
   const verdict = buildGlobalVerdict(normalizedReports);
-  const reportById = new Map(
-    normalizedReports.map((report) => [report.id, report])
-  );
+  const reportById = new Map(normalizedReports.map((report) => [report.id, report]));
   const weakestReport = [...normalizedReports].sort(
     (a, b) => a.score - b.score
   )[0];
@@ -231,10 +211,30 @@ export const createShieldScreen = () => {
   const grid = document.createElement('section');
   grid.className = 'shield-grid';
 
+  const renderHeavyIslandBits = () => {
+    islandRegistry.forEach((island) => {
+      const tile = grid.querySelector<HTMLElement>(`[data-island-id="${island.id}"]`);
+      if (!tile) return;
+      const islandState = state.islands[island.id];
+      const report = reportById.get(island.id) ?? islandState.lastReport;
+      const nextStepLabel =
+        report?.actions?.[0]?.title ?? 'Открыть остров и запустить анализ';
+      const sparkline = tile.querySelector<HTMLElement>('[data-sparkline]');
+      if (sparkline) {
+        sparkline.innerHTML = buildSparklineSvg(islandState.progress.history);
+      }
+      const next = tile.querySelector<HTMLElement>('[data-next-step]');
+      if (next) {
+        next.textContent = `Следующий шаг: ${nextStepLabel}`;
+      }
+    });
+  };
+
   islandRegistry.forEach((island) => {
     const tile = document.createElement('a');
     tile.className = 'shield-tile';
     tile.href = `#/island/${island.id}`;
+    tile.dataset.islandId = island.id;
 
     const islandState = state.islands[island.id];
     const report = reportById.get(island.id) ?? islandState.lastReport;
@@ -242,7 +242,6 @@ export const createShieldScreen = () => {
     const confidence = clampMetric(report?.confidence ?? 0);
     const progress = islandState.progress;
     const catalog = getIslandCatalogItem(island.id);
-    const nextStepLabel = report?.actions?.[0]?.title ?? 'Открыть остров и запустить анализ';
     const status = getIslandStatus(progress.lastRunAt, Boolean(report));
 
     tile.innerHTML = `
@@ -253,13 +252,22 @@ export const createShieldScreen = () => {
         <span>Доверие: ${confidence}%</span>
         <span>Запусков: ${progress.runsCount}</span>
       </div>
-      <div class="tile-sparkline">${buildSparklineSvg(progress.history)}</div>
-      <div class="tile-next">Следующий шаг: ${nextStepLabel}</div>
+      <div class="tile-sparkline" data-sparkline>Загрузка динамики…</div>
+      <div class="tile-next" data-next-step>Подготовка подсказки…</div>
     `;
 
     grid.appendChild(tile);
   });
   islandsGroup.appendChild(grid);
+
+  const scheduleHeavyRender = () => {
+    if ('requestIdleCallback' in window) {
+      window.requestIdleCallback(() => renderHeavyIslandBits(), { timeout: 1200 });
+      return;
+    }
+    window.setTimeout(renderHeavyIslandBits, 0);
+  };
+  scheduleHeavyRender();
 
   const historyGroup = document.createElement('section');
   historyGroup.className = 'shield-group';
@@ -272,7 +280,7 @@ export const createShieldScreen = () => {
       id: island.id,
       title: getIslandCatalogItem(island.id).displayName,
       lastRunAt: state.islands[island.id].progress.lastRunAt,
-      trail: getHistoryTail(state, island.id).join(' → ') || '—'
+      trail: ''
     }))
     .filter((item) => Boolean(item.lastRunAt))
     .sort((a, b) => (b.lastRunAt ?? '').localeCompare(a.lastRunAt ?? ''))
@@ -292,13 +300,29 @@ export const createShieldScreen = () => {
           <article class="quest-card">
             <div class="quest-title">${item.title}</div>
             <div class="quest-action">Последний запуск: ${formatLastRun(item.lastRunAt)}</div>
-            <div class="tile-next">Динамика: ${item.trail}</div>
+            <div class="tile-next" data-history-id="${item.id}">Динамика: загрузка…</div>
           </article>
         `
       )
       .join('');
   }
   historyGroup.appendChild(historyList);
+
+  const renderHistoryTrails = () => {
+    latestRuns.forEach((item) => {
+      const target = historyList.querySelector<HTMLElement>(
+        `[data-history-id="${item.id}"]`
+      );
+      if (!target) return;
+      const trail = getHistoryTail(state, item.id).join(' → ') || '—';
+      target.textContent = `Динамика: ${trail}`;
+    });
+  };
+  if ('requestIdleCallback' in window) {
+    window.requestIdleCallback(() => renderHistoryTrails(), { timeout: 1600 });
+  } else {
+    window.setTimeout(renderHistoryTrails, 16);
+  }
 
 
 
