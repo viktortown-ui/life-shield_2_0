@@ -12,6 +12,7 @@ import {
 import { ensureState } from './core/store';
 import {
   applyUpdate,
+  checkForUpdate,
   initPwaUpdate,
   onUpdateState,
   panicReset
@@ -602,6 +603,34 @@ try {
   const bannerText = banner.querySelector('span') as HTMLSpanElement;
   let needsPanicReset = false;
 
+  const offlineBanner = document.createElement('div');
+  offlineBanner.className = 'offline-banner hidden';
+  offlineBanner.textContent =
+    'Вы офлайн. Проверьте подключение, чтобы синхронизировать данные.';
+  document.body.prepend(offlineBanner);
+
+  const setOfflineState = (isOffline: boolean) => {
+    offlineBanner.classList.toggle('hidden', !isOffline);
+  };
+
+  setOfflineState(!navigator.onLine);
+  window.addEventListener('offline', () => setOfflineState(true));
+  window.addEventListener('online', () => setOfflineState(false));
+
+  const nativeFetch = window.fetch.bind(window);
+  window.fetch = async (...args) => {
+    try {
+      const response = await nativeFetch(...args);
+      if (!response.ok && (response.status === 0 || response.status >= 500)) {
+        setOfflineState(true);
+      }
+      return response;
+    } catch (error) {
+      setOfflineState(true);
+      throw error;
+    }
+  };
+
   bannerButton.addEventListener('click', () => {
     if (needsPanicReset) {
       void panicReset().catch(reportCaughtError);
@@ -617,11 +646,15 @@ try {
   onUpdateState((state) => {
     needsPanicReset = state.panic;
     if (state.panic) {
-      bannerText.textContent = 'Новая версия доступна. Сбросить кэш?';
+      bannerText.textContent =
+        'Версия обновилась, нужно перезагрузить. Сбросить кэш?';
       bannerButton.textContent = 'Сбросить кэш';
+      bannerButton.title =
+        'Сервис-воркер и кэш будут очищены, локальные данные могут быть потеряны.';
     } else {
       bannerText.textContent = 'Доступно обновление.';
       bannerButton.textContent = 'Обновить';
+      bannerButton.removeAttribute('title');
     }
     banner.classList.toggle('hidden', !state.ready && !state.panic);
 
@@ -641,6 +674,20 @@ try {
   if (root) {
     diagnostics.pushBreadcrumb('boot: mount_ui');
     initRouter(root);
+    const runUpdateCheck = () => {
+      try {
+        checkForUpdate();
+      } catch (error) {
+        reportCaughtError(error);
+      }
+    };
+
+    if ('requestIdleCallback' in window) {
+      window.requestIdleCallback(() => runUpdateCheck(), { timeout: 4_000 });
+    } else {
+      window.setTimeout(runUpdateCheck, 0);
+    }
+
     diagnostics.pushBreadcrumb('boot: ready');
     initBlankScreenWatchdog(diagnostics);
     initDomMutationObserver(root, diagnostics);
