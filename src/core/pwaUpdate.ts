@@ -210,7 +210,11 @@ export const applyUpdate = () => {
   }
 };
 
-export const panicReset = async () => {
+type PanicResetOptions = {
+  clearUserData?: boolean;
+};
+
+export const panicReset = async (options: PanicResetOptions = {}) => {
   try {
     if ('serviceWorker' in navigator) {
       const registrations = await navigator.serviceWorker.getRegistrations();
@@ -227,7 +231,9 @@ export const panicReset = async () => {
   } catch (error) {
     logPwaError('panic_reset_clear_caches', error);
   }
-  safeClear();
+  if (options.clearUserData) {
+    safeClear();
+  }
   try {
     window.location.reload();
   } catch (error) {
@@ -241,3 +247,14 @@ export const getUpdateState = (): UpdateState => ({
   panic: panicMode,
   registerError
 });
+
+
+export const __unsafeResetPwaUpdateStateForTests = () => {
+  updateReady = false;
+  offlineReady = false;
+  panicMode = false;
+  registerError = null;
+  updateAction = null;
+  listeners.clear();
+  serviceWorkerEventLogger = undefined;
+};

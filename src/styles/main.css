@@ -200,6 +200,25 @@ body {
   }
 }
 
+
+.offline-banner {
+  position: sticky;
+  top: 0;
+  z-index: 9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px;
+  background: #5e451a;
+  color: #fef5d8;
+  border-bottom: 1px solid #7a5d2a;
+  font-size: 14px;
+}
+
+.offline-banner.hidden {
+  display: none;
+}
+
 .update-banner {
   position: sticky;
   top: 0;
