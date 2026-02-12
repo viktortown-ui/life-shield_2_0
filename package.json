@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "smoke:preview": "bash ./scripts/smokePreview.sh"
+    "smoke:preview": "bash ./scripts/smokePreview.sh",
+    "lighthouse:pwa": "bash ./scripts/lighthousePwa.sh"
   },
   "devDependencies": {
     "@types/node": "^22.10.1",

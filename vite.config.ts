@@ -2,6 +2,8 @@ import { defineConfig } from 'vite';
 import { execSync } from 'node:child_process';
 import { VitePWA, cachePreset } from 'vite-plugin-pwa';
 
+const base = process.env.BASE ?? '/life-shield_2_0/';
+
 const buildId = (() => {
   try {
     return execSync('git rev-parse --short HEAD', {
@@ -14,7 +16,7 @@ const buildId = (() => {
 const builtAt = new Date().toISOString();
 
 export default defineConfig({
-  base: process.env.BASE ?? '/life-shield_2_0/',
+  base,
   define: {
     __BUILD_ID__: JSON.stringify(buildId),
     __BUILD_TIME__: JSON.stringify(builtAt)
@@ -22,23 +24,49 @@ export default defineConfig({
   plugins: [
     VitePWA({
       registerType: 'prompt',
-      includeAssets: ['icon.svg'],
+      includeAssets: ['icon.svg', 'icons/*.png'],
       manifest: {
-        name: 'LifeShieldV2',
+        id: `${base}#/`,
+        name: 'LifeShield 2.0',
         short_name: 'LifeShield',
         theme_color: '#0b1220',
         background_color: '#0b1220',
         display: 'standalone',
+        scope: base,
+        start_url: `${base}#/`,
         icons: [
           {
-            src: 'icon.svg',
+            src: '/icons/icon-192.png',
             sizes: '192x192',
-            type: 'image/svg+xml'
+            type: 'image/png'
           },
           {
-            src: 'icon.svg',
+            src: '/icons/icon-512.png',
             sizes: '512x512',
-            type: 'image/svg+xml'
+            type: 'image/png'
+          },
+          {
+            src: '/icons/icon-512-maskable.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable'
+          }
+        ],
+        shortcuts: [
+          {
+            name: 'Щит',
+            short_name: 'Щит',
+            url: `${base}#/`
+          },
+          {
+            name: 'Острова',
+            short_name: 'Острова',
+            url: `${base}#/islands`
+          },
+          {
+            name: 'Настройки',
+            short_name: 'Настройки',
+            url: `${base}#/settings`
           }
         ]
       },
@@ -46,17 +74,8 @@ export default defineConfig({
         cleanupOutdatedCaches: true,
         clientsClaim: true,
         skipWaiting: false,
-        runtimeCaching: [
-          {
-            urlPattern: ({ request }) => request.mode === 'navigate',
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'pages',
-              networkTimeoutSeconds: 3
-            }
-          },
-          ...cachePreset
-        ]
+        navigateFallback: 'index.html',
+        runtimeCaching: [...cachePreset]
       }
     })
   ],
