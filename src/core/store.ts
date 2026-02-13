@@ -47,7 +47,10 @@ const makeEmptyState = (): AppState => ({
     homeScreen: 'shield',
     cosmosShowAllLabels: false,
     cosmosOnlyImportant: false,
-    cosmosShowHalo: true
+    cosmosShowHalo: true,
+    cosmosSoundFxEnabled: false,
+    cosmosSfxVolume: 0.4,
+    cosmosReduceMotionOverride: null
   },
   inputData: {
     finance: { ...defaultFinanceInput }
@@ -186,7 +189,19 @@ const mergeWithDefaults = (
       cosmosShowHalo:
         typeof incomingFlags.cosmosShowHalo === 'boolean'
           ? incomingFlags.cosmosShowHalo
-          : base.flags.cosmosShowHalo
+          : base.flags.cosmosShowHalo,
+      cosmosSoundFxEnabled:
+        typeof incomingFlags.cosmosSoundFxEnabled === 'boolean'
+          ? incomingFlags.cosmosSoundFxEnabled
+          : base.flags.cosmosSoundFxEnabled,
+      cosmosSfxVolume:
+        typeof incomingFlags.cosmosSfxVolume === 'number' && Number.isFinite(incomingFlags.cosmosSfxVolume)
+          ? Math.max(0, Math.min(1, incomingFlags.cosmosSfxVolume))
+          : base.flags.cosmosSfxVolume,
+      cosmosReduceMotionOverride:
+        incomingFlags.cosmosReduceMotionOverride === null || typeof incomingFlags.cosmosReduceMotionOverride === 'boolean'
+          ? incomingFlags.cosmosReduceMotionOverride
+          : base.flags.cosmosReduceMotionOverride
     },
     inputData: {
       finance: {
@@ -416,6 +431,9 @@ export const setCosmosUiFlags = (value: {
   cosmosShowAllLabels?: boolean;
   cosmosOnlyImportant?: boolean;
   cosmosShowHalo?: boolean;
+  cosmosSoundFxEnabled?: boolean;
+  cosmosSfxVolume?: number;
+  cosmosReduceMotionOverride?: boolean | null;
 }) => {
   const state = getState();
   updateState({
@@ -430,6 +448,15 @@ export const setCosmosUiFlags = (value: {
         : {}),
       ...(typeof value.cosmosShowHalo === 'boolean'
         ? { cosmosShowHalo: value.cosmosShowHalo }
+        : {}),
+      ...(typeof value.cosmosSoundFxEnabled === 'boolean'
+        ? { cosmosSoundFxEnabled: value.cosmosSoundFxEnabled }
+        : {}),
+      ...(typeof value.cosmosSfxVolume === 'number' && Number.isFinite(value.cosmosSfxVolume)
+        ? { cosmosSfxVolume: Math.max(0, Math.min(1, value.cosmosSfxVolume)) }
+        : {}),
+      ...(value.cosmosReduceMotionOverride === null || typeof value.cosmosReduceMotionOverride === 'boolean'
+        ? { cosmosReduceMotionOverride: value.cosmosReduceMotionOverride }
         : {})
     }
   });

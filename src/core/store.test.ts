@@ -35,7 +35,10 @@ const makeState = (overrides: Partial<AppState> = {}): AppState => ({
     homeScreen: 'shield',
     cosmosShowAllLabels: false,
     cosmosOnlyImportant: false,
-    cosmosShowHalo: true
+    cosmosShowHalo: true,
+    cosmosSoundFxEnabled: false,
+    cosmosSfxVolume: 0.4,
+    cosmosReduceMotionOverride: null
   },
   inputData: {
     finance: {
@@ -133,13 +136,19 @@ describe('cosmos ui flags', () => {
     store.setCosmosUiFlags({
       cosmosShowAllLabels: true,
       cosmosOnlyImportant: true,
-      cosmosShowHalo: false
+      cosmosShowHalo: false,
+      cosmosSoundFxEnabled: true,
+      cosmosSfxVolume: 0.8,
+      cosmosReduceMotionOverride: true
     });
 
     const state = store.getState();
     expect(state.flags.cosmosShowAllLabels).toBe(true);
     expect(state.flags.cosmosOnlyImportant).toBe(true);
     expect(state.flags.cosmosShowHalo).toBe(false);
+    expect(state.flags.cosmosSoundFxEnabled).toBe(true);
+    expect(state.flags.cosmosSfxVolume).toBe(0.8);
+    expect(state.flags.cosmosReduceMotionOverride).toBe(true);
   });
 });
 

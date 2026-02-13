@@ -17,7 +17,14 @@ const makeState = (): AppState => ({
   streakDays: 0,
   flags: {
     onboarded: false,
-    demoLoaded: false
+    demoLoaded: false,
+    homeScreen: 'shield',
+    cosmosShowAllLabels: false,
+    cosmosOnlyImportant: false,
+    cosmosShowHalo: true,
+    cosmosSoundFxEnabled: false,
+    cosmosSfxVolume: 0.4,
+    cosmosReduceMotionOverride: null
   },
   inputData: {
     finance: {

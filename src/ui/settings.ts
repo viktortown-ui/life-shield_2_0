@@ -1,4 +1,11 @@
-import { exportState, getState, importState, resetState, setHomeScreen } from '../core/store';
+import {
+  exportState,
+  getState,
+  importState,
+  resetState,
+  setCosmosUiFlags,
+  setHomeScreen
+} from '../core/store';
 import {
   applyUpdate,
   checkForUpdate,
@@ -52,6 +59,27 @@ export const createSettingsScreen = () => {
         <span>Cosmos</span>
       </label>
     </div>
+  `;
+
+  const cosmosFxSettings = document.createElement('section');
+  cosmosFxSettings.className = 'settings-block';
+  cosmosFxSettings.innerHTML = `
+    <h2>Cosmos FX</h2>
+    <div class="cosmos-controls">
+      <label>
+        <input type="checkbox" data-cosmos-fx="sound" aria-label="Включить звуковые эффекты Cosmos" />
+        Sound FX
+      </label>
+      <label>
+        Volume
+        <input type="range" min="0" max="1" step="0.05" data-cosmos-fx="volume" aria-label="Громкость звуковых эффектов Cosmos" />
+      </label>
+      <label>
+        <input type="checkbox" data-cosmos-fx="reduceMotion" aria-label="Сократить анимации Cosmos" />
+        Reduce motion (override)
+      </label>
+    </div>
+    <p class="settings-hint">Системная настройка prefers-reduced-motion учитывается автоматически.</p>
   `;
 
   const maintenance = document.createElement('section');
@@ -213,6 +241,7 @@ export const createSettingsScreen = () => {
 
 
   const selectedHome = getState().flags.homeScreen;
+  const flags = getState().flags;
   const homeInputs = homeSettings.querySelectorAll<HTMLInputElement>('input[name="home-screen"]');
   homeInputs.forEach((input) => {
     input.checked = input.value === selectedHome;
@@ -221,6 +250,25 @@ export const createSettingsScreen = () => {
       setHomeScreen(input.value === 'cosmos' ? 'cosmos' : 'shield');
     });
   });
+
+  const soundInput = cosmosFxSettings.querySelector<HTMLInputElement>('input[data-cosmos-fx="sound"]');
+  const volumeInput = cosmosFxSettings.querySelector<HTMLInputElement>('input[data-cosmos-fx="volume"]');
+  const reduceMotionInput = cosmosFxSettings.querySelector<HTMLInputElement>('input[data-cosmos-fx="reduceMotion"]');
+  if (soundInput && volumeInput && reduceMotionInput) {
+    soundInput.checked = flags.cosmosSoundFxEnabled;
+    volumeInput.value = String(flags.cosmosSfxVolume);
+    reduceMotionInput.checked = flags.cosmosReduceMotionOverride === true;
+
+    soundInput.addEventListener('change', () => {
+      setCosmosUiFlags({ cosmosSoundFxEnabled: soundInput.checked });
+    });
+    volumeInput.addEventListener('input', () => {
+      setCosmosUiFlags({ cosmosSfxVolume: Number(volumeInput.value) });
+    });
+    reduceMotionInput.addEventListener('change', () => {
+      setCosmosUiFlags({ cosmosReduceMotionOverride: reduceMotionInput.checked ? true : null });
+    });
+  }
 
   const updateState = getUpdateState();
   updateButton.disabled = !updateState.ready;
@@ -244,6 +292,6 @@ export const createSettingsScreen = () => {
   actions.className = 'screen-actions';
   actions.innerHTML = '<a class="button ghost" href="#/">К щиту</a>';
 
-  container.append(header, homeSettings, exportBlock, maintenance, actions);
+  container.append(header, homeSettings, cosmosFxSettings, exportBlock, maintenance, actions);
   return container;
 };

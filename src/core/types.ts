@@ -99,6 +99,9 @@ export interface AppState {
     cosmosShowAllLabels: boolean;
     cosmosOnlyImportant: boolean;
     cosmosShowHalo: boolean;
+    cosmosSoundFxEnabled: boolean;
+    cosmosSfxVolume: number;
+    cosmosReduceMotionOverride: boolean | null;
   };
   inputData: {
     finance: FinanceInputData;

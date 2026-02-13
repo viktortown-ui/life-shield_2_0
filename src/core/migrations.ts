@@ -1,6 +1,6 @@
 import { AppState } from './types';
 
-export const schemaVersion = 6;
+export const schemaVersion = 7;
 
 export type Migration = (state: AppState) => AppState;
 
@@ -74,6 +74,21 @@ export const migrations: Migration[] = [
     flags: {
       ...state.flags,
       homeScreen: state.flags?.homeScreen === 'cosmos' ? 'cosmos' : 'shield'
+    }
+  }),
+  (state) => ({
+    ...state,
+    schemaVersion: 7,
+    flags: {
+      ...state.flags,
+      cosmosSoundFxEnabled: state.flags?.cosmosSoundFxEnabled ?? false,
+      cosmosSfxVolume: Number.isFinite(state.flags?.cosmosSfxVolume)
+        ? Math.max(0, Math.min(1, Number(state.flags?.cosmosSfxVolume)))
+        : 0.4,
+      cosmosReduceMotionOverride:
+        state.flags?.cosmosReduceMotionOverride === null || typeof state.flags?.cosmosReduceMotionOverride === 'boolean'
+          ? state.flags.cosmosReduceMotionOverride
+          : null
     }
   })
 
