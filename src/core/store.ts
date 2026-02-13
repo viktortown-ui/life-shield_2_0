@@ -43,7 +43,8 @@ const makeEmptyState = (): AppState => ({
   streakDays: 0,
   flags: {
     onboarded: false,
-    demoLoaded: false
+    demoLoaded: false,
+    homeScreen: 'shield'
   },
   inputData: {
     finance: { ...defaultFinanceInput }
@@ -168,7 +169,9 @@ const mergeWithDefaults = (
       demoLoaded:
         typeof incomingFlags.demoLoaded === 'boolean'
           ? incomingFlags.demoLoaded
-          : base.flags.demoLoaded
+          : base.flags.demoLoaded,
+      homeScreen:
+        incomingFlags.homeScreen === 'cosmos' ? 'cosmos' : base.flags.homeScreen
     },
     inputData: {
       finance: {
@@ -377,6 +380,18 @@ export const setOnboarded = (value = true) => {
     flags: {
       ...state.flags,
       onboarded: value
+    }
+  });
+};
+
+
+export const setHomeScreen = (value: AppState['flags']['homeScreen']) => {
+  const state = getState();
+  updateState({
+    ...state,
+    flags: {
+      ...state.flags,
+      homeScreen: value
     }
   });
 };

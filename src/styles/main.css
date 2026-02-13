@@ -1284,3 +1284,100 @@ body {
   display: grid;
   gap: 4px;
 }
+
+.settings-home-switch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.settings-home-switch label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid #24314d;
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: #0f1627;
+  cursor: pointer;
+}
+
+.settings-home-switch input {
+  accent-color: #4f8bff;
+}
+
+.cosmos-screen {
+  position: relative;
+}
+
+.cosmos-map-wrap {
+  position: relative;
+  border-radius: 16px;
+  border: 1px solid #24314d;
+  background: radial-gradient(circle at 40% 30%, #182849, #0e1628 60%);
+  padding: 10px;
+}
+
+.cosmos-map {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.cosmos-core {
+  fill: #ffd36a;
+  opacity: 0.9;
+}
+
+.cosmos-orbit {
+  fill: none;
+  stroke: rgba(139, 168, 220, 0.35);
+  stroke-width: 1;
+}
+
+.cosmos-orbit-label {
+  fill: #9fb2d7;
+  font-size: 12px;
+}
+
+.cosmos-planet {
+  cursor: pointer;
+}
+
+.cosmos-planet-label {
+  fill: #e8edf6;
+  font-size: 12px;
+}
+
+.cosmos-badge--ok {
+  fill: #7ef7e6;
+}
+
+.cosmos-badge--risk {
+  fill: #ff6b6b;
+}
+
+.cosmos-badge--none {
+  fill: #ffd36a;
+}
+
+.cosmos-menu {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  min-width: 170px;
+  max-width: min(260px, 80vw);
+  background: #101a2e;
+  border: 1px solid #24314d;
+  border-radius: 12px;
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+  z-index: 4;
+}
+
+.cosmos-menu-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

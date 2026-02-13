@@ -1,4 +1,4 @@
-import { exportState, importState, resetState } from '../core/store';
+import { exportState, getState, importState, resetState, setHomeScreen } from '../core/store';
 import {
   applyUpdate,
   checkForUpdate,
@@ -34,6 +34,24 @@ export const createSettingsScreen = () => {
     </div>
     <p class="settings-warning">Импорт перезапишет текущие данные.</p>
     <p class="settings-hint"></p>
+  `;
+
+
+  const homeSettings = document.createElement('section');
+  homeSettings.className = 'settings-block';
+  homeSettings.innerHTML = `
+    <h2>Интерфейс</h2>
+    <p class="settings-hint">Домашний экран по умолчанию.</p>
+    <div class="settings-home-switch" role="radiogroup" aria-label="Домашний экран">
+      <label>
+        <input type="radio" name="home-screen" value="shield" />
+        <span>Shield</span>
+      </label>
+      <label>
+        <input type="radio" name="home-screen" value="cosmos" />
+        <span>Cosmos</span>
+      </label>
+    </div>
   `;
 
   const maintenance = document.createElement('section');
@@ -193,6 +211,17 @@ export const createSettingsScreen = () => {
     }
   });
 
+
+  const selectedHome = getState().flags.homeScreen;
+  const homeInputs = homeSettings.querySelectorAll<HTMLInputElement>('input[name="home-screen"]');
+  homeInputs.forEach((input) => {
+    input.checked = input.value === selectedHome;
+    input.addEventListener('change', () => {
+      if (!input.checked) return;
+      setHomeScreen(input.value === 'cosmos' ? 'cosmos' : 'shield');
+    });
+  });
+
   const updateState = getUpdateState();
   updateButton.disabled = !updateState.ready;
   if (updateState.ready) {
@@ -215,6 +244,6 @@ export const createSettingsScreen = () => {
   actions.className = 'screen-actions';
   actions.innerHTML = '<a class="button ghost" href="#/">К щиту</a>';
 
-  container.append(header, exportBlock, maintenance, actions);
+  container.append(header, homeSettings, exportBlock, maintenance, actions);
   return container;
 };

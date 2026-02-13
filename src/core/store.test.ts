@@ -29,7 +29,7 @@ const makeState = (overrides: Partial<AppState> = {}): AppState => ({
   xp: 0,
   level: 1,
   streakDays: 0,
-  flags: { onboarded: false, demoLoaded: false },
+  flags: { onboarded: false, demoLoaded: false, homeScreen: 'shield' },
   inputData: {
     finance: {
       monthlyIncome: 180000,
@@ -118,6 +118,17 @@ describe('onboarding flags', () => {
 });
 
 
+
+
+describe('home screen setting', () => {
+  it('persists selected home screen', async () => {
+    const store = await loadStore();
+    store.setHomeScreen('cosmos');
+
+    const state = store.getState();
+    expect(state.flags.homeScreen).toBe('cosmos');
+  });
+});
 describe('history tracking', () => {
   it('stores only the last 10 runs for each island', async () => {
     const store = await loadStore();
