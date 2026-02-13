@@ -14,6 +14,7 @@ interface PlanetConfig {
   angleDeg: number;
   distanceFactor: number;
   dataHref?: string;
+  reportHref?: string;
 }
 
 interface ViewTransform {
@@ -32,15 +33,15 @@ interface PlanetInstrumentStatus {
 }
 
 const PLANETS: PlanetConfig[] = [
-  { id: 'snapshot', orbitId: 'money', angleDeg: 20, distanceFactor: 0.8, dataHref: '#/finance' },
-  { id: 'stressTest', orbitId: 'obligations', angleDeg: 96, distanceFactor: 0.86, dataHref: '#/finance' },
-  { id: 'incomePortfolio', orbitId: 'income', angleDeg: 162, distanceFactor: 0.88, dataHref: '#/finance' },
-  { id: 'bayes', orbitId: 'energy', angleDeg: 212, distanceFactor: 0.72 },
-  { id: 'hmm', orbitId: 'energy', angleDeg: 254, distanceFactor: 0.9 },
-  { id: 'timeseries', orbitId: 'support', angleDeg: 302, distanceFactor: 0.76 },
-  { id: 'optimization', orbitId: 'flexibility', angleDeg: 342, distanceFactor: 0.9 },
-  { id: 'decisionTree', orbitId: 'support', angleDeg: 42, distanceFactor: 0.94 },
-  { id: 'causalDag', orbitId: 'obligations', angleDeg: 136, distanceFactor: 0.68 }
+  { id: 'snapshot', orbitId: 'money', angleDeg: 20, distanceFactor: 0.8, dataHref: '#/finance', reportHref: '#/report' },
+  { id: 'stressTest', orbitId: 'obligations', angleDeg: 96, distanceFactor: 0.86, dataHref: '#/finance', reportHref: '#/report' },
+  { id: 'incomePortfolio', orbitId: 'income', angleDeg: 162, distanceFactor: 0.88, dataHref: '#/finance', reportHref: '#/report' },
+  { id: 'bayes', orbitId: 'energy', angleDeg: 212, distanceFactor: 0.72, reportHref: '#/report' },
+  { id: 'hmm', orbitId: 'energy', angleDeg: 254, distanceFactor: 0.9, reportHref: '#/report' },
+  { id: 'timeseries', orbitId: 'support', angleDeg: 302, distanceFactor: 0.76, reportHref: '#/report' },
+  { id: 'optimization', orbitId: 'flexibility', angleDeg: 342, distanceFactor: 0.9, reportHref: '#/report' },
+  { id: 'decisionTree', orbitId: 'support', angleDeg: 42, distanceFactor: 0.94, reportHref: '#/report' },
+  { id: 'causalDag', orbitId: 'obligations', angleDeg: 136, distanceFactor: 0.68, reportHref: '#/report' }
 ];
 
 const ORBIT_RADIUS: Record<OrbitId, number> = {
@@ -67,6 +68,9 @@ const MIN_ZOOM = 1;
 const MAX_ZOOM = 3.2;
 const PAN_MARGIN = 80;
 const STALE_AFTER_DAYS = 7;
+const HOLD_DELAY_MS = 210;
+const DEADZONE_RADIUS = 12;
+const ACTIVATION_RADIUS = 22;
 
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
 
@@ -136,7 +140,7 @@ export const createCosmosScreen = () => {
   );
 
   const uiFlags = {
-    showAllLabels: state.flags.cosmosShowAllLabels,
+    showAllLabels: state.flags.cosmosShowAllLabels && !state.flags.cosmosOnlyImportant,
     onlyImportant: state.flags.cosmosOnlyImportant,
     showHalo: state.flags.cosmosShowHalo
   };
@@ -217,12 +221,54 @@ export const createCosmosScreen = () => {
   const menu = document.createElement('div');
   menu.className = 'cosmos-menu hidden';
 
+  const radialMenu = document.createElement('div');
+  radialMenu.className = 'cosmos-radial-menu hidden';
+  radialMenu.setAttribute('role', 'menu');
+  radialMenu.setAttribute('aria-label', 'Жестовое меню планеты');
+
+  const radialCenter = document.createElement('div');
+  radialCenter.className = 'cosmos-radial-center';
+  radialCenter.setAttribute('aria-hidden', 'true');
+  radialMenu.appendChild(radialCenter);
+
   const closeMenu = () => {
     menu.classList.add('hidden');
     menu.innerHTML = '';
   };
 
   const menuState = { labelBox: null as DOMRect | null };
+
+  type PlanetAction = {
+    id: string;
+    label: string;
+    href?: string;
+    onSelect?: () => void;
+  };
+
+  const buildPlanetActions = (config: PlanetConfig): PlanetAction[] => {
+    const hasResult = Boolean(state.islands[config.id]?.lastReport);
+    const actions: PlanetAction[] = [
+      { id: 'open', label: 'Открыть', href: `#/island/${config.id}` }
+    ];
+    if (config.dataHref) {
+      actions.push({ id: 'data', label: 'Данные', href: config.dataHref });
+    }
+    if (config.reportHref && hasResult) {
+      actions.push({ id: 'result', label: 'Результат', href: config.reportHref });
+    }
+    actions.push({ id: 'close', label: 'Отмена', onSelect: closeMenu });
+    return actions;
+  };
+
+  const runPlanetAction = (action: PlanetAction) => {
+    if (action.onSelect) {
+      action.onSelect();
+      return;
+    }
+    if (action.href) {
+      window.location.hash = action.href;
+    }
+  };
 
   const placeMenu = (x: number, y: number) => {
     const wrapRect = mapWrap.getBoundingClientRect();
@@ -254,6 +300,7 @@ export const createCosmosScreen = () => {
 
   const openMenu = (config: PlanetConfig, x: number, y: number) => {
     const catalogItem = getIslandCatalogItem(config.id);
+    const actionsList = buildPlanetActions(config);
     menu.classList.remove('hidden');
     menu.innerHTML = '';
 
@@ -262,21 +309,125 @@ export const createCosmosScreen = () => {
 
     const actions = document.createElement('div');
     actions.className = 'cosmos-menu-actions';
-    actions.innerHTML = `
-      <a class="button small" href="#/island/${config.id}">Открыть</a>
-      ${
-        config.dataHref
-          ? `<a class="button small ghost" href="${config.dataHref}">Данные</a>`
-          : ''
+    actionsList.forEach((action) => {
+      if (action.href) {
+        const link = document.createElement('a');
+        link.className = `button small ${action.id === 'open' ? '' : 'ghost'}`.trim();
+        link.href = action.href;
+        link.textContent = action.label;
+        link.setAttribute('aria-label', `${catalogItem.displayName}: ${action.label}`);
+        actions.appendChild(link);
+      } else {
+        const button = document.createElement('button');
+        button.className = 'button small ghost';
+        button.type = 'button';
+        button.textContent = action.label;
+        button.setAttribute('aria-label', `${catalogItem.displayName}: ${action.label}`);
+        button.addEventListener('click', () => runPlanetAction(action));
+        actions.appendChild(button);
       }
-      <button class="button small ghost" type="button" data-close>Закрыть</button>
-    `;
-    actions.querySelector<HTMLButtonElement>('[data-close]')?.addEventListener('click', () => {
-      closeMenu();
     });
 
     menu.append(title, actions);
     requestAnimationFrame(() => placeMenu(x, y));
+  };
+
+  type RadialSession = {
+    planet: PlanetConfig;
+    centerX: number;
+    centerY: number;
+    pointerId: number;
+    actions: PlanetAction[];
+    selectedIndex: number;
+  };
+
+  const radialState: {
+    active: RadialSession | null;
+    items: HTMLElement[];
+    suppressClickFor: IslandId | null;
+  } = {
+    active: null,
+    items: [],
+    suppressClickFor: null
+  };
+
+  const closeRadialMenu = () => {
+    radialState.active = null;
+    radialMenu.classList.add('hidden');
+    radialMenu.classList.remove('is-active');
+    radialState.items.forEach((item) => item.remove());
+    radialState.items = [];
+  };
+
+  const clampRadialPosition = (x: number, y: number) => {
+    const wrapRect = mapWrap.getBoundingClientRect();
+    const radius = 74;
+    return {
+      x: Math.min(Math.max(x, radius), wrapRect.width - radius),
+      y: Math.min(Math.max(y, radius), wrapRect.height - radius)
+    };
+  };
+
+  const renderRadialItems = (actions: PlanetAction[]) => {
+    radialState.items.forEach((item) => item.remove());
+    radialState.items = actions.map((action) => {
+      const item = document.createElement('div');
+      item.className = 'cosmos-radial-item';
+      item.setAttribute('role', 'menuitem');
+      item.setAttribute('aria-label', action.label);
+      item.textContent = action.label;
+      radialMenu.appendChild(item);
+      return item;
+    });
+
+    const count = Math.max(1, actions.length);
+    radialState.items.forEach((item, index) => {
+      const angle = -Math.PI / 2 + ((Math.PI * 2) / count) * index;
+      const itemX = Math.cos(angle) * 58;
+      const itemY = Math.sin(angle) * 58;
+      item.style.transform = `translate(${itemX.toFixed(1)}px, ${itemY.toFixed(1)}px)`;
+    });
+  };
+
+  const openRadialMenu = (planet: PlanetConfig, x: number, y: number, pointerId: number) => {
+    const actions = buildPlanetActions(planet);
+    const clamped = clampRadialPosition(x, y);
+    selectedPlanetId = planet.id;
+    updateSelectionState();
+    closeMenu();
+    renderRadialItems(actions);
+    radialState.active = {
+      planet,
+      centerX: clamped.x,
+      centerY: clamped.y,
+      pointerId,
+      actions,
+      selectedIndex: -1
+    };
+    radialMenu.style.left = `${Math.round(clamped.x)}px`;
+    radialMenu.style.top = `${Math.round(clamped.y)}px`;
+    radialMenu.classList.remove('hidden');
+    radialMenu.classList.add('is-active');
+  };
+
+  const updateRadialSelection = (clientX: number, clientY: number) => {
+    const active = radialState.active;
+    if (!active) return;
+    const wrapRect = mapWrap.getBoundingClientRect();
+    const dx = clientX - (wrapRect.left + active.centerX);
+    const dy = clientY - (wrapRect.top + active.centerY);
+    const distance = Math.hypot(dx, dy);
+    let selectedIndex = -1;
+    if (distance >= ACTIVATION_RADIUS) {
+      const angle = (Math.atan2(dy, dx) + Math.PI * 2 + Math.PI / 2) % (Math.PI * 2);
+      const sectorSize = (Math.PI * 2) / active.actions.length;
+      selectedIndex = Math.floor(angle / sectorSize);
+    }
+    active.selectedIndex = selectedIndex;
+    radialState.items.forEach((item, index) => {
+      item.classList.toggle('is-active', index === selectedIndex);
+    });
+    radialCenter.classList.toggle('is-idle', distance < DEADZONE_RADIUS);
   };
 
   const clampTransform = (next: ViewTransform): ViewTransform => {
@@ -330,6 +481,7 @@ export const createCosmosScreen = () => {
   const resetView = () => {
     setTransform({ x: 0, y: 0, scale: 1 });
     closeMenu();
+    closeRadialMenu();
   };
 
   resetViewButton.addEventListener('click', resetView);
@@ -362,7 +514,6 @@ export const createCosmosScreen = () => {
   };
 
   PLANETS.filter((item) => islandRegistry.some((island) => island.id === item.id)).forEach((planet) => {
-    const islandState = state.islands[planet.id];
     const instrument = statuses.get(planet.id)!;
     const catalogItem = getIslandCatalogItem(planet.id);
     const radius = ORBIT_RADIUS[planet.orbitId] * planet.distanceFactor;
@@ -449,7 +600,84 @@ export const createCosmosScreen = () => {
       openMenu(planet, screenX + 64, screenY + 8);
     };
 
-    planetGroup.addEventListener('click', openPlanetMenu);
+    let holdTimer = 0;
+    let holdPointerId: number | null = null;
+    let holdStartX = 0;
+    let holdStartY = 0;
+    let holdStarted = false;
+
+    const cancelHold = () => {
+      if (holdTimer) {
+        window.clearTimeout(holdTimer);
+        holdTimer = 0;
+      }
+      holdPointerId = null;
+      holdStarted = false;
+    };
+
+    planetGroup.addEventListener('pointerdown', (event) => {
+      event.stopPropagation();
+      if (event.button !== 0) return;
+      planetGroup.setPointerCapture(event.pointerId);
+      holdPointerId = event.pointerId;
+      holdStartX = event.clientX;
+      holdStartY = event.clientY;
+      holdStarted = false;
+      holdTimer = window.setTimeout(() => {
+        if (holdPointerId !== event.pointerId) return;
+        holdStarted = true;
+        const wrapRect = mapWrap.getBoundingClientRect();
+        openRadialMenu(planet, event.clientX - wrapRect.left, event.clientY - wrapRect.top, event.pointerId);
+        radialState.suppressClickFor = planet.id;
+      }, HOLD_DELAY_MS);
+    });
+
+    planetGroup.addEventListener('pointermove', (event) => {
+      event.stopPropagation();
+      if (radialState.active?.pointerId === event.pointerId) {
+        updateRadialSelection(event.clientX, event.clientY);
+        return;
+      }
+      if (holdPointerId !== event.pointerId || holdStarted) return;
+      const distance = Math.hypot(event.clientX - holdStartX, event.clientY - holdStartY);
+      if (distance > DEADZONE_RADIUS) {
+        cancelHold();
+      }
+    });
+
+    planetGroup.addEventListener('pointerup', (event) => {
+      event.stopPropagation();
+      if (radialState.active?.pointerId === event.pointerId) {
+        const index = radialState.active.selectedIndex;
+        const action = index >= 0 ? radialState.active.actions[index] : null;
+        closeRadialMenu();
+        if (action) {
+          runPlanetAction(action);
+        }
+        cancelHold();
+        return;
+      }
+      cancelHold();
+    });
+
+    planetGroup.addEventListener('pointercancel', (event) => {
+      event.stopPropagation();
+      cancelHold();
+    });
+    planetGroup.addEventListener('pointerleave', (event) => {
+      if (!holdStarted && holdPointerId === event.pointerId) {
+        cancelHold();
+      }
+    });
+
+    planetGroup.addEventListener('click', (event) => {
+      event.stopPropagation();
+      if (radialState.suppressClickFor === planet.id) {
+        radialState.suppressClickFor = null;
+        return;
+      }
+      openPlanetMenu();
+    });
     planetGroup.addEventListener('pointerenter', () => {
       if (window.matchMedia('(hover: hover)').matches && !importantPlanets.has(planet.id)) {
         planetGroup.classList.add('show-label');
@@ -477,13 +705,29 @@ export const createCosmosScreen = () => {
     const target = event.target as HTMLInputElement;
     if (target.dataset.flag === 'showAllLabels') {
       uiFlags.showAllLabels = target.checked;
-      setCosmosUiFlags({ cosmosShowAllLabels: target.checked });
+      if (target.checked) {
+        uiFlags.onlyImportant = false;
+        const onlyImportantInput = controls.querySelector<HTMLInputElement>('input[data-flag="onlyImportant"]');
+        if (onlyImportantInput) onlyImportantInput.checked = false;
+      }
+      setCosmosUiFlags({
+        cosmosShowAllLabels: uiFlags.showAllLabels,
+        cosmosOnlyImportant: uiFlags.onlyImportant
+      });
     }
     if (target.dataset.flag === 'onlyImportant') {
       uiFlags.onlyImportant = target.checked;
-      setCosmosUiFlags({ cosmosOnlyImportant: target.checked });
+      if (target.checked) {
+        uiFlags.showAllLabels = false;
+        const showAllInput = controls.querySelector<HTMLInputElement>('input[data-flag="showAllLabels"]');
+        if (showAllInput) showAllInput.checked = false;
+      }
+      setCosmosUiFlags({
+        cosmosOnlyImportant: uiFlags.onlyImportant,
+        cosmosShowAllLabels: uiFlags.showAllLabels
+      });
       planetGroups.forEach((group, id) => {
-        group.setAttribute('tabindex', !target.checked || importantPlanets.has(id) ? '0' : '-1');
+        group.setAttribute('tabindex', !uiFlags.onlyImportant || importantPlanets.has(id) ? '0' : '-1');
       });
     }
     if (target.dataset.flag === 'showHalo') {
@@ -520,6 +764,7 @@ export const createCosmosScreen = () => {
   };
 
   map.addEventListener('pointerdown', (event) => {
+    if (radialState.active) return;
     map.setPointerCapture(event.pointerId);
     activePointers.set(event.pointerId, { clientX: event.clientX, clientY: event.clientY });
 
@@ -539,6 +784,7 @@ export const createCosmosScreen = () => {
   });
 
   map.addEventListener('pointermove', (event) => {
+    if (radialState.active) return;
     if (!activePointers.has(event.pointerId)) return;
     activePointers.set(event.pointerId, { clientX: event.clientX, clientY: event.clientY });
     if (pinchStart && activePointers.size >= 2) {
@@ -565,6 +811,7 @@ export const createCosmosScreen = () => {
   });
 
   const releasePointer = (event: PointerEvent) => {
+    if (radialState.active) return;
     activePointers.delete(event.pointerId);
     if (activePointers.size < 2) pinchStart = null;
     if (panPointerId === event.pointerId) panPointerId = null;
@@ -586,6 +833,7 @@ export const createCosmosScreen = () => {
   map.addEventListener(
     'wheel',
     (event) => {
+      if (radialState.active) return;
       event.preventDefault();
       const center = toSvgPoint(event.clientX, event.clientY);
       const zoomFactor = Math.exp(-event.deltaY * 0.0022);
@@ -595,6 +843,8 @@ export const createCosmosScreen = () => {
   );
 
   mapWrap.addEventListener('click', (event) => {
+    if ((event.target as HTMLElement).closest('.cosmos-radial-menu')) return;
+    closeRadialMenu();
     if ((event.target as HTMLElement).closest('.cosmos-menu')) return;
     if ((event.target as SVGElement).closest('.cosmos-planet')) return;
     selectedPlanetId = null;
@@ -609,7 +859,7 @@ export const createCosmosScreen = () => {
     <a class="button ghost" href="#/shield">К щиту</a>
   `;
 
-  mapWrap.append(resetViewButton, map, menu);
+  mapWrap.append(resetViewButton, map, menu, radialMenu);
   container.append(header, controls, mapWrap, actions);
   return container;
 };

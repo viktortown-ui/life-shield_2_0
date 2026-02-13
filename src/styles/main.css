@@ -1449,3 +1449,70 @@ body {
   flex-wrap: wrap;
   gap: 8px;
 }
+
+.cosmos-radial-menu {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 148px;
+  height: 148px;
+  border-radius: 50%;
+  border: 1px solid rgba(159, 178, 215, 0.4);
+  background: radial-gradient(circle, rgba(16, 26, 46, 0.86) 35%, rgba(7, 11, 22, 0.96) 100%);
+  z-index: 6;
+  pointer-events: none;
+}
+
+.cosmos-radial-menu.is-active {
+  animation: cosmosRadialFade 120ms ease-out;
+}
+
+.cosmos-radial-center {
+  position: absolute;
+  inset: 50%;
+  width: 18px;
+  height: 18px;
+  margin-left: -9px;
+  margin-top: -9px;
+  border-radius: 50%;
+  border: 1px solid rgba(126, 247, 230, 0.75);
+  background: rgba(126, 247, 230, 0.25);
+  transition: opacity 0.16s ease;
+}
+
+.cosmos-radial-center.is-idle {
+  opacity: 0.5;
+}
+
+.cosmos-radial-item {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  margin-left: -38px;
+  margin-top: -14px;
+  width: 76px;
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.2;
+  padding: 5px 6px;
+  border-radius: 8px;
+  color: #e8edf6;
+  background: rgba(25, 39, 67, 0.78);
+  border: 1px solid transparent;
+  transition: background-color 0.14s ease, border-color 0.14s ease;
+}
+
+.cosmos-radial-item.is-active {
+  background: rgba(79, 139, 255, 0.35);
+  border-color: rgba(126, 247, 230, 0.9);
+}
+
+@keyframes cosmosRadialFade {
+  from {
+    opacity: 0.2;
+    transform: translate(-50%, -50%) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
