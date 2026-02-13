@@ -3,6 +3,7 @@ import { loadDemoData, setOnboarded } from '../core/store';
 export const createOnboardingModal = () => {
   const overlay = document.createElement('div');
   overlay.className = 'onboarding-overlay';
+  overlay.setAttribute('data-active', 'true');
   overlay.innerHTML = `
     <div class="onboarding-card">
       <h2>Добро пожаловать в Life‑Shield</h2>
@@ -14,7 +15,7 @@ export const createOnboardingModal = () => {
       <div class="onboarding-actions">
         <button class="button" data-action="quick">Быстрый старт</button>
         <button class="button ghost" data-action="demo">Загрузить демо</button>
-        <button class="button ghost" data-action="skip">Пропустить</button>
+        <button class="button ghost" data-action="skip" aria-label="Закрыть онбординг">Пропустить</button>
       </div>
     </div>
   `;
@@ -35,6 +36,7 @@ export const createOnboardingModal = () => {
       window.location.hash = '#/';
     }
 
+    overlay.setAttribute('data-active', 'false');
     overlay.remove();
     window.dispatchEvent(new HashChangeEvent('hashchange'));
   });

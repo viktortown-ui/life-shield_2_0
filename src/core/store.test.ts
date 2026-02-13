@@ -29,7 +29,14 @@ const makeState = (overrides: Partial<AppState> = {}): AppState => ({
   xp: 0,
   level: 1,
   streakDays: 0,
-  flags: { onboarded: false, demoLoaded: false, homeScreen: 'shield' },
+  flags: {
+    onboarded: false,
+    demoLoaded: false,
+    homeScreen: 'shield',
+    cosmosShowAllLabels: false,
+    cosmosOnlyImportant: false,
+    cosmosShowHalo: true
+  },
   inputData: {
     finance: {
       monthlyIncome: 180000,
@@ -119,6 +126,22 @@ describe('onboarding flags', () => {
 
 
 
+
+describe('cosmos ui flags', () => {
+  it('persists legend toggles in store', async () => {
+    const store = await loadStore();
+    store.setCosmosUiFlags({
+      cosmosShowAllLabels: true,
+      cosmosOnlyImportant: true,
+      cosmosShowHalo: false
+    });
+
+    const state = store.getState();
+    expect(state.flags.cosmosShowAllLabels).toBe(true);
+    expect(state.flags.cosmosOnlyImportant).toBe(true);
+    expect(state.flags.cosmosShowHalo).toBe(false);
+  });
+});
 
 describe('home screen setting', () => {
   it('persists selected home screen', async () => {
