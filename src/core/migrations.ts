@@ -1,6 +1,6 @@
 import { AppState } from './types';
 
-export const schemaVersion = 5;
+export const schemaVersion = 6;
 
 export type Migration = (state: AppState) => AppState;
 
@@ -67,7 +67,16 @@ export const migrations: Migration[] = [
         top3Share: state.inputData?.finance?.top3Share ?? 1
       }
     }
+  }),
+  (state) => ({
+    ...state,
+    schemaVersion: 6,
+    flags: {
+      ...state.flags,
+      homeScreen: state.flags?.homeScreen === 'cosmos' ? 'cosmos' : 'shield'
+    }
   })
+
 ];
 
 export const migrate = (state: AppState): AppState => {

@@ -1,6 +1,7 @@
 import { createIslandPage } from './islandPage';
 import { createSettingsScreen } from './settings';
 import { createShieldScreen } from './shield';
+import { createCosmosScreen } from './cosmos';
 import { IslandId } from '../core/types';
 import { panicReset } from '../core/pwaUpdate';
 import { reportCaughtError } from '../core/reportError';
@@ -15,26 +16,37 @@ import { createFinanceScreen } from './finance';
 const parseRoute = () => {
   const hash = window.location.hash.replace('#', '') || '/';
   const parts = hash.split('/').filter(Boolean);
+  if (parts.length === 0) {
+    return { name: 'home' } as const;
+  }
   if (parts[0] === 'island' && parts[1]) {
     return { name: 'island', id: parts[1] as IslandId };
   }
   if (parts[0] === 'settings') {
-    return { name: 'settings' };
+    return { name: 'settings' } as const;
   }
   if (parts[0] === 'islands') {
-    return { name: 'islands' };
+    return { name: 'islands' } as const;
+  }
+  if (parts[0] === 'cosmos') {
+    return { name: 'cosmos' } as const;
   }
   if ((parts[0] === 'shield' && parts[1] === 'report') || parts[0] === 'report') {
-    return { name: 'report' };
+    return { name: 'report' } as const;
   }
   if (parts[0] === 'finance') {
-    return { name: 'finance' };
+    return { name: 'finance' } as const;
   }
-  return { name: 'shield' };
+  if (parts[0] === 'shield') {
+    return { name: 'shield' } as const;
+  }
+  return { name: 'home' } as const;
 };
 
 type Route =
+  | { name: 'home' }
   | { name: 'shield' }
+  | { name: 'cosmos' }
   | { name: 'settings' }
   | { name: 'island'; id: IslandId }
   | { name: 'islands' }
@@ -47,7 +59,7 @@ const createBottomNav = (route: Route) => {
   nav.setAttribute('aria-label', 'Нижняя навигация');
 
   nav.innerHTML = `
-    <a class="bottom-nav-link ${route.name === 'shield' ? 'active' : ''}" href="#/">Щит</a>
+    <a class="bottom-nav-link ${route.name === 'shield' || route.name === 'home' || route.name === 'cosmos' ? 'active' : ''}" href="#/">Home</a>
     <a class="bottom-nav-link ${route.name === 'island' || route.name === 'islands' ? 'active' : ''}" href="#/islands">Острова</a>
     <a class="bottom-nav-link ${route.name === 'finance' ? 'active' : ''}" href="#/finance">Финансы</a>
     <a class="bottom-nav-link ${route.name === 'report' ? 'active' : ''}" href="#/report">Отчёт</a>
@@ -140,8 +152,14 @@ export const initRouter = (root: HTMLElement) => {
         root.appendChild(createAppShell(createReportScreen(), route, showBuildInfo));
       } else if (route.name === 'finance') {
         root.appendChild(createAppShell(createFinanceScreen(), route, showBuildInfo));
-      } else {
+      } else if (route.name === 'cosmos') {
+        root.appendChild(createAppShell(createCosmosScreen(), route, showBuildInfo));
+      } else if (route.name === 'shield') {
         root.appendChild(createAppShell(createShieldScreen(), route, showBuildInfo));
+      } else {
+        const homeRoute = getState().flags.homeScreen === 'cosmos' ? { name: 'cosmos' as const } : { name: 'shield' as const };
+        const screen = homeRoute.name === 'cosmos' ? createCosmosScreen() : createShieldScreen();
+        root.appendChild(createAppShell(screen, homeRoute, showBuildInfo));
       }
 
       if (!getState().flags.onboarded) {

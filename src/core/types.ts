@@ -95,6 +95,7 @@ export interface AppState {
   flags: {
     onboarded: boolean;
     demoLoaded: boolean;
+    homeScreen: 'shield' | 'cosmos';
   };
   inputData: {
     finance: FinanceInputData;
