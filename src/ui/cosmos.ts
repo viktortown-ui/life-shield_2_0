@@ -3,6 +3,7 @@ import { getIslandCatalogItem } from '../core/islandsCatalog';
 import { deriveShieldTiles } from '../core/shieldModel';
 import { getState, setCosmosUiFlags } from '../core/store';
 import { IslandId, IslandReport } from '../core/types';
+import { createCosmosSfxEngine } from './cosmosSfx';
 
 type OrbitId = 'money' | 'obligations' | 'income' | 'energy' | 'support' | 'flexibility';
 
@@ -71,6 +72,9 @@ const STALE_AFTER_DAYS = 7;
 const HOLD_DELAY_MS = 210;
 const DEADZONE_RADIUS = 12;
 const ACTIVATION_RADIUS = 22;
+const SPARK_DURATION_MS = 430;
+const SPARK_MIN = 6;
+const SPARK_MAX = 12;
 
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
 
@@ -139,11 +143,17 @@ export const createCosmosScreen = () => {
       : FALLBACK_IMPORTANT
   );
 
+  const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const reduceMotion = state.flags.cosmosReduceMotionOverride ?? mediaQuery.matches;
   const uiFlags = {
     showAllLabels: state.flags.cosmosShowAllLabels && !state.flags.cosmosOnlyImportant,
     onlyImportant: state.flags.cosmosOnlyImportant,
-    showHalo: state.flags.cosmosShowHalo
+    showHalo: state.flags.cosmosShowHalo,
+    soundFxEnabled: state.flags.cosmosSoundFxEnabled,
+    sfxVolume: state.flags.cosmosSfxVolume,
+    reduceMotion
   };
+  const sfx = createCosmosSfxEngine();
 
   const container = document.createElement('div');
   container.className = 'screen cosmos-screen';
@@ -160,9 +170,12 @@ export const createCosmosScreen = () => {
   const controls = document.createElement('section');
   controls.className = 'cosmos-controls';
   controls.innerHTML = `
-    <label><input type="checkbox" data-flag="showAllLabels" ${uiFlags.showAllLabels ? 'checked' : ''}/> Показывать все подписи</label>
-    <label><input type="checkbox" data-flag="onlyImportant" ${uiFlags.onlyImportant ? 'checked' : ''}/> Показывать только важные</label>
-    <label><input type="checkbox" data-flag="showHalo" ${uiFlags.showHalo ? 'checked' : ''}/> Показывать halo (турбулентность)</label>
+    <label><input type="checkbox" data-flag="showAllLabels" aria-label="Показывать все подписи планет" ${uiFlags.showAllLabels ? 'checked' : ''}/> Показывать все подписи</label>
+    <label><input type="checkbox" data-flag="onlyImportant" aria-label="Показывать только важные планеты" ${uiFlags.onlyImportant ? 'checked' : ''}/> Показывать только важные</label>
+    <label><input type="checkbox" data-flag="showHalo" aria-label="Показывать halo планет" ${uiFlags.showHalo ? 'checked' : ''}/> Показывать halo (турбулентность)</label>
+    <label><input type="checkbox" data-flag="soundFx" aria-label="Включить Sound FX в Cosmos" ${uiFlags.soundFxEnabled ? 'checked' : ''}/> Sound FX</label>
+    <label>Volume <input type="range" data-flag="sfxVolume" min="0" max="1" step="0.05" aria-label="Громкость Sound FX в Cosmos" value="${uiFlags.sfxVolume}" /></label>
+    <label><input type="checkbox" data-flag="reduceMotion" aria-label="Сократить анимации Cosmos" ${state.flags.cosmosReduceMotionOverride === true ? 'checked' : ''}/> Reduce motion (override)</label>
   `;
 
   const mapWrap = document.createElement('section');
@@ -187,6 +200,10 @@ export const createCosmosScreen = () => {
   const viewport = document.createElementNS('http://www.w3.org/2000/svg', 'g');
   viewport.setAttribute('class', 'cosmos-viewport');
   map.appendChild(viewport);
+
+  const sparkLayer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  sparkLayer.setAttribute('class', 'cosmos-spark-layer');
+  map.appendChild(sparkLayer);
 
   const sun = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
   sun.setAttribute('cx', '260');
@@ -217,6 +234,7 @@ export const createCosmosScreen = () => {
   resetViewButton.type = 'button';
   resetViewButton.className = 'button ghost small cosmos-reset';
   resetViewButton.textContent = 'Сброс вида';
+  resetViewButton.setAttribute('aria-label', 'Сбросить масштаб и позицию карты Cosmos');
 
   const menu = document.createElement('div');
   menu.className = 'cosmos-menu hidden';
@@ -270,6 +288,35 @@ export const createCosmosScreen = () => {
     }
   };
 
+  const playSfx = (tone: 'select' | 'menuOpen' | 'confirm' | 'cancel') => {
+    if (!uiFlags.soundFxEnabled) return;
+    sfx.play(tone, uiFlags.sfxVolume);
+  };
+
+  const triggerSparkBurst = (x: number, y: number) => {
+    if (uiFlags.reduceMotion) return;
+    const count = Math.floor(Math.random() * (SPARK_MAX - SPARK_MIN + 1)) + SPARK_MIN;
+    for (let i = 0; i < count; i += 1) {
+      const spark = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      spark.setAttribute('cx', x.toFixed(1));
+      spark.setAttribute('cy', y.toFixed(1));
+      spark.setAttribute('r', String(1.5 + Math.random() * 1.8));
+      spark.setAttribute('class', 'cosmos-spark');
+      const angle = Math.random() * Math.PI * 2;
+      const distance = 18 + Math.random() * 24;
+      spark.style.setProperty('--spark-dx', `${Math.cos(angle) * distance}px`);
+      spark.style.setProperty('--spark-dy', `${Math.sin(angle) * distance}px`);
+      spark.style.animationDuration = `${SPARK_DURATION_MS - Math.random() * 120}ms`;
+      sparkLayer.appendChild(spark);
+      window.setTimeout(() => spark.remove(), SPARK_DURATION_MS + 140);
+    }
+  };
+
+  const unlockAudioFromGesture = () => {
+    if (sfx.isUnlocked()) return;
+    sfx.unlock().catch(() => undefined);
+  };
+
   const placeMenu = (x: number, y: number) => {
     const wrapRect = mapWrap.getBoundingClientRect();
     const menuRect = menu.getBoundingClientRect();
@@ -299,6 +346,7 @@ export const createCosmosScreen = () => {
   };
 
   const openMenu = (config: PlanetConfig, x: number, y: number) => {
+    playSfx('menuOpen');
     const catalogItem = getIslandCatalogItem(config.id);
     const actionsList = buildPlanetActions(config);
     menu.classList.remove('hidden');
@@ -316,6 +364,11 @@ export const createCosmosScreen = () => {
         link.href = action.href;
         link.textContent = action.label;
         link.setAttribute('aria-label', `${catalogItem.displayName}: ${action.label}`);
+        link.addEventListener('click', () => {
+          playSfx('confirm');
+          const point = planetPoints.get(config.id);
+          if (point) triggerSparkBurst(point.x, point.y);
+        });
         actions.appendChild(link);
       } else {
         const button = document.createElement('button');
@@ -323,7 +376,14 @@ export const createCosmosScreen = () => {
         button.type = 'button';
         button.textContent = action.label;
         button.setAttribute('aria-label', `${catalogItem.displayName}: ${action.label}`);
-        button.addEventListener('click', () => runPlanetAction(action));
+        button.addEventListener('click', () => {
+          playSfx(action.id === 'close' ? 'cancel' : 'confirm');
+          if (action.id !== 'close') {
+            const point = planetPoints.get(config.id);
+            if (point) triggerSparkBurst(point.x, point.y);
+          }
+          runPlanetAction(action);
+        });
         actions.appendChild(button);
       }
     });
@@ -390,6 +450,7 @@ export const createCosmosScreen = () => {
   };
 
   const openRadialMenu = (planet: PlanetConfig, x: number, y: number, pointerId: number) => {
+    playSfx('menuOpen');
     const actions = buildPlanetActions(planet);
     const clamped = clampRadialPosition(x, y);
     selectedPlanetId = planet.id;
@@ -488,6 +549,7 @@ export const createCosmosScreen = () => {
 
   let selectedPlanetId: IslandId | null = null;
   const planetGroups = new Map<IslandId, SVGGElement>();
+  const planetPoints = new Map<IslandId, { x: number; y: number }>();
 
   const shouldShowPlanet = (id: IslandId) => !uiFlags.onlyImportant || importantPlanets.has(id);
 
@@ -518,9 +580,14 @@ export const createCosmosScreen = () => {
     const catalogItem = getIslandCatalogItem(planet.id);
     const radius = ORBIT_RADIUS[planet.orbitId] * planet.distanceFactor;
     const point = toPoint(planet.angleDeg, radius);
+    planetPoints.set(planet.id, point);
 
     const planetGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     planetGroup.setAttribute('class', 'cosmos-planet');
+    if (!uiFlags.reduceMotion) {
+      planetGroup.classList.add('cosmos-planet--twinkle');
+      planetGroup.style.setProperty('--twinkle-phase', `${(Math.random() * 2.4).toFixed(2)}s`);
+    }
     planetGroup.setAttribute('tabindex', shouldShowPlanet(planet.id) ? '0' : '-1');
     planetGroup.setAttribute('role', 'button');
     planetGroup.setAttribute(
@@ -541,9 +608,11 @@ export const createCosmosScreen = () => {
     halo.setAttribute('cx', point.x.toFixed(1));
     halo.setAttribute('cy', point.y.toFixed(1));
     halo.setAttribute('r', '18');
-    halo.setAttribute('class', 'cosmos-planet-halo');
+    halo.setAttribute('class', `cosmos-planet-halo${uiFlags.reduceMotion ? '' : ' cosmos-planet-halo--pulse'}`);
     const haloStrength = Math.max(instrument.riskSeverity, instrument.confidence === null ? 0.5 : 1 - instrument.confidence / 100);
-    halo.style.opacity = uiFlags.showHalo ? String(Math.max(0.16, haloStrength)) : '0';
+    const baseHaloOpacity = Math.max(0.16, haloStrength);
+    halo.style.opacity = uiFlags.showHalo ? String(baseHaloOpacity) : '0';
+    halo.style.setProperty('--halo-base-opacity', String(baseHaloOpacity));
     planetGroup.appendChild(halo);
 
     const hit = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
@@ -618,6 +687,7 @@ export const createCosmosScreen = () => {
     planetGroup.addEventListener('pointerdown', (event) => {
       event.stopPropagation();
       if (event.button !== 0) return;
+      unlockAudioFromGesture();
       planetGroup.setPointerCapture(event.pointerId);
       holdPointerId = event.pointerId;
       holdStartX = event.clientX;
@@ -648,11 +718,21 @@ export const createCosmosScreen = () => {
     planetGroup.addEventListener('pointerup', (event) => {
       event.stopPropagation();
       if (radialState.active?.pointerId === event.pointerId) {
-        const index = radialState.active.selectedIndex;
-        const action = index >= 0 ? radialState.active.actions[index] : null;
+        const session = radialState.active;
+        const index = session.selectedIndex;
+        const action = index >= 0 ? session.actions[index] : null;
         closeRadialMenu();
         if (action) {
+          if (action.id === 'close') {
+            playSfx('cancel');
+          } else {
+            playSfx('confirm');
+            const point = planetPoints.get(session.planet.id);
+            if (point) triggerSparkBurst(point.x, point.y);
+          }
           runPlanetAction(action);
+        } else {
+          playSfx('cancel');
         }
         cancelHold();
         return;
@@ -676,6 +756,7 @@ export const createCosmosScreen = () => {
         radialState.suppressClickFor = null;
         return;
       }
+      playSfx('select');
       openPlanetMenu();
     });
     planetGroup.addEventListener('pointerenter', () => {
@@ -691,6 +772,7 @@ export const createCosmosScreen = () => {
     planetGroup.addEventListener('keydown', (event) => {
       if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault();
+        playSfx('select');
         openPlanetMenu();
       }
     });
@@ -736,10 +818,25 @@ export const createCosmosScreen = () => {
       planetGroups.forEach((group) => {
         const halo = group.querySelector<SVGCircleElement>('.cosmos-planet-halo');
         if (halo) {
-          const base = Number(halo.style.opacity || '0');
+          const base = Number(halo.style.getPropertyValue('--halo-base-opacity') || '0.2');
           halo.style.opacity = target.checked ? String(Math.max(0.16, base)) : '0';
         }
       });
+    }
+    if (target.dataset.flag === 'soundFx') {
+      uiFlags.soundFxEnabled = target.checked;
+      setCosmosUiFlags({ cosmosSoundFxEnabled: target.checked });
+    }
+    if (target.dataset.flag === 'sfxVolume') {
+      const volume = Number(target.value);
+      uiFlags.sfxVolume = Number.isFinite(volume) ? Math.max(0, Math.min(1, volume)) : uiFlags.sfxVolume;
+      setCosmosUiFlags({ cosmosSfxVolume: uiFlags.sfxVolume });
+    }
+    if (target.dataset.flag === 'reduceMotion') {
+      const override = target.checked ? true : null;
+      setCosmosUiFlags({ cosmosReduceMotionOverride: override });
+      window.location.reload();
+      return;
     }
     updateSelectionState();
   });
@@ -765,6 +862,7 @@ export const createCosmosScreen = () => {
 
   map.addEventListener('pointerdown', (event) => {
     if (radialState.active) return;
+    unlockAudioFromGesture();
     map.setPointerCapture(event.pointerId);
     activePointers.set(event.pointerId, { clientX: event.clientX, clientY: event.clientY });
 

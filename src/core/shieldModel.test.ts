@@ -15,7 +15,17 @@ const makeState = (finance: AppState['inputData']['finance']): AppState => ({
   xp: 0,
   level: 1,
   streakDays: 0,
-  flags: { onboarded: true, demoLoaded: false },
+  flags: {
+    onboarded: true,
+    demoLoaded: false,
+    homeScreen: 'shield',
+    cosmosShowAllLabels: false,
+    cosmosOnlyImportant: false,
+    cosmosShowHalo: true,
+    cosmosSoundFxEnabled: false,
+    cosmosSfxVolume: 0.4,
+    cosmosReduceMotionOverride: null
+  },
   inputData: { finance },
   islands: {
     snapshot: { input: '', lastReport: null, progress: makeProgress() },

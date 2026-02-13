@@ -1425,6 +1425,28 @@ body {
   fill: #ffd36a;
 }
 
+
+.cosmos-spark-layer {
+  pointer-events: none;
+}
+
+.cosmos-planet--twinkle {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: cosmosTwinkle 3.2s ease-in-out infinite;
+  animation-delay: var(--twinkle-phase, 0s);
+}
+
+.cosmos-planet-halo--pulse {
+  animation: cosmosHaloPulse 2.4s ease-in-out infinite;
+}
+
+.cosmos-spark {
+  fill: #c5ffec;
+  opacity: 0.95;
+  animation: cosmosSparkBurst 430ms ease-out forwards;
+}
+
 .cosmos-planet:focus-visible .cosmos-planet-hit {
   stroke: #ffffff;
   stroke-width: 2;
@@ -1514,5 +1536,30 @@ body {
   to {
     opacity: 1;
     transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+
+@keyframes cosmosTwinkle {
+  0%, 100% { opacity: 0.84; transform: scale(0.97); }
+  45% { opacity: 1; transform: scale(1.04); }
+}
+
+@keyframes cosmosHaloPulse {
+  0%, 100% { opacity: calc(var(--halo-base-opacity, 0.25) * 0.9); }
+  50% { opacity: calc(var(--halo-base-opacity, 0.25) * 1.15); }
+}
+
+@keyframes cosmosSparkBurst {
+  from { opacity: 0.95; transform: translate(0, 0) scale(1); }
+  to { opacity: 0; transform: translate(var(--spark-dx, 0px), var(--spark-dy, 0px)) scale(0.35); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cosmos-planet--twinkle,
+  .cosmos-planet-halo--pulse,
+  .cosmos-spark,
+  .cosmos-radial-menu.is-active {
+    animation: none !important;
   }
 }
