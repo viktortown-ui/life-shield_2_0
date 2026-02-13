@@ -44,7 +44,10 @@ const makeEmptyState = (): AppState => ({
   flags: {
     onboarded: false,
     demoLoaded: false,
-    homeScreen: 'shield'
+    homeScreen: 'shield',
+    cosmosShowAllLabels: false,
+    cosmosOnlyImportant: false,
+    cosmosShowHalo: true
   },
   inputData: {
     finance: { ...defaultFinanceInput }
@@ -171,7 +174,19 @@ const mergeWithDefaults = (
           ? incomingFlags.demoLoaded
           : base.flags.demoLoaded,
       homeScreen:
-        incomingFlags.homeScreen === 'cosmos' ? 'cosmos' : base.flags.homeScreen
+        incomingFlags.homeScreen === 'cosmos' ? 'cosmos' : base.flags.homeScreen,
+      cosmosShowAllLabels:
+        typeof incomingFlags.cosmosShowAllLabels === 'boolean'
+          ? incomingFlags.cosmosShowAllLabels
+          : base.flags.cosmosShowAllLabels,
+      cosmosOnlyImportant:
+        typeof incomingFlags.cosmosOnlyImportant === 'boolean'
+          ? incomingFlags.cosmosOnlyImportant
+          : base.flags.cosmosOnlyImportant,
+      cosmosShowHalo:
+        typeof incomingFlags.cosmosShowHalo === 'boolean'
+          ? incomingFlags.cosmosShowHalo
+          : base.flags.cosmosShowHalo
     },
     inputData: {
       finance: {
@@ -392,6 +407,30 @@ export const setHomeScreen = (value: AppState['flags']['homeScreen']) => {
     flags: {
       ...state.flags,
       homeScreen: value
+    }
+  });
+};
+
+
+export const setCosmosUiFlags = (value: {
+  cosmosShowAllLabels?: boolean;
+  cosmosOnlyImportant?: boolean;
+  cosmosShowHalo?: boolean;
+}) => {
+  const state = getState();
+  updateState({
+    ...state,
+    flags: {
+      ...state.flags,
+      ...(typeof value.cosmosShowAllLabels === 'boolean'
+        ? { cosmosShowAllLabels: value.cosmosShowAllLabels }
+        : {}),
+      ...(typeof value.cosmosOnlyImportant === 'boolean'
+        ? { cosmosOnlyImportant: value.cosmosOnlyImportant }
+        : {}),
+      ...(typeof value.cosmosShowHalo === 'boolean'
+        ? { cosmosShowHalo: value.cosmosShowHalo }
+        : {})
     }
   });
 };

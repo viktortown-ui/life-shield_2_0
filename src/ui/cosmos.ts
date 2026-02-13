@@ -1,11 +1,12 @@
 import { islandRegistry } from '../core/registry';
 import { getIslandCatalogItem } from '../core/islandsCatalog';
 import { deriveShieldTiles } from '../core/shieldModel';
-import { getState } from '../core/store';
-import { IslandId } from '../core/types';
-import { getIslandStatus } from './reportUtils';
+import { getState, setCosmosUiFlags } from '../core/store';
+import { IslandId, IslandReport } from '../core/types';
 
 type OrbitId = 'money' | 'obligations' | 'income' | 'energy' | 'support' | 'flexibility';
+
+type PlanetBadge = 'ok' | 'risk' | 'none';
 
 interface PlanetConfig {
   id: IslandId;
@@ -19,6 +20,15 @@ interface ViewTransform {
   x: number;
   y: number;
   scale: number;
+}
+
+interface PlanetInstrumentStatus {
+  id: IslandId;
+  badge: PlanetBadge;
+  riskSeverity: number;
+  confidence: number | null;
+  freshnessUrgency: number;
+  proximityUrgency: number;
 }
 
 const PLANETS: PlanetConfig[] = [
@@ -51,16 +61,14 @@ const ORBIT_LABELS: Record<OrbitId, string> = {
   flexibility: 'Гибкость'
 };
 
+const FALLBACK_IMPORTANT: IslandId[] = PLANETS.slice(0, 7).map((planet) => planet.id);
 const VIEWBOX_SIZE = 520;
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 3.2;
 const PAN_MARGIN = 80;
+const STALE_AFTER_DAYS = 7;
 
-const toneToVariant = (tone: string) => {
-  if (tone === 'status--fresh') return 'ok';
-  if (tone === 'status--stale') return 'risk';
-  return 'none';
-};
+const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
 
 const toPoint = (angleDeg: number, radius: number) => {
   const angleRad = (angleDeg * Math.PI) / 180;
@@ -70,10 +78,68 @@ const toPoint = (angleDeg: number, radius: number) => {
   };
 };
 
+const inferRiskSeverity = (report: IslandReport | null) => {
+  if (!report) return 0;
+  const scoreRisk = clamp01((65 - report.score) / 40);
+  const insightRisk = report.insights?.some((item) => item.severity === 'risk') ? 1 : 0;
+  return Math.max(scoreRisk, insightRisk);
+};
+
+const inferConfidence = (report: IslandReport | null, input: string) => {
+  if (report) return Math.max(0, Math.min(100, Math.round(report.confidence)));
+  return input.trim().length > 0 ? 45 : null;
+};
+
+const inferFreshnessUrgency = (lastRunAt: string | null) => {
+  if (!lastRunAt) return 1;
+  const diffDays = (Date.now() - new Date(lastRunAt).getTime()) / (1000 * 60 * 60 * 24);
+  return clamp01(diffDays / STALE_AFTER_DAYS);
+};
+
+const inferBadge = (hasReport: boolean, riskSeverity: number): PlanetBadge => {
+  if (!hasReport) return 'none';
+  return riskSeverity >= 0.42 ? 'risk' : 'ok';
+};
+
 export const createCosmosScreen = () => {
   const state = getState();
   const tiles = deriveShieldTiles(state);
   const orbitTitleById = new Map(tiles.map((tile) => [tile.id, tile.title]));
+
+  const statuses = PLANETS.reduce((acc, planet) => {
+    const islandState = state.islands[planet.id];
+    const riskSeverity = inferRiskSeverity(islandState.lastReport);
+    const confidence = inferConfidence(islandState.lastReport, islandState.input);
+    const freshnessUrgency = inferFreshnessUrgency(islandState.progress.lastRunAt);
+    const maxRadius = Math.max(...Object.values(ORBIT_RADIUS));
+    const proximityUrgency = clamp01(1 - (ORBIT_RADIUS[planet.orbitId] * planet.distanceFactor) / maxRadius);
+    acc.set(planet.id, {
+      id: planet.id,
+      badge: inferBadge(Boolean(islandState.lastReport), riskSeverity),
+      riskSeverity,
+      confidence,
+      freshnessUrgency,
+      proximityUrgency
+    });
+    return acc;
+  }, new Map<IslandId, PlanetInstrumentStatus>());
+
+  const scored = [...statuses.values()].map((status) => ({
+    id: status.id,
+    score: status.riskSeverity * 0.5 + status.freshnessUrgency * 0.35 + status.proximityUrgency * 0.15
+  }));
+  const hasAnyData = [...statuses.values()].some((status) => status.badge !== 'none');
+  const importantPlanets = new Set<IslandId>(
+    hasAnyData
+      ? scored.sort((a, b) => b.score - a.score).slice(0, 7).map((item) => item.id)
+      : FALLBACK_IMPORTANT
+  );
+
+  const uiFlags = {
+    showAllLabels: state.flags.cosmosShowAllLabels,
+    onlyImportant: state.flags.cosmosOnlyImportant,
+    showHalo: state.flags.cosmosShowHalo
+  };
 
   const container = document.createElement('div');
   container.className = 'screen cosmos-screen';
@@ -83,8 +149,16 @@ export const createCosmosScreen = () => {
   header.innerHTML = `
     <div>
       <h1>Cosmos</h1>
-      <p>Альтернативный Home: орбиты доменов и планеты модулей.</p>
+      <p>Инструмент приоритетов: риск, свежесть данных и сигналы турбулентности.</p>
     </div>
+  `;
+
+  const controls = document.createElement('section');
+  controls.className = 'cosmos-controls';
+  controls.innerHTML = `
+    <label><input type="checkbox" data-flag="showAllLabels" ${uiFlags.showAllLabels ? 'checked' : ''}/> Показывать все подписи</label>
+    <label><input type="checkbox" data-flag="onlyImportant" ${uiFlags.onlyImportant ? 'checked' : ''}/> Показывать только важные</label>
+    <label><input type="checkbox" data-flag="showHalo" ${uiFlags.showHalo ? 'checked' : ''}/> Показывать halo (турбулентность)</label>
   `;
 
   const mapWrap = document.createElement('section');
@@ -261,13 +335,15 @@ export const createCosmosScreen = () => {
   resetViewButton.addEventListener('click', resetView);
 
   let selectedPlanetId: IslandId | null = null;
-  const importantPlanets = new Set(PLANETS.slice(0, 7).map((planet) => planet.id));
   const planetGroups = new Map<IslandId, SVGGElement>();
+
+  const shouldShowPlanet = (id: IslandId) => !uiFlags.onlyImportant || importantPlanets.has(id);
 
   const updateSelectionState = () => {
     planetGroups.forEach((group, id) => {
       group.classList.toggle('is-selected', selectedPlanetId === id);
-      group.classList.toggle('show-label', selectedPlanetId === id || importantPlanets.has(id));
+      group.classList.toggle('show-label', uiFlags.showAllLabels || selectedPlanetId === id || importantPlanets.has(id));
+      group.classList.toggle('is-hidden', !shouldShowPlanet(id));
     });
   };
 
@@ -287,19 +363,21 @@ export const createCosmosScreen = () => {
 
   PLANETS.filter((item) => islandRegistry.some((island) => island.id === item.id)).forEach((planet) => {
     const islandState = state.islands[planet.id];
-    const status = getIslandStatus(
-      islandState.progress.lastRunAt,
-      Boolean(islandState.lastReport)
-    );
+    const instrument = statuses.get(planet.id)!;
     const catalogItem = getIslandCatalogItem(planet.id);
     const radius = ORBIT_RADIUS[planet.orbitId] * planet.distanceFactor;
     const point = toPoint(planet.angleDeg, radius);
 
     const planetGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     planetGroup.setAttribute('class', 'cosmos-planet');
-    planetGroup.setAttribute('tabindex', '0');
+    planetGroup.setAttribute('tabindex', shouldShowPlanet(planet.id) ? '0' : '-1');
     planetGroup.setAttribute('role', 'button');
-    planetGroup.setAttribute('aria-label', `${catalogItem.displayName}: ${status.label}`);
+    planetGroup.setAttribute(
+      'aria-label',
+      `${catalogItem.displayName}: ${
+        instrument.badge === 'risk' ? 'RISK' : instrument.badge === 'ok' ? 'OK' : 'NO DATA'
+      }`
+    );
 
     const body = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
     body.setAttribute('cx', point.x.toFixed(1));
@@ -313,6 +391,8 @@ export const createCosmosScreen = () => {
     halo.setAttribute('cy', point.y.toFixed(1));
     halo.setAttribute('r', '18');
     halo.setAttribute('class', 'cosmos-planet-halo');
+    const haloStrength = Math.max(instrument.riskSeverity, instrument.confidence === null ? 0.5 : 1 - instrument.confidence / 100);
+    halo.style.opacity = uiFlags.showHalo ? String(Math.max(0.16, haloStrength)) : '0';
     planetGroup.appendChild(halo);
 
     const hit = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
@@ -326,7 +406,7 @@ export const createCosmosScreen = () => {
     badge.setAttribute('cx', (point.x + 12).toFixed(1));
     badge.setAttribute('cy', (point.y - 9).toFixed(1));
     badge.setAttribute('r', '4.5');
-    badge.setAttribute('class', `cosmos-badge cosmos-badge--${toneToVariant(status.tone)}`);
+    badge.setAttribute('class', `cosmos-badge cosmos-badge--${instrument.badge}`);
     planetGroup.appendChild(badge);
 
     const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
@@ -376,7 +456,7 @@ export const createCosmosScreen = () => {
       }
     });
     planetGroup.addEventListener('pointerleave', () => {
-      if (selectedPlanetId !== planet.id && !importantPlanets.has(planet.id)) {
+      if (!uiFlags.showAllLabels && selectedPlanetId !== planet.id && !importantPlanets.has(planet.id)) {
         planetGroup.classList.remove('show-label');
       }
     });
@@ -392,6 +472,33 @@ export const createCosmosScreen = () => {
   });
 
   updateSelectionState();
+
+  controls.addEventListener('change', (event) => {
+    const target = event.target as HTMLInputElement;
+    if (target.dataset.flag === 'showAllLabels') {
+      uiFlags.showAllLabels = target.checked;
+      setCosmosUiFlags({ cosmosShowAllLabels: target.checked });
+    }
+    if (target.dataset.flag === 'onlyImportant') {
+      uiFlags.onlyImportant = target.checked;
+      setCosmosUiFlags({ cosmosOnlyImportant: target.checked });
+      planetGroups.forEach((group, id) => {
+        group.setAttribute('tabindex', !target.checked || importantPlanets.has(id) ? '0' : '-1');
+      });
+    }
+    if (target.dataset.flag === 'showHalo') {
+      uiFlags.showHalo = target.checked;
+      setCosmosUiFlags({ cosmosShowHalo: target.checked });
+      planetGroups.forEach((group) => {
+        const halo = group.querySelector<SVGCircleElement>('.cosmos-planet-halo');
+        if (halo) {
+          const base = Number(halo.style.opacity || '0');
+          halo.style.opacity = target.checked ? String(Math.max(0.16, base)) : '0';
+        }
+      });
+    }
+    updateSelectionState();
+  });
 
   const activePointers = new Map<number, { clientX: number; clientY: number }>();
   let panPointerId: number | null = null;
@@ -503,6 +610,6 @@ export const createCosmosScreen = () => {
   `;
 
   mapWrap.append(resetViewButton, map, menu);
-  container.append(header, mapWrap, actions);
+  container.append(header, controls, mapWrap, actions);
   return container;
 };

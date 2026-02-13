@@ -96,6 +96,9 @@ export interface AppState {
     onboarded: boolean;
     demoLoaded: boolean;
     homeScreen: 'shield' | 'cosmos';
+    cosmosShowAllLabels: boolean;
+    cosmosOnlyImportant: boolean;
+    cosmosShowHalo: boolean;
   };
   inputData: {
     finance: FinanceInputData;
