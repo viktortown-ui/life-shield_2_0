@@ -1317,12 +1317,24 @@ body {
   border: 1px solid #24314d;
   background: radial-gradient(circle at 40% 30%, #182849, #0e1628 60%);
   padding: 10px;
+  overflow: hidden;
 }
 
 .cosmos-map {
   width: 100%;
   height: auto;
   display: block;
+}
+
+.cosmos-reset {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  z-index: 5;
+}
+
+.cosmos-viewport {
+  transform-origin: center;
 }
 
 .cosmos-core {
@@ -1345,9 +1357,34 @@ body {
   cursor: pointer;
 }
 
+.cosmos-planet-halo {
+  fill: none;
+  stroke: rgba(126, 247, 230, 0.75);
+  stroke-width: 2;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+
+.cosmos-planet-hit {
+  fill: transparent;
+  pointer-events: all;
+}
+
+.cosmos-planet.is-selected .cosmos-planet-halo {
+  opacity: 1;
+}
+
 .cosmos-planet-label {
   fill: #e8edf6;
   font-size: 12px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+
+.cosmos-planet.show-label .cosmos-planet-label {
+  opacity: 1;
 }
 
 .cosmos-badge--ok {
