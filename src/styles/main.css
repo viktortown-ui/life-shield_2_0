@@ -1450,6 +1450,61 @@ body {
   animation: cosmosCometFly 820ms ease-out forwards;
 }
 
+
+.cosmos-legend {
+  margin-bottom: 10px;
+  color: #9fb2d7;
+  font-size: 13px;
+}
+
+.cosmos-legend p {
+  margin: 0;
+}
+
+.cosmos-forecast-block {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #24314d;
+  display: grid;
+  gap: 6px;
+  color: #d9e2f4;
+  font-size: 13px;
+}
+
+.cosmos-forecast-block h4 {
+  margin: 0;
+  font-size: 13px;
+  color: #c6d3ec;
+}
+
+.cosmos-forecast-block p {
+  margin: 0;
+}
+
+.cosmos-interval {
+  position: relative;
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(64, 91, 139, 0.45);
+  overflow: hidden;
+}
+
+.cosmos-interval-range {
+  position: absolute;
+  top: 3px;
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #65a2ff, #7ef7e6);
+}
+
+.cosmos-interval-median {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  border-radius: 2px;
+  background: #fff2a0;
+}
 .cosmos-activity-panel {
   margin-top: 12px;
   padding: 12px;

@@ -4,6 +4,11 @@ import { deriveShieldTiles } from '../core/shieldModel';
 import { getState, recordCosmosEvent, setCosmosUiFlags } from '../core/store';
 import { CosmosActivityEvent, IslandId, IslandReport } from '../core/types';
 import { createCosmosSfxEngine } from './cosmosSfx';
+import {
+  getTurbulenceScore,
+  getUncertaintyLabel,
+  MC_RISK_BADGE_THRESHOLD
+} from './cosmosTurbulence';
 
 type OrbitId = 'money' | 'obligations' | 'income' | 'energy' | 'support' | 'flexibility';
 
@@ -31,6 +36,7 @@ interface PlanetInstrumentStatus {
   confidence: number | null;
   freshnessUrgency: number;
   proximityUrgency: number;
+  turbulence: number | null;
 }
 
 const PLANETS: PlanetConfig[] = [
@@ -156,6 +162,8 @@ const formatEventAge = (ts: string) => {
   return `${Math.floor(hours / 24)}д назад`;
 };
 
+const formatMonths = (value: number) => `${value.toFixed(1)} мес`;
+
 export const createCosmosScreen = () => {
   const state = getState();
   const tiles = deriveShieldTiles(state);
@@ -168,16 +176,27 @@ export const createCosmosScreen = () => {
     const freshnessUrgency = inferFreshnessUrgency(islandState.progress.lastRunAt);
     const maxRadius = Math.max(...Object.values(ORBIT_RADIUS));
     const proximityUrgency = clamp01(1 - (ORBIT_RADIUS[planet.orbitId] * planet.distanceFactor) / maxRadius);
+    const mcTurbulence = planet.id === 'stressTest' ? getTurbulenceScore(islandState.mcLast) : null;
+    const stressRiskBadge = planet.id === 'stressTest' && mcTurbulence ? mcTurbulence.hasRiskBadge : null;
     acc.set(planet.id, {
       id: planet.id,
-      badge: inferBadge(Boolean(islandState.lastReport), riskSeverity),
+      badge:
+        stressRiskBadge === null
+          ? inferBadge(Boolean(islandState.lastReport), riskSeverity)
+          : stressRiskBadge
+            ? 'risk'
+            : 'ok',
       riskSeverity,
       confidence,
       freshnessUrgency,
-      proximityUrgency
+      proximityUrgency,
+      turbulence: mcTurbulence?.turbulence ?? null
     });
     return acc;
   }, new Map<IslandId, PlanetInstrumentStatus>());
+
+  const stressMc = state.islands.stressTest.mcLast;
+  const hasMonteCarloStress = Boolean(stressMc);
 
   const scored = [...statuses.values()].map((status) => ({
     id: status.id,
@@ -225,6 +244,14 @@ export const createCosmosScreen = () => {
     <label>Volume <input type="range" data-flag="sfxVolume" data-testid="cosmos-toggle-sfxVolume" min="0" max="1" step="0.05" aria-label="Громкость Sound FX в Cosmos" value="${uiFlags.sfxVolume}" /></label>
     <label><input type="checkbox" data-flag="reduceMotion" data-testid="cosmos-toggle-reduceMotion" aria-label="Сократить анимации Cosmos" ${state.flags.cosmosReduceMotionOverride === true ? 'checked' : ''}/> Reduce motion (override)</label>
   `;
+
+  const legend = document.createElement('section');
+  legend.className = 'cosmos-legend';
+  legend.innerHTML = `<p>${
+    hasMonteCarloStress
+      ? 'Halo = прогнозная турбулентность (Monte Carlo)'
+      : 'Halo = эвристика (нет Monte Carlo)'
+  }</p>`;
 
   const mapWrap = document.createElement('section');
   mapWrap.className = 'cosmos-map-wrap';
@@ -642,7 +669,28 @@ export const createCosmosScreen = () => {
           .map((event) => `<li><strong>${formatEventAction(event.action)}</strong> · ${formatEventAge(event.ts)}</li>`)
           .join('')}</ul>`
       : '<p class="muted">Нет событий за последнее время.</p>';
-    activityPanel.innerHTML = `<h3>Последние действия · ${title}</h3>${list}`;
+    const mcForecastBlock =
+      selectedPlanetId === 'stressTest'
+        ? (() => {
+            const mc = state.islands.stressTest.mcLast;
+            if (!mc) {
+              return '<section class="cosmos-forecast-block"><h4>Прогноз Monte Carlo</h4><p class="muted">Запусти Monte Carlo в Стресс-тесте.</p></section>';
+            }
+            const turbulence = getTurbulenceScore(mc);
+            const uncertainty = turbulence?.uncertainty ?? 0;
+            const uncertaintyLabel = getUncertaintyLabel(uncertainty);
+            const span = Math.max(1, mc.quantiles.p90 - mc.quantiles.p10);
+            const intervalStart = 0;
+            const intervalWidth = 100;
+            const medianPos = Math.max(0, Math.min(100, ((mc.quantiles.p50 - mc.quantiles.p10) / span) * 100));
+            return `<section class="cosmos-forecast-block"><h4>Прогноз Monte Carlo</h4><p>Вероятность провала: <strong>${mc.ruinProb.toFixed(
+              1
+            )}%</strong> (RISK от ${(MC_RISK_BADGE_THRESHOLD * 100).toFixed(0)}%)</p><p>Runway p10/p50/p90: ${formatMonths(
+              mc.quantiles.p10
+            )} / ${formatMonths(mc.quantiles.p50)} / ${formatMonths(mc.quantiles.p90)}</p><p>Неопределённость: <strong>${uncertaintyLabel}</strong></p><div class="cosmos-interval" role="img" aria-label="Интервал runway p10-p90 и медиана p50"><span class="cosmos-interval-range" style="left:${intervalStart}%;width:${intervalWidth}%"></span><span class="cosmos-interval-median" style="left:${medianPos}%"></span></div></section>`;
+          })()
+        : '';
+    activityPanel.innerHTML = `<h3>Последние действия · ${title}</h3>${list}${mcForecastBlock}`;
   };
 
   const shouldShowPlanet = (id: IslandId) => !uiFlags.onlyImportant || importantPlanets.has(id);
@@ -723,7 +771,11 @@ export const createCosmosScreen = () => {
     halo.setAttribute('cy', point.y.toFixed(1));
     halo.setAttribute('r', '18');
     halo.setAttribute('class', `cosmos-planet-halo${uiFlags.reduceMotion ? '' : ' cosmos-planet-halo--pulse'}`);
-    const haloStrength = Math.max(instrument.riskSeverity, instrument.confidence === null ? 0.5 : 1 - instrument.confidence / 100);
+    const fallbackHaloStrength = Math.max(
+      instrument.riskSeverity,
+      instrument.confidence === null ? 0.5 : 1 - instrument.confidence / 100
+    );
+    const haloStrength = instrument.turbulence ?? fallbackHaloStrength;
     const baseHaloOpacity = Math.max(0.16, haloStrength);
     halo.style.opacity = uiFlags.showHalo ? String(baseHaloOpacity) : '0';
     halo.style.setProperty('--halo-base-opacity', String(baseHaloOpacity));
@@ -1087,7 +1139,7 @@ export const createCosmosScreen = () => {
   `;
 
   mapWrap.append(resetViewButton, map, menu, radialMenu);
-  container.append(header, controls, mapWrap, activityPanel, actions);
+  container.append(header, controls, legend, mapWrap, activityPanel, actions);
   window.addEventListener('beforeunload', () => window.clearInterval(cometIntervalId), { once: true });
   return container;
 };
