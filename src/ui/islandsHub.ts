@@ -2,6 +2,7 @@ import { islandRegistry } from '../core/registry';
 import { getCatalogByGroup, getIslandCatalogItem } from '../core/islandsCatalog';
 import { getState } from '../core/store';
 import { t } from './i18n';
+import { createHelpIconButton, HelpTopicId } from './help';
 import {
   buildSparklineSvg,
   formatLastRun,
@@ -9,6 +10,14 @@ import {
   getIslandStatus,
   getReportSummary
 } from './reportUtils';
+
+
+const islandHelpTopicMap: Partial<Record<string, HelpTopicId>> = {
+  timeseries: 'timeseries',
+  snapshot: 'snapshot',
+  stressTest: 'stressTest',
+  bayes: 'bayes'
+};
 
 export const createIslandsHubScreen = () => {
   const state = getState();
@@ -21,10 +30,16 @@ export const createIslandsHubScreen = () => {
 
   const titleWrap = document.createElement('div');
   titleWrap.innerHTML = `
-    <h1>${t('navIslands')}</h1>
+    <div class="islands-hub-screen-title">
+      <h1>${t('navIslands')}</h1>
+    </div>
     <p>Выберите модуль и двигайтесь шаг за шагом.</p>
     <p class="hub-meta">Результатов: ${summary.total} · Ср. индекс: ${summary.avgScore} · Последний запуск: ${formatLastRun(summary.latestRun)}</p>
   `;
+
+  titleWrap
+    .querySelector('.islands-hub-screen-title')
+    ?.append(createHelpIconButton('islandsHub'));
 
   const labToggleLabel = document.createElement('label');
   labToggleLabel.className = 'islands-lab-toggle';
@@ -53,6 +68,7 @@ export const createIslandsHubScreen = () => {
         Boolean(islandState.lastReport)
       );
       const trend = getHistoryTail(state, catalogItem.id).join(' → ') || '—';
+      const helpTopic = islandHelpTopicMap[catalogItem.id];
 
       const badge = catalogItem.badge
         ? `<span class="islands-hub-badge status--fresh">${catalogItem.badge}</span>`
@@ -62,23 +78,28 @@ export const createIslandsHubScreen = () => {
       card.className = 'shield-tile islands-hub-card';
       card.innerHTML = `
         <div class="tile-header islands-hub-card-header">
-          <div class="tile-score">${catalogItem.displayName}</div>
+          <div class="islands-hub-title-wrap">
+            <div class="tile-score">${catalogItem.displayName}</div>
+          </div>
           <div class="tile-meta-badges">
             <span class="tile-status tile-status--chip ${status.tone}">${status.label}</span>
             ${badge}
           </div>
         </div>
-        <div class="tile-headline"><strong>Зачем это:</strong> ${catalogItem.shortWhy}</div>
-        <div class="tile-headline"><strong>Что нужно ввести:</strong> ${catalogItem.inputHint}</div>
-        <div class="tile-headline"><strong>Что получишь:</strong> ${catalogItem.outputHint}</div>
+        <div class="tile-headline">${catalogItem.shortWhy}</div>
         <div class="tile-progress">
           <span>Запусков: ${islandState.progress.runsCount}</span>
-          <span>Последний запуск: ${formatLastRun(islandState.progress.lastRunAt)}</span>
+          <span>Динамика: ${trend}</span>
         </div>
-        <div class="tile-next">Динамика: ${trend}</div>
         <div class="tile-sparkline">${buildSparklineSvg(islandState.progress.history)}</div>
         <div class="tile-next"><a class="button small" href="#/island/${catalogItem.id}">Открыть</a></div>
       `;
+
+      if (helpTopic) {
+        const titleWrap = card.querySelector('.islands-hub-title-wrap');
+        titleWrap?.append(createHelpIconButton(helpTopic));
+      }
+
       grid.appendChild(card);
     });
   };

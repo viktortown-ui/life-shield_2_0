@@ -35,6 +35,7 @@ const dict = {
     navHistory: 'История',
     navReport: 'Отчёт',
     navSettings: 'Настройки',
+    navHelp: 'Справка',
     cosmosTitle: 'Космос',
     settingsLanguage: 'Язык',
     languageRu: 'Русский',
@@ -58,7 +59,15 @@ const dict = {
     glossaryStepSize: 'Step size = Шаг',
     glossarySeasonLength: 'Season length = Сезонность',
     glossaryTestSize: 'Test size = Доля теста',
-    glossaryReduceMotion: 'Reduce motion = Меньше анимации'
+    glossaryReduceMotion: 'Reduce motion = Меньше анимации',
+    helpLabelPrefix: 'Справка',
+    helpClose: 'Закрыть справку',
+    helpWhy: 'Зачем это',
+    helpInput: 'Что нужно ввести',
+    helpOutput: 'Что получишь',
+    helpTerms: 'Простыми словами',
+    helpOpenModule: 'Открыть модуль',
+    helpScreenIntro: 'Короткие и понятные пояснения по ключевым модулям.'
   },
   en: {
     navHome: 'Shield',
@@ -67,6 +76,7 @@ const dict = {
     navHistory: 'History',
     navReport: 'Report',
     navSettings: 'Settings',
+    navHelp: 'Help',
     cosmosTitle: 'Cosmos',
     settingsLanguage: 'Language',
     languageRu: 'Русский',
@@ -90,7 +100,15 @@ const dict = {
     glossaryStepSize: 'Step size = Step size',
     glossarySeasonLength: 'Season length = Season length',
     glossaryTestSize: 'Test size = Test size',
-    glossaryReduceMotion: 'Reduce motion = Reduce motion'
+    glossaryReduceMotion: 'Reduce motion = Reduce motion',
+    helpLabelPrefix: 'Help',
+    helpClose: 'Close help',
+    helpWhy: 'Why use it',
+    helpInput: 'What to enter',
+    helpOutput: 'What you get',
+    helpTerms: 'In simple words',
+    helpOpenModule: 'Open module',
+    helpScreenIntro: 'Short, plain-language guidance for key modules.'
   }
 } as const;
 

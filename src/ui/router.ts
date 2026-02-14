@@ -14,6 +14,7 @@ import { createReportScreen } from './report';
 import { createFinanceScreen } from './finance';
 import { createHistoryScreen } from './history';
 import { onLangChange, t } from './i18n';
+import { createHelpScreen } from './help';
 
 const parseRoute = () => {
   const hash = window.location.hash.replace('#', '') || '/';
@@ -26,6 +27,9 @@ const parseRoute = () => {
   }
   if (parts[0] === 'settings') {
     return { name: 'settings' } as const;
+  }
+  if (parts[0] === 'help') {
+    return { name: 'help' } as const;
   }
   if (parts[0] === 'islands') {
     return { name: 'islands' } as const;
@@ -53,6 +57,7 @@ type Route =
   | { name: 'shield' }
   | { name: 'cosmos' }
   | { name: 'settings' }
+  | { name: 'help' }
   | { name: 'island'; id: IslandId }
   | { name: 'islands' }
   | { name: 'report' }
@@ -71,6 +76,7 @@ const createBottomNav = (route: Route) => {
     <a class="bottom-nav-link ${route.name === 'history' ? 'active' : ''}" href="#/history">${t('navHistory')}</a>
     <a class="bottom-nav-link ${route.name === 'report' ? 'active' : ''}" href="#/report">${t('navReport')}</a>
     <a class="bottom-nav-link ${route.name === 'settings' ? 'active' : ''}" href="#/settings">${t('navSettings')}</a>
+    <a class="bottom-nav-link ${route.name === 'help' ? 'active' : ''}" href="#/help">${t('navHelp')}</a>
   `;
 
   return nav;
@@ -124,6 +130,10 @@ export const initRouter = (root: HTMLElement) => {
       } else if (route.name === 'settings') {
         root.appendChild(
           createAppShell(createSettingsScreen(), route, showBuildInfo)
+        );
+      } else if (route.name === 'help') {
+        root.appendChild(
+          createAppShell(createHelpScreen(), route, showBuildInfo)
         );
       } else if (route.name === 'islands') {
         root.appendChild(
