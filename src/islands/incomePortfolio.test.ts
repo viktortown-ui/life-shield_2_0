@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { getIncomePortfolioReport } from './incomePortfolio';
 
 describe('incomePortfolio calculations', () => {
-  it('calculates HHI, topShare and concentration using source list', () => {
+  it('calculates concentration, top share and stability using source list', () => {
     const report = getIncomePortfolioReport(
       JSON.stringify({
         monthlyIncome: 210000,
@@ -15,8 +15,8 @@ describe('incomePortfolio calculations', () => {
       })
     );
 
-    expect(report.details[0]).toContain('HHI');
-    expect(report.details[1]).toContain('Top share');
+    expect(report.details[0]).toContain('Концентрация дохода');
+    expect(report.details[1]).toContain('Доля главного источника');
     expect(report.headline).toContain('концентрация');
     expect(report.score).toBeGreaterThanOrEqual(0);
     expect(report.score).toBeLessThanOrEqual(100);

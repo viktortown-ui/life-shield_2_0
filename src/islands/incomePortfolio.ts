@@ -1,5 +1,8 @@
 import { ActionItem, IslandReport } from '../core/types';
 import { parseFinanceInput } from './finance';
+import { getMetricLabel } from '../i18n/glossary';
+import { getLang, getProTerms } from '../ui/i18n';
+import { formatNumber, formatPercent } from '../ui/format';
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
@@ -42,7 +45,7 @@ export const getIncomePortfolioReport = (input: string): IslandReport => {
   const advice: ActionItem =
     concentration === 'высокая'
       ? {
-          title: 'Снизить концентрацию top-1 дохода',
+          title: 'Снизить концентрацию главного дохода',
           impact: 84,
           effort: 58,
           description: 'Доведите долю крупнейшего источника ниже 60%.'
@@ -61,16 +64,22 @@ export const getIncomePortfolioReport = (input: string): IslandReport => {
             description: 'Раз в месяц проверяйте доли и стабильность источников.'
           };
 
+  const lang = getLang();
+  const proTerms = getProTerms();
+  const hhiLabel = getMetricLabel('hhi', { lang, proTerms }).label;
+  const topShareLabel = getMetricLabel('topShare', { lang, proTerms }).label;
+  const avgStabilityLabel = getMetricLabel('avgStability', { lang, proTerms }).label;
+
   return {
     id: 'incomePortfolio',
     score,
     confidence: 72,
     headline: `Портфель доходов: концентрация ${concentration}`,
-    summary: 'Оценка концентрации дохода через HHI, долю top-1 и среднюю стабильность источников.',
+    summary: 'Оценка концентрации дохода, доли главного источника и средней стабильности источников.',
     details: [
-      `HHI: ${hhi.toFixed(2)}`,
-      `Top share: ${Math.round(topShare * 100)}%`,
-      `Avg stability: ${avgStability.toFixed(2)} / 1.00`
+      `${hhiLabel}: ${formatNumber(hhi, { maximumFractionDigits: 2 })}`,
+      `${topShareLabel}: ${formatPercent(topShare, 0)}`,
+      `${avgStabilityLabel}: ${formatNumber(avgStability, { maximumFractionDigits: 2 })} / 1,00`
     ],
     actions: [advice]
   };

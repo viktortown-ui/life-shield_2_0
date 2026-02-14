@@ -4,7 +4,8 @@ import { deriveShieldTiles } from '../core/shieldModel';
 import { getState, recordCosmosEvent } from '../core/store';
 import { CosmosActivityEvent, IslandId, IslandReport } from '../core/types';
 import { createCosmosSfxEngine } from './cosmosSfx';
-import { formatDateTime, formatNumber, t } from './i18n';
+import { t } from './i18n';
+import { formatDateTime, formatNumber } from './format';
 import { computeTurbulence } from '../core/turbulence';
 import {
   getTurbulenceScore,

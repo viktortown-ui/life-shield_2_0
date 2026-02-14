@@ -1,7 +1,9 @@
 export type Lang = 'ru' | 'en';
 
 const STORAGE_KEY = 'ls_lang';
+const PRO_TERMS_STORAGE_KEY = 'ls_pro_terms';
 const CHANGE_EVENT = 'ls:lang-change';
+const PRO_TERMS_CHANGE_EVENT = 'ls:pro-terms-change';
 
 export const getLang = (): Lang => {
   const saved = window.localStorage.getItem(STORAGE_KEY);
@@ -22,6 +24,20 @@ export const onLangChange = (listener: (lang: Lang) => void) => {
   return () => window.removeEventListener(CHANGE_EVENT, handler);
 };
 
+export const getProTerms = (): boolean =>
+  window.localStorage.getItem(PRO_TERMS_STORAGE_KEY) === '1';
+
+export const setProTerms = (enabled: boolean) => {
+  window.localStorage.setItem(PRO_TERMS_STORAGE_KEY, enabled ? '1' : '0');
+  window.dispatchEvent(new CustomEvent(PRO_TERMS_CHANGE_EVENT, { detail: enabled }));
+};
+
+export const onProTermsChange = (listener: (enabled: boolean) => void) => {
+  const handler = () => listener(getProTerms());
+  window.addEventListener(PRO_TERMS_CHANGE_EVENT, handler);
+  return () => window.removeEventListener(PRO_TERMS_CHANGE_EVENT, handler);
+};
+
 const dict = {
   ru: {
     navHome: 'Щит',
@@ -35,6 +51,8 @@ const dict = {
     buildLabel: 'Сборка',
     cosmosTitle: 'Космос',
     settingsLanguage: 'Язык',
+    settingsProTerms: 'Профессиональные термины',
+    settingsProTermsHint: 'Показывать проф. аббревиатуры рядом с простыми названиями.',
     languageRu: 'RU',
     languageEn: 'EN',
     stop: 'Стоп',
@@ -95,6 +113,8 @@ const dict = {
     buildLabel: 'Build',
     cosmosTitle: 'Cosmos',
     settingsLanguage: 'Language',
+    settingsProTerms: 'Professional terms',
+    settingsProTermsHint: 'Show pro abbreviations next to plain labels.',
     languageRu: 'RU',
     languageEn: 'EN',
     stop: 'Stop',
@@ -156,21 +176,3 @@ export const tf = (key: I18nKey, vars: Record<string, string | number>) => {
     template
   );
 };
-
-export const formatNumber = (value: number, options?: Intl.NumberFormatOptions) =>
-  new Intl.NumberFormat(getLang(), options).format(value);
-
-export const formatPercent = (value: number, digits = 0) =>
-  new Intl.NumberFormat(getLang(), {
-    style: 'percent',
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits
-  }).format(value);
-
-export const formatDateTime = (
-  value: string | number | Date,
-  options?: Intl.DateTimeFormatOptions
-) =>
-  new Intl.DateTimeFormat(getLang(), options ?? { dateStyle: 'short', timeStyle: 'short' }).format(
-    new Date(value)
-  );

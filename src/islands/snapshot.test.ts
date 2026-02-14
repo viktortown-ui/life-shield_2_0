@@ -14,9 +14,9 @@ describe('snapshot calculations', () => {
     );
 
     expect(report.score).toBeGreaterThan(70);
-    expect(report.details[0]).toContain('5.0');
-    expect(report.details[1]).toContain('10%');
-    expect(report.details[2]).toContain('2.10');
+    expect(report.details[0]).toContain('5');
+    expect(report.details[1]).toMatch(/10\s*%/);
+    expect(report.details[2]).toContain('2,1');
   });
 
   it('caps score to 0-100 for stressed profile', () => {

@@ -36,7 +36,7 @@ export const deriveShieldTiles = (state: AppState): ShieldTile[] => {
   const debtBurden = finance.monthlyIncome > 0 ? finance.monthlyDebtPayment / finance.monthlyIncome : 1;
 
   const topShare =
-    readPercentFromText(incomePortfolio?.details.find((line) => line.includes('Top share'))) ??
+    readPercentFromText(incomePortfolio?.details.find((line) => line.includes('Доля главного источника') || line.includes('Top share'))) ??
     finance.top1Share ??
     1;
   const concentrationClass = classifyConcentration(incomePortfolio?.headline);
@@ -56,44 +56,44 @@ export const deriveShieldTiles = (state: AppState): ShieldTile[] => {
   return [
     {
       id: 'money',
-      title: 'Money',
+      title: 'Деньги',
       score: moneyScore,
       source: 'на основе Снимка',
       summary: `Покрытие ${coverage.toFixed(2)} и запас ${runwayMonths.toFixed(1)} мес.`
     },
     {
       id: 'obligations',
-      title: 'Obligations',
+      title: 'Обязательства',
       score: obligationsScore,
       source: 'на основе Снимка/Стресс-теста',
       summary: `Долговая нагрузка ${Math.round(debtBurden * 100)}% дохода.`
     },
     {
       id: 'income',
-      title: 'Income',
+      title: 'Доходы',
       score: incomeScore,
       source: 'на основе Снимка/Портфеля',
-      summary: `Top-1 ${Math.round(topShare * 100)}%, концентрация ${concentrationClass}.`
+      summary: `Главный источник ${Math.round(topShare * 100)}%, концентрация ${concentrationClass}.`
     },
     {
       id: 'energy',
-      title: 'Energy',
+      title: 'Энергия',
       score: clamp(baseScore - 4),
-      source: 'self-report (временно)',
+      source: 'самооценка (временно)',
       summary: 'Оценка личного ресурса до следующего обновления опросника.'
     },
     {
       id: 'support',
-      title: 'Support',
+      title: 'Поддержка',
       score: clamp(baseScore + 1),
-      source: 'self-report (временно)',
+      source: 'самооценка (временно)',
       summary: 'Опора на окружение и процессы (временная прокси-оценка).'
     },
     {
       id: 'flexibility',
-      title: 'Flexibility',
+      title: 'Гибкость',
       score: clamp(baseScore),
-      source: 'self-report (временно)',
+      source: 'самооценка (временно)',
       summary: 'Способность быстро менять сценарий (временная прокси-оценка).'
     }
   ];

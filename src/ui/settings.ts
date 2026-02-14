@@ -15,7 +15,8 @@ import {
 } from '../core/pwaUpdate';
 import { reportCaughtError } from '../core/reportError';
 import { safeClear } from '../core/storage';
-import { getLang, setLang, t } from './i18n';
+import { getLang, getProTerms, setLang, setProTerms, t } from './i18n';
+import { getMetricLabel } from '../i18n/glossary';
 
 export const createSettingsScreen = () => {
   const container = document.createElement('div');
@@ -121,6 +122,18 @@ export const createSettingsScreen = () => {
         <span>${t('languageEn')}</span>
       </label>
     </div>
+  `;
+
+
+
+  const proTermsSettings = document.createElement('section');
+  proTermsSettings.className = 'settings-block';
+  proTermsSettings.innerHTML = `
+    <h2>${t('settingsProTerms')}</h2>
+    <label>
+      <input type="checkbox" name="pro-terms" />
+      ${t('settingsProTermsHint')}
+    </label>
   `;
 
   const maintenance = document.createElement('section');
@@ -297,14 +310,14 @@ export const createSettingsScreen = () => {
   const reduceMotionInput = cosmosFxSettings.querySelector<HTMLInputElement>('input[data-cosmos-fx="reduceMotion"]');
   if (soundInput && volumeInput && reduceMotionInput) {
     soundInput.checked = flags.cosmosSoundFxEnabled;
-    volumeInput.value = String(flags.cosmosSfxГромкость);
+    volumeInput.value = String(flags.cosmosSfxVolume);
     reduceMotionInput.checked = flags.cosmosReduceMotionOverride === true;
 
     soundInput.addEventListener('change', () => {
       setCosmosUiFlags({ cosmosSoundFxEnabled: soundInput.checked });
     });
     volumeInput.addEventListener('input', () => {
-      setCosmosUiFlags({ cosmosSfxГромкость: Number(volumeInput.value) });
+      setCosmosUiFlags({ cosmosSfxVolume: Number(volumeInput.value) });
     });
     reduceMotionInput.addEventListener('change', () => {
       setCosmosUiFlags({ cosmosReduceMotionOverride: reduceMotionInput.checked ? true : null });
@@ -379,22 +392,25 @@ export const createSettingsScreen = () => {
     });
   });
 
+  const proTermsInput = proTermsSettings.querySelector<HTMLInputElement>('input[name="pro-terms"]');
+  if (proTermsInput) {
+    proTermsInput.checked = getProTerms();
+    proTermsInput.addEventListener('change', () => {
+      setProTerms(proTermsInput.checked);
+    });
+  }
+
+  const glossaryKeys = ['runway', 'debtBurden', 'coverage', 'hhi', 'topShare', 'avgStability', 'burnIn', 'stepSize', 'simulations', 'horizon', 'seasonLength', 'testSize', 'auto'] as const;
+  const glossaryItems = glossaryKeys
+    .map((key) => `<li>${getMetricLabel(key, { lang: getLang(), proTerms: getProTerms() }).label}</li>`)
+    .join('');
   const glossary = document.createElement('section');
   glossary.className = 'settings-block';
   glossary.innerHTML = `
     <h2>${t('glossaryTitle')}</h2>
-    <ul class="settings-glossary">
-      <li>${t('glossaryRunway')}</li>
-      <li>${t('glossaryConfidence')}</li>
-      <li>${t('glossaryScore')}</li>
-      <li>${t('glossaryBurnIn')}</li>
-      <li>${t('glossaryStepSize')}</li>
-      <li>${t('glossarySeasonLength')}</li>
-      <li>${t('glossaryTestSize')}</li>
-      <li>${t('glossaryReduceMotion')}</li>
-    </ul>
+    <ul class="settings-glossary">${glossaryItems}</ul>
   `;
 
-  container.append(header, languageSettings, homeSettings, cosmosViewSettings, cosmosFxSettings, exportBlock, maintenance, glossary, actions);
+  container.append(header, languageSettings, proTermsSettings, homeSettings, cosmosViewSettings, cosmosFxSettings, exportBlock, maintenance, glossary, actions);
   return container;
 };
