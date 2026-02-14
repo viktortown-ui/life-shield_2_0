@@ -318,10 +318,8 @@ export const getDecisionTreeReport = (rawInput: string): IslandReport => {
     id: 'decisionTree',
     score: Math.round(score),
     confidence: Math.round(confidence * 100),
-    headline: `Лучший вариант: ${bestByEV.name} (средний итог=${formatNumber(bestByEV.ev)}, риск потери=${formatNumber(bestByEV.probLoss, 2)})`,
-    summary: `Осторожный вариант: ${robustChoice.name}. Вероятности: ${
-      probabilityMismatch ? 'есть расхождения' : 'суммы в норме'
-    }.`,
+    headline: `Лучший ход: ${bestByEV.name}`,
+    summary: `Что выгоднее: ${bestByEV.name}. Риск потери: ${formatPercent(bestByEV.probLoss, 0)}. Что проверить: ${probabilityMismatch ? 'суммы вероятностей по действиям' : 'крайние исходы и размеры потерь'}.`,
     details,
     actions: buildActionItems({ probabilityMismatch, singleOutcome }),
     insights: [

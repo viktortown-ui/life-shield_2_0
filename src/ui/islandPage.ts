@@ -107,6 +107,16 @@ const sanitizeRuTerms = (text: string) => {
     .replace(/Step size/gi, 'шаг');
 };
 
+const forbiddenAdvancedTerms = /\b(EV|EL|HHI|Runway|Coverage)\b/gi;
+
+const toVisibleRu = (text: string) =>
+  getLang() === 'ru' && !getProTerms()
+    ? sanitizeRuTerms(text).replace(forbiddenAdvancedTerms, '').replace(/\s{2,}/g, ' ').trim()
+    : sanitizeRuTerms(text);
+
+const hasDataInReport = (report: { score: number; confidence: number; details: string[] }) =>
+  report.score > 0 || report.confidence > 0 || report.details.some((line) => /\d/.test(line));
+
 const getIslandTagline = (description: string) => {
   if (getLang() !== 'ru') return description;
   return description.replace(/\s+/g, ' ').trim();
@@ -1644,7 +1654,7 @@ export const createIslandPage = (id: IslandId) => {
           <div><span>Метрика</span><strong>${metricLabel}</strong></div>
           <div><span>Тренд</span><strong>${trendLabel}</strong></div>
           <div><span>Волатильность</span><strong>${volatilityLabel}</strong></div>
-          <div><span>Доверие</span><strong>${confidenceLabel}</strong></div>
+          <div><span>Надёжность</span><strong>${confidenceLabel}</strong></div>
         </div>
       `;
     };
@@ -1811,19 +1821,57 @@ export const createIslandPage = (id: IslandId) => {
       id === 'stressTest' && observationsCount >= 6
         ? '<p class="muted">Можно будет строить прогнозы по истории.</p>'
         : '';
+
+    const visibleReasons = (report.reasons ?? report.details.slice(0, 2))
+      .map((line) => toVisibleRu(line))
+      .filter(Boolean)
+      .slice(0, 2);
+
+    const visibleSteps = (report.nextSteps ?? report.actions?.map((item) => item.title) ?? [])
+      .map((line) => toVisibleRu(line))
+      .filter(Boolean)
+      .slice(0, 3);
+
+    const advancedDetails = report.details
+      .map((line) => sanitizeRuTerms(line))
+      .filter(Boolean);
+
+    const emptyHint =
+      !hasDataInReport(report)
+        ? '<div class="island-empty-state"><p>Пока пусто. Заполни 2–3 поля и нажми «Рассчитать».</p><p>Можно нажать «Заполнить пример».</p></div>'
+        : '';
+
     result.innerHTML = `
       <div class="result-metrics compact">
         <div><span>${t('score')}</span><strong>${formatNumber(report.score)}</strong></div>
         <div><span>${t('confidence')}</span><strong>${formatPercent(report.confidence / 100, 0)}</strong></div>
-        <div><span>Статус</span><strong>${sanitizeRuTerms(report.headline)}</strong></div>
-        <div><span>Коротко</span><strong>${sanitizeRuTerms(report.summary)}</strong></div>
+        <div><span>Состояние</span><strong>${toVisibleRu(report.headline)}</strong></div>
+        <div><span>Смысл</span><strong>${toVisibleRu(report.summary)}</strong></div>
       </div>
+      <section class="result-card">
+        <h3>${toVisibleRu(report.headline)}</h3>
+        <p class="result-card-subtitle">${toVisibleRu(report.summary)}</p>
+        <div class="result-card-grid">
+          <div>
+            <h4>Почему</h4>
+            <ul>${visibleReasons.map((line) => `<li>${line}</li>`).join('')}</ul>
+          </div>
+          <div>
+            <h4>Что дальше</h4>
+            <ul>${visibleSteps.map((line) => `<li>${line}</li>`).join('')}</ul>
+          </div>
+        </div>
+      </section>
+      ${emptyHint}
       ${historyHint}
       ${
         mc
           ? `<section class="stress-mc-result"><h3>Монте-Карло</h3><div class="result-metrics compact"><div><span>Риск</span><strong>${formatPercent(mc.ruinProb / 100, 2)}</strong></div><div><span>${getMetricLabel('runway', { lang: getLang(), proTerms: getProTerms() }).label} p50</span><strong>${formatNumber(mc.quantiles.p50, { maximumFractionDigits: 1 })} мес</strong></div><div><span>p10</span><strong>${formatNumber(mc.quantiles.p10, { maximumFractionDigits: 1 })} мес</strong></div><div><span>p90</span><strong>${formatNumber(mc.quantiles.p90, { maximumFractionDigits: 1 })} мес</strong></div></div>${renderHistogram()}${renderMcHistory()}</section>`
           : ''
       }
+      <details class="island-advanced"><summary>Показать детали (для продвинутых)</summary><ul>${advancedDetails
+        .map((line) => `<li>${line}</li>`)
+        .join('')}</ul></details>
     `;
   };
 

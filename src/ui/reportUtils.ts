@@ -70,7 +70,7 @@ export const getReportSummary = (state: AppState) => {
 
 export const getTopMetrics = (report: IslandReport | null) => {
   if (!report) {
-    return ['Нет ключевых метрик'];
+    return ['Пока пусто. Заполни 2–3 поля и нажми «Рассчитать».', 'Можно нажать «Заполнить пример».'];
   }
   const detailMetrics = report.details.slice(0, 2);
   if (detailMetrics.length > 0) {

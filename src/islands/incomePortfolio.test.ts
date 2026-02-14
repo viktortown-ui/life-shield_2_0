@@ -17,7 +17,7 @@ describe('incomePortfolio calculations', () => {
 
     expect(report.details[0]).toContain('Концентрация дохода');
     expect(report.details[1]).toContain('Доля главного источника');
-    expect(report.headline).toContain('концентрация');
+    expect(['Зависишь от одного', 'Нормально', 'Диверсифицирован']).toContain(report.headline);
     expect(report.score).toBeGreaterThanOrEqual(0);
     expect(report.score).toBeLessThanOrEqual(100);
   });
