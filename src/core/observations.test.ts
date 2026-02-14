@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { sanitizeCashflowMonthly } from './observations';
+import { sanitizeCashflowMonthly, sanitizeObservations } from './observations';
 
 describe('sanitizeCashflowMonthly', () => {
   it('sanitizes numbers and defaults invalid/negative values to 0', () => {
@@ -41,4 +41,22 @@ describe('sanitizeCashflowMonthly', () => {
 
     expect(rows).toEqual([{ ym: '2025-03', income: 1, expense: 1 }]);
   });
+
+  it('sanitizes cashflowDriftLast payload', () => {
+    const result = sanitizeObservations({
+      cashflowMonthly: [],
+      cashflowDriftLast: {
+        detected: 1,
+        score: 7,
+        ym: '2025-02',
+        ts: '2026-01-01T00:00:00.000Z',
+        paramsUsed: { delta: 'bad', lambda: 10, minN: 1 }
+      }
+    });
+
+    expect(result.cashflowDriftLast?.detected).toBe(true);
+    expect(result.cashflowDriftLast?.score).toBe(1);
+    expect(result.cashflowDriftLast?.paramsUsed.minN).toBe(2);
+  });
+
 });

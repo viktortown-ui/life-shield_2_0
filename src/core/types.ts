@@ -31,8 +31,23 @@ export interface CashflowMonthlyEntry {
   expense: number;
 }
 
+export interface CashflowDriftParams {
+  delta: number;
+  lambda: number;
+  minN: number;
+}
+
+export interface CashflowDriftLastState {
+  detected: boolean;
+  score: number;
+  ym: string | null;
+  ts: string;
+  paramsUsed: CashflowDriftParams;
+}
+
 export interface ObservationsState {
   cashflowMonthly: CashflowMonthlyEntry[];
+  cashflowDriftLast?: CashflowDriftLastState;
 }
 
 export interface IslandReport {

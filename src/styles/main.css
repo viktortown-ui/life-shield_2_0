@@ -1801,3 +1801,21 @@ body {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+
+.history-sparkline-marker {
+  stroke: #ff9f6e;
+  stroke-width: 1.5;
+  stroke-dasharray: 2 2;
+}
+
+.history-drift-alert {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 159, 110, 0.45);
+  border-radius: 10px;
+  background: rgba(255, 159, 110, 0.08);
+}
+
+.history-drift-alert p {
+  margin: 6px 0 0;
+}

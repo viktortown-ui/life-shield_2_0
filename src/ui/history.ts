@@ -12,7 +12,13 @@ const toAmount = (value: string): number => {
   return Math.max(0, num);
 };
 
-const buildNetSparkline = (values: number[]) => {
+const getDriftLevelLabel = (score: number) => {
+  if (score >= 0.75) return 'высокий';
+  if (score >= 0.5) return 'средний';
+  return 'низкий';
+};
+
+const buildNetSparkline = (values: number[], driftIndex: number | null) => {
   if (!values.length) {
     return '<p class="muted">Нет данных для мини-графика.</p>';
   }
@@ -28,9 +34,18 @@ const buildNetSparkline = (values: number[]) => {
     })
     .join(' ');
 
+  const marker =
+    driftIndex !== null && driftIndex >= 0 && driftIndex < values.length
+      ? (() => {
+          const x = values.length === 1 ? 0 : (driftIndex / (values.length - 1)) * 100;
+          return `<line x1="${x.toFixed(2)}" y1="0" x2="${x.toFixed(2)}" y2="100" class="history-sparkline-marker"></line>`;
+        })()
+      : '';
+
   return `
     <svg viewBox="0 0 100 100" class="history-sparkline" role="img" aria-label="Динамика net за 12 месяцев">
       <polyline points="${points}"></polyline>
+      ${marker}
     </svg>
   `;
 };
@@ -114,10 +129,20 @@ export const createHistoryScreen = () => {
       </table>
     `;
 
-    const sparkValues = rows.slice(-12).map((row) => row.income - row.expense);
+    const recentForSpark = rows.slice(-12);
+    const sparkValues = recentForSpark.map((row) => row.income - row.expense);
+    const drift = state.observations.cashflowDriftLast;
+    const driftIndex = drift?.ym ? recentForSpark.findIndex((row) => row.ym === drift.ym) : -1;
+    const driftAlert =
+      drift?.detected
+        ? `<div class="history-drift-alert"><strong>Смена режима net cashflow обнаружена.</strong><p>Месяц: ${drift.ym ?? '—'} · уровень: ${getDriftLevelLabel(
+            drift.score
+          )} (${(drift.score * 100).toFixed(0)}%)</p></div>`
+        : '';
     summary.innerHTML = `
       <h3>Net за 12 месяцев</h3>
-      ${buildNetSparkline(sparkValues)}
+      ${buildNetSparkline(sparkValues, driftIndex >= 0 ? driftIndex : null)}
+      ${driftAlert}
       <p class="muted">данных: ${rows.length} месяцев</p>
     `;
 
