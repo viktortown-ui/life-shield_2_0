@@ -54,15 +54,17 @@ export const createIslandsHubScreen = () => {
       const trend = getHistoryTail(state, catalogItem.id).join(' → ') || '—';
 
       const badge = catalogItem.badge
-        ? `<span class="tile-status status--fresh">${catalogItem.badge}</span>`
+        ? `<span class="islands-hub-badge status--fresh">${catalogItem.badge}</span>`
         : '';
 
       const card = document.createElement('article');
       card.className = 'shield-tile islands-hub-card';
       card.innerHTML = `
         <span class="tile-status ${status.tone}">${status.label}</span>
-        ${badge}
-        <div class="tile-score">${catalogItem.displayName}</div>
+        <div class="islands-hub-card-header">
+          <div class="tile-score">${catalogItem.displayName}</div>
+          ${badge}
+        </div>
         <div class="tile-headline"><strong>Зачем это:</strong> ${catalogItem.shortWhy}</div>
         <div class="tile-headline"><strong>Что нужно ввести:</strong> ${catalogItem.inputHint}</div>
         <div class="tile-headline"><strong>Что получишь:</strong> ${catalogItem.outputHint}</div>

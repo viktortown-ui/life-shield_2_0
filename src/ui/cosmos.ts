@@ -385,6 +385,8 @@ export const createCosmosScreen = () => {
     menu.innerHTML = '';
   };
 
+  let cometIntervalId: number | null = null;
+
   const menuState = { labelBox: null as DOMRect | null };
 
   type PlanetAction = {
@@ -448,6 +450,36 @@ export const createCosmosScreen = () => {
     }
   };
 
+  const spawnComet = () => {
+    if (uiFlags.reduceMotion) return;
+    const comet = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    comet.setAttribute('class', 'cosmos-comet');
+    const startX = 40 + Math.random() * 440;
+    const startY = 30 + Math.random() * 460;
+    comet.setAttribute('x1', startX.toFixed(1));
+    comet.setAttribute('y1', startY.toFixed(1));
+    comet.setAttribute('x2', (startX + 18).toFixed(1));
+    comet.setAttribute('y2', (startY + 10).toFixed(1));
+    comet.style.setProperty('--comet-dx', `${24 + Math.random() * 38}px`);
+    comet.style.setProperty('--comet-dy', `${10 + Math.random() * 24}px`);
+    comet.style.animationDuration = `${880 + Math.random() * 540}ms`;
+    cometLayer.appendChild(comet);
+    window.setTimeout(() => comet.remove(), 1700);
+  };
+
+  const clearCometInterval = () => {
+    if (cometIntervalId != null) {
+      window.clearInterval(cometIntervalId);
+      cometIntervalId = null;
+    }
+  };
+
+  const startCometInterval = () => {
+    clearCometInterval();
+    if (uiFlags.reduceMotion) return;
+    cometIntervalId = window.setInterval(spawnComet, COMET_INTERVAL_MS);
+  };
+
   const unlockAudioFromGesture = () => {
     if (!uiFlags.soundFxEnabled) return;
     if (sfx.isUnlocked()) {
@@ -495,17 +527,7 @@ export const createCosmosScreen = () => {
     const title = document.createElement('strong');
     title.textContent = catalogItem?.displayName ?? "История";
 
-    document.addEventListener('visibilitychange', () => {
-    if (document.hidden) {
-      sfx.suspend().catch(() => undefined);
-      return;
-    }
-    if (uiFlags.soundFxEnabled) {
-      sfx.resume().catch(() => undefined);
-    }
-  });
-
-  const actions = document.createElement('div');
+    const actions = document.createElement('div');
     actions.className = 'cosmos-menu-actions';
     actionsList.forEach((action) => {
       if (action.href) {
@@ -532,7 +554,7 @@ export const createCosmosScreen = () => {
             const point = planetPoints.get(config.id);
             if (point) triggerSparkBurst(point.x, point.y);
           }
-          runPlanetAction(session.planet.id, action);
+          runPlanetAction(config.id, action);
         });
         actions.appendChild(button);
       }
@@ -1207,15 +1229,25 @@ export const createCosmosScreen = () => {
     closeMenu();
   });
 
-  document.addEventListener('visibilitychange', () => {
+  const handleVisibilityChange = () => {
     if (document.hidden) {
+      clearCometInterval();
       sfx.suspend().catch(() => undefined);
       return;
     }
+    startCometInterval();
     if (uiFlags.soundFxEnabled) {
       sfx.resume().catch(() => undefined);
     }
-  });
+  };
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+
+  const handleBeforeUnload = () => {
+    clearCometInterval();
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
+  };
+
+  startCometInterval();
 
   const actions = document.createElement('div');
   actions.className = 'screen-actions';
@@ -1226,6 +1258,6 @@ export const createCosmosScreen = () => {
 
   mapWrap.append(resetViewButton, map, menu, radialMenu);
   container.append(header, controls, legend, mapWrap, activityPanel, actions);
-  window.addEventListener('beforeunload', () => window.clearInterval(cometIntervalId), { once: true });
+  window.addEventListener('beforeunload', handleBeforeUnload, { once: true });
   return container;
 };

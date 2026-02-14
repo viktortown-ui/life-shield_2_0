@@ -1248,6 +1248,33 @@ body {
   font-size: 18px;
 }
 
+.islands-hub-card-header {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.islands-hub-card-header .tile-score {
+  min-width: 0;
+}
+
+.islands-hub-badge {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+@media (max-width: 420px) {
+  .islands-hub-card-header {
+    flex-wrap: wrap;
+  }
+}
+
 
 .hub-meta {
   margin-top: 8px;
