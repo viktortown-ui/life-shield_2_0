@@ -526,7 +526,7 @@ body {
   padding: 18px;
   background: #151d2e;
   display: grid;
-  gap: 8px;
+  gap: 10px;
   text-decoration: none;
   color: inherit;
   min-height: 170px;
@@ -537,14 +537,20 @@ body {
 }
 
 .tile-status {
-  position: absolute;
-  top: 12px;
-  right: 12px;
   padding: 4px 10px;
   border-radius: 999px;
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.6px;
+}
+
+.tile-status--chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
+  max-width: 100%;
+  text-align: center;
 }
 
 .status--new {
@@ -562,9 +568,25 @@ body {
   color: #ff6b6b;
 }
 
+.tile-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
 .tile-score {
   font-size: 22px;
   font-weight: 700;
+  min-width: 0;
+  flex: 1 1 220px;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-clamp: 2;
 }
 
 .tile-confidence {
@@ -1249,20 +1271,29 @@ body {
 }
 
 .islands-hub-card-header {
-  display: flex;
-  gap: 8px;
-  align-items: flex-start;
-  justify-content: space-between;
+  gap: 10px;
 }
 
-.islands-hub-card-header .tile-score {
+.tile-meta-badges {
+  display: flex;
+  flex: 0 1 160px;
   min-width: 0;
+  max-width: 100%;
+  gap: 6px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
 }
 
 .islands-hub-badge {
-  flex: 0 0 auto;
-  white-space: nowrap;
+  flex: 0 1 auto;
+  max-width: 100%;
+  white-space: normal;
+  word-break: break-word;
   padding: 4px 10px;
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  text-align: center;
   border-radius: 999px;
   font-size: 12px;
   text-transform: uppercase;
@@ -1270,8 +1301,13 @@ body {
 }
 
 @media (max-width: 420px) {
-  .islands-hub-card-header {
-    flex-wrap: wrap;
+  .tile-header {
+    align-items: stretch;
+  }
+
+  .tile-meta-badges {
+    justify-content: flex-start;
+    flex-basis: 100%;
   }
 }
 

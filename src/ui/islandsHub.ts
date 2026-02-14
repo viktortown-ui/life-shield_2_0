@@ -61,10 +61,12 @@ export const createIslandsHubScreen = () => {
       const card = document.createElement('article');
       card.className = 'shield-tile islands-hub-card';
       card.innerHTML = `
-        <span class="tile-status ${status.tone}">${status.label}</span>
-        <div class="islands-hub-card-header">
+        <div class="tile-header islands-hub-card-header">
           <div class="tile-score">${catalogItem.displayName}</div>
-          ${badge}
+          <div class="tile-meta-badges">
+            <span class="tile-status tile-status--chip ${status.tone}">${status.label}</span>
+            ${badge}
+          </div>
         </div>
         <div class="tile-headline"><strong>Зачем это:</strong> ${catalogItem.shortWhy}</div>
         <div class="tile-headline"><strong>Что нужно ввести:</strong> ${catalogItem.inputHint}</div>

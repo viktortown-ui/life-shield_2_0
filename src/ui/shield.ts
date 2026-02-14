@@ -217,8 +217,10 @@ export const createShieldScreen = () => {
     .map(
       (tile) => `
         <article class="shield-tile">
-          <span class="tile-status status--fresh">${tile.source}</span>
-          <div class="tile-score">${tile.title}</div>
+          <div class="tile-header">
+            <div class="tile-score">${tile.title}</div>
+            <span class="tile-status tile-status--chip status--fresh">${tile.source}</span>
+          </div>
           <div class="tile-progress"><span>Индекс: ${tile.score}</span></div>
           <div class="tile-next">${tile.summary}</div>
         </article>
