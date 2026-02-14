@@ -72,6 +72,16 @@ const dict = {
     horizon: 'Горизонт',
     settingsTitle: 'Настройки',
     settingsSubtitle: 'Экспорт, импорт и обслуживание приложения.'
+    ,helpSearchPlaceholder: 'Поиск по модулям'
+    ,helpNoResults: 'Ничего не найдено. Попробуйте другое слово.'
+    ,helpExample: 'Пример данных'
+    ,helpOpenSettings: 'Параметры'
+    ,islandsHubIntro: 'Выберите модуль и начните с короткого шага.'
+    ,islandsHubSummary: 'Результатов: {total} · Ср. индекс: {avg} · Последний запуск: {latest}'
+    ,islandsHubShowLab: 'Показать лабораторию'
+    ,islandsHubRuns: 'Запусков: {count}'
+    ,islandsHubTrend: 'Динамика: {trend}'
+    ,cosmosIntro: 'Карта приоритетов по рискам и свежести данных.'
   },
   en: {
     navHome: 'Shield',
@@ -122,12 +132,30 @@ const dict = {
     horizon: 'Horizon',
     settingsTitle: 'Settings',
     settingsSubtitle: 'Export, import, and app maintenance.'
+    ,helpSearchPlaceholder: 'Search modules'
+    ,helpNoResults: 'No matches found. Try another query.'
+    ,helpExample: 'Example data'
+    ,helpOpenSettings: 'Settings'
+    ,islandsHubIntro: 'Pick a module and start with one short step.'
+    ,islandsHubSummary: 'Reports: {total} · Avg score: {avg} · Last run: {latest}'
+    ,islandsHubShowLab: 'Show laboratory'
+    ,islandsHubRuns: 'Runs: {count}'
+    ,islandsHubTrend: 'Trend: {trend}'
+    ,cosmosIntro: 'Priority map by risk and data freshness.'
   }
 } as const;
 
 export type I18nKey = keyof (typeof dict)['ru'];
 
 export const t = (key: I18nKey) => dict[getLang()][key];
+
+export const tf = (key: I18nKey, vars: Record<string, string | number>) => {
+  const template = t(key);
+  return Object.entries(vars).reduce(
+    (result, [name, value]) => result.replaceAll(`{${name}}`, String(value)),
+    template
+  );
+};
 
 export const formatNumber = (value: number, options?: Intl.NumberFormatOptions) =>
   new Intl.NumberFormat(getLang(), options).format(value);

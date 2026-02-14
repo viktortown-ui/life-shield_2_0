@@ -18,7 +18,7 @@ export const islandsCatalog: Record<IslandId, IslandCatalogItem> = {
     displayName: 'Снимок',
     shortWhy: 'Понять финансовую устойчивость на текущий момент по ключевым метрикам.',
     inputHint: 'monthlyIncome, monthlyExpenses, reserveCash, monthlyDebtPayment, incomeSourcesCount.',
-    outputHint: 'Runway, долговую нагрузку, покрытие и итоговый индекс 0–100.',
+    outputHint: 'Запас хода, долговую нагрузку, покрытие и итоговый индекс 0–100.',
     group: 'base',
     badge: 'База'
   },
@@ -27,7 +27,7 @@ export const islandsCatalog: Record<IslandId, IslandCatalogItem> = {
     displayName: 'Стресс-тест',
     shortWhy: 'Проверить, что будет при просадке дохода и росте расходов.',
     inputHint: 'Те же финполя, что и в «Снимке».',
-    outputHint: 'Runway по сценариям, зоны риска и короткие подсказки действий.',
+    outputHint: 'Запас хода по сценариям, зоны риска и короткие подсказки действий.',
     group: 'base',
     badge: 'База'
   },
@@ -36,7 +36,7 @@ export const islandsCatalog: Record<IslandId, IslandCatalogItem> = {
     displayName: 'Портфель доходов',
     shortWhy: 'Оценить концентрацию доходов и устойчивость источников.',
     inputHint: 'Список источников (amount, stability) или top1/top3 + число источников.',
-    outputHint: 'HHI, долю top-1, стабильность и совет по диверсификации.',
+    outputHint: 'Концентрацию доходов, долю крупнейшего источника, стабильность и совет по диверсификации.',
     group: 'base',
     badge: 'База'
   },

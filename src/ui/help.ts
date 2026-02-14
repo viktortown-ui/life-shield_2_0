@@ -1,163 +1,227 @@
-import { t, getLang } from './i18n';
+import { IslandId } from '../core/types';
+import { getLang, t } from './i18n';
 
-export type HelpTopicId = 'islandsHub' | 'timeseries' | 'snapshot' | 'stressTest' | 'bayes';
+export type HelpTopicId =
+  | 'islandsHub'
+  | 'snapshot'
+  | 'stressTest'
+  | 'incomePortfolio'
+  | 'timeseries'
+  | 'bayes'
+  | 'hmm'
+  | 'optimization'
+  | 'decisionTree'
+  | 'causalDag';
+
+interface LocaleText {
+  ru: string;
+  en: string;
+}
 
 interface HelpTopic {
   id: HelpTopicId;
-  title: { ru: string; en: string };
-  oneLiner: { ru: string; en: string };
-  why: { ru: string; en: string };
-  input: { ru: string; en: string };
-  output: { ru: string; en: string };
-  terms: Array<{ ru: string; en: string }>;
-  href?: string;
+  moduleId?: IslandId;
+  title: LocaleText;
+  oneLiner: LocaleText;
+  why: LocaleText;
+  input: LocaleText[];
+  output: LocaleText[];
+  example: LocaleText;
+  href: string;
 }
 
 const helpTopics: HelpTopic[] = [
   {
     id: 'islandsHub',
-    title: { ru: 'Islands Hub', en: 'Islands Hub' },
+    title: { ru: 'Острова', en: 'Islands' },
     oneLiner: {
-      ru: 'Показывает все модули в одном месте и помогает выбрать, с чего начать.',
-      en: 'Shows all modules in one place and helps you choose where to start.'
+      ru: 'Главный экран модулей: что уже запускали и куда идти дальше.',
+      en: 'Main module hub: what ran recently and where to go next.'
     },
     why: {
-      ru: 'Чтобы быстро понять, какие инструменты есть и какой из них решить вашу задачу прямо сейчас.',
-      en: 'So you can quickly see available tools and pick the one that solves your current task.'
+      ru: 'Чтобы быстро выбрать нужный инструмент без длинных объяснений на карточках.',
+      en: 'So you can quickly choose a tool without long explanations on cards.'
     },
-    input: {
-      ru: 'Ничего вводить не нужно. Просто выберите нужный модуль.',
-      en: 'No input required. Just choose the module you need.'
-    },
-    output: {
-      ru: 'Переход в нужный модуль и короткая карточка с его смыслом.',
-      en: 'Direct access to the selected module and a short card explaining its purpose.'
-    },
-    terms: [
+    input: [
       {
-        ru: 'Модуль — это отдельный мини-инструмент для конкретной задачи.',
-        en: 'Module — a separate mini-tool for a specific task.'
+        ru: 'Ничего вводить не нужно — просто выберите модуль.',
+        en: 'No input required — just pick a module.'
       }
     ],
+    output: [
+      {
+        ru: 'Короткий статус по каждому модулю.',
+        en: 'A compact status for each module.'
+      },
+      {
+        ru: 'Переход в модуль в один клик.',
+        en: 'One-click access to each module.'
+      }
+    ],
+    example: {
+      ru: 'Пример статуса: «есть данные · запусков: 3 · динамика: 58 → 63 → 67».',
+      en: 'Example status: “has data · runs: 3 · trend: 58 → 63 → 67”.'
+    },
     href: '#/islands'
   },
   {
-    id: 'timeseries',
-    title: { ru: 'Тренды', en: 'Trends' },
-    oneLiner: {
-      ru: 'Показывает, как меняются ваши показатели со временем.',
-      en: 'Shows how your metrics change over time.'
-    },
-    why: {
-      ru: 'Чтобы заранее заметить ухудшение или рост, а не реагировать в последний момент.',
-      en: 'So you can spot decline or growth early, not at the last minute.'
-    },
-    input: {
-      ru: 'Последовательность значений по месяцам или неделям.',
-      en: 'A sequence of values by month or week.'
-    },
-    output: {
-      ru: 'Простая картина: куда движется показатель в ближайший период.',
-      en: 'A simple view of where a metric is moving in the near term.'
-    },
-    terms: [
-      {
-        ru: 'Тренд — общее направление: вверх, вниз или примерно ровно.',
-        en: 'Trend — the overall direction: up, down, or mostly flat.'
-      }
-    ],
-    href: '#/island/timeseries'
-  },
-  {
     id: 'snapshot',
+    moduleId: 'snapshot',
     title: { ru: 'Снимок', en: 'Snapshot' },
-    oneLiner: {
-      ru: 'Делает быструю проверку вашего текущего финансового состояния.',
-      en: 'Runs a quick check of your current financial condition.'
-    },
-    why: {
-      ru: 'Чтобы за пару минут понять, всё в норме или уже есть риск.',
-      en: 'So you can understand in minutes whether things are okay or already risky.'
-    },
-    input: {
-      ru: 'Доход, расходы, резерв и платежи по долгам.',
-      en: 'Income, expenses, reserve, and debt payments.'
-    },
-    output: {
-      ru: 'Понятная оценка устойчивости и где сейчас самое слабое место.',
-      en: 'A clear resilience score and the weakest area right now.'
-    },
-    terms: [
-      {
-        ru: 'Запас хода — на сколько месяцев хватит денег без новых поступлений.',
-        en: 'Runway — how many months your money lasts without new income.'
-      }
+    oneLiner: { ru: 'Быстрая проверка текущей финансовой устойчивости.', en: 'Quick check of current financial resilience.' },
+    why: { ru: 'Помогает понять, всё ли в порядке прямо сейчас.', en: 'Helps assess whether things are okay right now.' },
+    input: [
+      { ru: 'Доход за месяц', en: 'Monthly income' },
+      { ru: 'Расходы за месяц', en: 'Monthly expenses' },
+      { ru: 'Резерв и платежи по долгам', en: 'Reserve and debt payments' }
     ],
+    output: [
+      { ru: 'Индекс устойчивости', en: 'Resilience score' },
+      { ru: 'Подсказки по слабым местам', en: 'Hints about weak spots' }
+    ],
+    example: { ru: 'Доход 120 000, расходы 85 000, резерв 300 000.', en: 'Income 120,000, expenses 85,000, reserve 300,000.' },
     href: '#/island/snapshot'
   },
   {
     id: 'stressTest',
-    title: { ru: 'Стресс-тест', en: 'Stress-test' },
-    oneLiner: {
-      ru: 'Проверяет, что будет с бюджетом при неприятном сценарии.',
-      en: 'Checks what happens to your budget in a bad-case scenario.'
-    },
-    why: {
-      ru: 'Чтобы заранее подготовить план на случай падения дохода или роста расходов.',
-      en: 'So you can prepare in advance for income drops or expense spikes.'
-    },
-    input: {
-      ru: 'Те же базовые финданные, плюс параметры сложного сценария.',
-      en: 'The same base finance data plus stress-scenario settings.'
-    },
-    output: {
-      ru: 'Где риск высокий и какие шаги стоит сделать в первую очередь.',
-      en: 'Where risk is high and which actions to take first.'
-    },
-    terms: [
-      {
-        ru: 'Сценарий — возможная ситуация, например «доход снизился на 20%».',
-        en: 'Scenario — a possible situation, like “income drops by 20%”.'
-      }
+    moduleId: 'stressTest',
+    title: { ru: 'Стресс-тест', en: 'Stress test' },
+    oneLiner: { ru: 'Проверка бюджета при неприятном сценарии.', en: 'Budget check under a bad-case scenario.' },
+    why: { ru: 'Позволяет заранее подготовить план действий.', en: 'Lets you prepare an action plan in advance.' },
+    input: [
+      { ru: 'Текущий доход и расходы', en: 'Current income and expenses' },
+      { ru: 'Параметры ухудшения сценария', en: 'Stress scenario settings' }
     ],
+    output: [
+      { ru: 'Оценка риска по сценарию', en: 'Scenario risk level' },
+      { ru: 'Приоритетные шаги для снижения риска', en: 'Priority actions to reduce risk' }
+    ],
+    example: { ru: 'Сценарий: доход -20%, расходы +10%.', en: 'Scenario: income -20%, expenses +10%.' },
     href: '#/island/stressTest'
   },
   {
-    id: 'bayes',
-    title: { ru: 'Bayes', en: 'Bayes' },
-    oneLiner: {
-      ru: 'Оценивает риск с учётом того, что жизнь может пойти по-разному.',
-      en: 'Estimates risk while accounting for different possible outcomes.'
-    },
-    why: {
-      ru: 'Чтобы не опираться на один «идеальный» прогноз, а видеть диапазон вариантов.',
-      en: 'So you do not rely on a single “perfect” forecast and can see a range of outcomes.'
-    },
-    input: {
-      ru: 'Средние доходы/расходы, запас и горизонт планирования.',
-      en: 'Average income/expenses, reserve, and planning horizon.'
-    },
-    output: {
-      ru: 'Оценка вероятности проблем и более реалистичная картина рисков.',
-      en: 'A probability-based risk estimate and a more realistic risk picture.'
-    },
-    terms: [
-      {
-        ru: 'Вероятность — шанс, что событие действительно случится.',
-        en: 'Probability — the chance that an event will actually happen.'
-      }
+    id: 'incomePortfolio',
+    moduleId: 'incomePortfolio',
+    title: { ru: 'Портфель доходов', en: 'Income portfolio' },
+    oneLiner: { ru: 'Показывает зависимость от отдельных источников дохода.', en: 'Shows dependence on individual income sources.' },
+    why: { ru: 'Нужен для снижения риска потери ключевого дохода.', en: 'Useful for lowering single-source income risk.' },
+    input: [
+      { ru: 'Источники дохода и суммы', en: 'Income sources and amounts' },
+      { ru: 'Насколько стабилен каждый источник', en: 'Stability of each source' }
     ],
+    output: [
+      { ru: 'Оценка концентрации доходов', en: 'Income concentration estimate' },
+      { ru: 'Рекомендации по диверсификации', en: 'Diversification recommendations' }
+    ],
+    example: { ru: '2 источника: 80% и 20% дохода.', en: '2 sources: 80% and 20% of income.' },
+    href: '#/island/incomePortfolio'
+  },
+  {
+    id: 'timeseries',
+    moduleId: 'timeseries',
+    title: { ru: 'Тренды', en: 'Trends' },
+    oneLiner: { ru: 'Показывает направление изменений по времени.', en: 'Shows direction of change over time.' },
+    why: { ru: 'Позволяет заранее заметить ухудшение или рост.', en: 'Helps spot deterioration or growth early.' },
+    input: [
+      { ru: 'Ряд значений по неделям или месяцам', en: 'Series by week or month' }
+    ],
+    output: [
+      { ru: 'Краткосрочная динамика', en: 'Short-term dynamics' },
+      { ru: 'Ориентир для следующего шага', en: 'Guidance for the next step' }
+    ],
+    example: { ru: 'Последние значения: 42, 45, 47, 49.', en: 'Recent values: 42, 45, 47, 49.' },
+    href: '#/island/timeseries'
+  },
+  {
+    id: 'bayes',
+    moduleId: 'bayes',
+    title: { ru: 'Вероятности', en: 'Probabilities' },
+    oneLiner: { ru: 'Оценка риска с учётом разных возможных исходов.', en: 'Risk estimate accounting for multiple possible outcomes.' },
+    why: { ru: 'Помогает не опираться на один сценарий.', en: 'Prevents relying on only one scenario.' },
+    input: [
+      { ru: 'Доход, расходы, резерв и горизонт', en: 'Income, expenses, reserve, and horizon' }
+    ],
+    output: [
+      { ru: 'Вероятность проблем в выбранном горизонте', en: 'Probability of issues in the selected horizon' }
+    ],
+    example: { ru: 'Горизонт: 6 месяцев, резерв: 250 000.', en: 'Horizon: 6 months, reserve: 250,000.' },
     href: '#/island/bayes'
+  },
+  {
+    id: 'hmm',
+    moduleId: 'hmm',
+    title: { ru: 'Режимы', en: 'Regimes' },
+    oneLiner: { ru: 'Показывает, в каком состоянии сейчас находится система.', en: 'Shows which regime the system is currently in.' },
+    why: { ru: 'Нужен, чтобы понимать, стабилен период или напряжён.', en: 'Helps identify stable versus stressed periods.' },
+    input: [{ ru: 'Последовательность наблюдений по периодам', en: 'Sequence of observations by period' }],
+    output: [{ ru: 'Текущий режим и риск смены режима', en: 'Current regime and regime-switch risk' }],
+    example: { ru: 'Последние 12 точек по месяцам.', en: 'Last 12 monthly points.' },
+    href: '#/island/hmm'
+  },
+  {
+    id: 'optimization',
+    moduleId: 'optimization',
+    title: { ru: 'Планировщик', en: 'Planner' },
+    oneLiner: { ru: 'Подбирает наиболее полезный набор действий.', en: 'Selects the most useful action set.' },
+    why: { ru: 'Упрощает выбор при ограниченных ресурсах.', en: 'Simplifies choices with limited resources.' },
+    input: [{ ru: 'Цели, ограничения и варианты действий', en: 'Goals, constraints, and action options' }],
+    output: [{ ru: 'Рекомендованный план действий', en: 'Recommended action plan' }],
+    example: { ru: 'Цель: снизить риск при фиксированном бюджете.', en: 'Goal: lower risk under fixed budget.' },
+    href: '#/island/optimization'
+  },
+  {
+    id: 'decisionTree',
+    moduleId: 'decisionTree',
+    title: { ru: 'Вилки решений', en: 'Decision branches' },
+    oneLiner: { ru: 'Сравнение вариантов решения по последствиям.', en: 'Compares decision options by consequences.' },
+    why: { ru: 'Помогает выбрать вариант с лучшим балансом риска и пользы.', en: 'Helps pick the best risk-benefit balance.' },
+    input: [{ ru: 'Варианты, вероятности и эффекты', en: 'Options, probabilities, and effects' }],
+    output: [{ ru: 'Рейтинг вариантов', en: 'Option ranking' }],
+    example: { ru: 'Сценарии A/B/C с вероятностями исходов.', en: 'A/B/C scenarios with outcome probabilities.' },
+    href: '#/island/decisionTree'
+  },
+  {
+    id: 'causalDag',
+    moduleId: 'causalDag',
+    title: { ru: 'Причины', en: 'Causes' },
+    oneLiner: { ru: 'Показывает ключевые связи между факторами.', en: 'Shows key links between factors.' },
+    why: { ru: 'Нужен, чтобы воздействовать на причины, а не только симптомы.', en: 'Helps act on causes, not only symptoms.' },
+    input: [{ ru: 'Факторы и связи между ними', en: 'Factors and relations between them' }],
+    output: [{ ru: 'Главные точки влияния', en: 'Main intervention points' }],
+    example: { ru: 'Факторы: доход, расходы, долг, резерв.', en: 'Factors: income, expenses, debt, reserve.' },
+    href: '#/island/causalDag'
   }
 ];
 
+const textByLang = (value: LocaleText) => value[getLang()];
+
 export const getHelpTopics = () => helpTopics;
 
-const getById = (id: HelpTopicId) =>
-  helpTopics.find((topic) => topic.id === id);
+const getById = (id: HelpTopicId) => helpTopics.find((topic) => topic.id === id);
 
-const textByLang = (value: { ru: string; en: string }) =>
-  value[getLang()];
+const createHelpDetails = (topic: HelpTopic) => {
+  const details = document.createElement('div');
+  details.className = 'help-sections';
+  details.innerHTML = `
+    <section>
+      <h3>${t('helpWhy')}</h3>
+      <p>${textByLang(topic.why)}</p>
+    </section>
+    <section>
+      <h3>${t('helpInput')}</h3>
+      <ul>${topic.input.map((item) => `<li>${textByLang(item)}</li>`).join('')}</ul>
+    </section>
+    <section>
+      <h3>${t('helpOutput')}</h3>
+      <ul>${topic.output.map((item) => `<li>${textByLang(item)}</li>`).join('')}</ul>
+    </section>
+    <section>
+      <h3>${t('helpExample')}</h3>
+      <p>${textByLang(topic.example)}</p>
+    </section>
+  `;
+  return details;
+};
 
 export const createHelpIconButton = (topicId: HelpTopicId) => {
   const topic = getById(topicId);
@@ -169,7 +233,16 @@ export const createHelpIconButton = (topicId: HelpTopicId) => {
   button.type = 'button';
   button.className = 'help-icon-button';
   button.textContent = '?';
+  const descId = `help-topic-desc-${topicId}`;
   button.setAttribute('aria-label', `${t('helpLabelPrefix')}: ${textByLang(topic.title)}`);
+  button.setAttribute('aria-describedby', descId);
+
+  const sr = document.createElement('span');
+  sr.id = descId;
+  sr.className = 'sr-only';
+  sr.textContent = textByLang(topic.oneLiner);
+  button.appendChild(sr);
+
   button.addEventListener('click', () => {
     document.body.append(createHelpModal(topicId));
   });
@@ -190,6 +263,7 @@ export const createHelpModal = (topicId: HelpTopicId) => {
   dialog.className = 'help-modal';
   dialog.setAttribute('role', 'dialog');
   dialog.setAttribute('aria-modal', 'true');
+  dialog.id = `help-dialog-${topicId}`;
   dialog.setAttribute('aria-label', `${t('helpLabelPrefix')}: ${textByLang(topic.title)}`);
 
   dialog.innerHTML = `
@@ -198,30 +272,17 @@ export const createHelpModal = (topicId: HelpTopicId) => {
       <button type="button" class="help-close" aria-label="${t('helpClose')}">×</button>
     </div>
     <p class="help-one-liner">${textByLang(topic.oneLiner)}</p>
-    <div class="help-sections">
-      <section>
-        <h3>${t('helpWhy')}</h3>
-        <p>${textByLang(topic.why)}</p>
-      </section>
-      <section>
-        <h3>${t('helpInput')}</h3>
-        <p>${textByLang(topic.input)}</p>
-      </section>
-      <section>
-        <h3>${t('helpOutput')}</h3>
-        <p>${textByLang(topic.output)}</p>
-      </section>
-      <section>
-        <h3>${t('helpTerms')}</h3>
-        <ul>
-          ${topic.terms.map((item) => `<li>${textByLang(item)}</li>`).join('')}
-        </ul>
-      </section>
-    </div>
   `;
+  dialog.append(createHelpDetails(topic));
+
+  const action = document.createElement('div');
+  action.className = 'help-topic-actions';
+  action.innerHTML = `<a class="button small" href="${topic.href}">${t('helpOpenModule')}</a>`;
+  dialog.append(action);
 
   const close = () => {
     overlay.remove();
+    window.removeEventListener('keydown', onEsc);
   };
 
   overlay.addEventListener('click', (event) => {
@@ -234,7 +295,6 @@ export const createHelpModal = (topicId: HelpTopicId) => {
   const onEsc = (event: KeyboardEvent) => {
     if (event.key === 'Escape') {
       close();
-      window.removeEventListener('keydown', onEsc);
     }
   };
   window.addEventListener('keydown', onEsc);
@@ -247,40 +307,63 @@ export const createHelpScreen = () => {
   const container = document.createElement('div');
   container.className = 'screen';
 
-  const topics = getHelpTopics();
-
-  const grid = topics
-    .map((topic) => {
-      const action = topic.href
-        ? `<a class="button small" href="${topic.href}">${t('helpOpenModule')}</a>`
-        : '';
-      return `
-        <article class="shield-tile help-topic-card">
-          <div class="help-topic-header">
-            <h2>${textByLang(topic.title)}</h2>
-          </div>
-          <p class="tile-headline">${textByLang(topic.oneLiner)}</p>
-          <div class="help-topic-actions" data-help-actions="${topic.id}">
-            ${action}
-          </div>
-        </article>
-      `;
-    })
-    .join('');
+  const topics = getHelpTopics().filter((topic) => topic.id !== 'islandsHub');
 
   container.innerHTML = `
     <header class="screen-header">
       <h1>${t('navHelp')}</h1>
       <p>${t('helpScreenIntro')}</p>
+      <input class="help-search-input" data-help-search type="search" placeholder="${t('helpSearchPlaceholder')}" aria-label="${t('helpSearchPlaceholder')}" />
     </header>
-    <section class="shield-grid">${grid}</section>
+    <section class="shield-grid" data-help-list></section>
+    <p class="muted hidden" data-help-empty>${t('helpNoResults')}</p>
   `;
 
-  topics.forEach((topic) => {
-    const actions = container.querySelector<HTMLElement>(`[data-help-actions="${topic.id}"]`);
-    if (!actions) return;
-    actions.prepend(createHelpIconButton(topic.id));
-  });
+  const list = container.querySelector<HTMLElement>('[data-help-list]');
+  const empty = container.querySelector<HTMLElement>('[data-help-empty]');
+  const search = container.querySelector<HTMLInputElement>('[data-help-search]');
+
+  const render = (query: string) => {
+    if (!list || !empty) return;
+    const q = query.trim().toLocaleLowerCase(getLang());
+    const filtered = topics.filter((topic) => {
+      const haystack = [
+        textByLang(topic.title),
+        textByLang(topic.oneLiner),
+        textByLang(topic.why),
+        ...topic.input.map((item) => textByLang(item)),
+        ...topic.output.map((item) => textByLang(item))
+      ].join(' ').toLocaleLowerCase(getLang());
+      return q.length === 0 || haystack.includes(q);
+    });
+
+    list.innerHTML = '';
+    filtered.forEach((topic) => {
+      const card = document.createElement('article');
+      card.className = 'shield-tile help-topic-card';
+      card.innerHTML = `
+        <details>
+          <summary class="help-topic-header">
+            <h2>${textByLang(topic.title)}</h2>
+            <span class="tile-status tile-status--chip status--neutral">${textByLang(topic.oneLiner)}</span>
+          </summary>
+        </details>
+      `;
+      const details = card.querySelector('details');
+      details?.append(createHelpDetails(topic));
+
+      const actions = document.createElement('div');
+      actions.className = 'help-topic-actions';
+      actions.innerHTML = `<a class="button small" href="${topic.href}">${t('helpOpenModule')}</a>`;
+      details?.append(actions);
+      list.append(card);
+    });
+
+    empty.classList.toggle('hidden', filtered.length > 0);
+  };
+
+  search?.addEventListener('input', () => render(search.value));
+  render('');
 
   return container;
 };
