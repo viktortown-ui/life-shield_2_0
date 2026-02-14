@@ -86,30 +86,6 @@ const createBuildFooter = () => {
   return footer;
 };
 
-const updateBottomNavInset = (root: HTMLElement) => {
-  const nav = root.querySelector<HTMLElement>('.bottom-nav');
-  if (!nav) {
-    document.documentElement.style.removeProperty('--bottom-nav-inset');
-    return;
-  }
-  const rect = nav.getBoundingClientRect();
-  const distanceToViewportBottom = Math.max(0, window.innerHeight - rect.bottom);
-  const inset = Math.ceil(rect.height + distanceToViewportBottom);
-  document.documentElement.style.setProperty('--bottom-nav-inset', `${inset}px`);
-};
-
-const initBottomNavInsetSync = (root: HTMLElement) => {
-  let rafId = 0;
-  const update = () => {
-    if (rafId) window.cancelAnimationFrame(rafId);
-    rafId = window.requestAnimationFrame(() => updateBottomNavInset(root));
-  };
-
-  window.addEventListener('resize', update);
-  window.addEventListener('orientationchange', update);
-  update();
-  return update;
-};
 
 const createAppShell = (
   screen: HTMLElement,
@@ -136,8 +112,6 @@ const createAppShell = (
 };
 
 export const initRouter = (root: HTMLElement) => {
-  const syncBottomNavInset = initBottomNavInsetSync(root);
-
   const render = () => {
     try {
       root.innerHTML = '';
@@ -174,7 +148,6 @@ export const initRouter = (root: HTMLElement) => {
       if (!getState().flags.onboarded) {
         root.appendChild(createOnboardingModal());
       }
-      syncBottomNavInset();
     } catch (error) {
       reportCaughtError(error);
       if (typeof window.reportError === 'function') {
@@ -196,7 +169,6 @@ export const initRouter = (root: HTMLElement) => {
       resetButton?.addEventListener('click', () => {
         void panicReset().catch(reportCaughtError);
       });
-      syncBottomNavInset();
     }
   };
 
