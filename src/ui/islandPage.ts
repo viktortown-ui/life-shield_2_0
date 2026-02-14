@@ -1,5 +1,11 @@
 import { findIsland } from '../core/registry';
-import { getState, updateIslandInput, updateIslandReport } from '../core/store';
+import { parseFinanceInput } from '../islands/finance';
+import {
+  getState,
+  updateIslandInput,
+  updateIslandMonteCarlo,
+  updateIslandReport
+} from '../core/store';
 import { IslandId } from '../core/types';
 import { reportCaughtError } from '../core/reportError';
 import {
@@ -45,6 +51,12 @@ import {
   parseTimeseriesSeries,
   serializeTimeseriesInput
 } from '../islands/timeseries';
+
+import {
+  MonteCarloRunwayInput,
+  MonteCarloWorkerResponse,
+  getDeterministicRunwayMonths
+} from '../islands/stressMonteCarlo';
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
@@ -761,6 +773,213 @@ export const createIslandPage = (id: IslandId) => {
       islandState.lastReport = report;
       renderReport();
     });
+
+  } else if (id === 'stressTest') {
+    const modeKey = 'ls2.stressTest.mode';
+    const paramsKey = 'ls2.stressTest.mc';
+    const parsedFinance = parseFinanceInput(islandState.input);
+    const readStoredMode = () =>
+      localStorage.getItem(modeKey) === 'mc' ? 'mc' : 'det';
+    const readStoredParams = (): MonteCarloRunwayInput => {
+      const fallback: MonteCarloRunwayInput = {
+        horizonMonths: 6,
+        iterations: 2000,
+        incomeVolatility: 15,
+        expensesVolatility: 8,
+        seed: 202501,
+        shock: { enabled: false, probability: 0.1, dropPercent: 30 }
+      };
+      try {
+        const raw = localStorage.getItem(paramsKey);
+        if (!raw) return fallback;
+        const parsed = JSON.parse(raw) as Partial<MonteCarloRunwayInput>;
+        return {
+          horizonMonths: Number(parsed.horizonMonths ?? fallback.horizonMonths),
+          iterations: Number(parsed.iterations ?? fallback.iterations),
+          incomeVolatility: Number(
+            parsed.incomeVolatility ?? fallback.incomeVolatility
+          ),
+          expensesVolatility: Number(
+            parsed.expensesVolatility ?? fallback.expensesVolatility
+          ),
+          seed: Number(parsed.seed ?? fallback.seed),
+          shock: {
+            enabled: Boolean(parsed.shock?.enabled ?? fallback.shock.enabled),
+            probability: Number(
+              parsed.shock?.probability ?? fallback.shock.probability
+            ),
+            dropPercent: Number(
+              parsed.shock?.dropPercent ?? fallback.shock.dropPercent
+            )
+          }
+        };
+      } catch {
+        return fallback;
+      }
+    };
+
+    form.innerHTML = `
+      <fieldset class="stress-mode-toggle">
+        <label><input type="radio" name="stressMode" value="det" ${
+          readStoredMode() === 'det' ? 'checked' : ''
+        } /> Детерминированный</label>
+        <label><input type="radio" name="stressMode" value="mc" ${
+          readStoredMode() === 'mc' ? 'checked' : ''
+        } /> Вероятностный (Monte Carlo)</label>
+      </fieldset>
+      <div class="stress-mc-fields" data-mc-fields>
+        <div class="bayes-grid">
+          <label>Горизонт (мес)
+            <select name="horizonMonths">
+              <option value="3">3</option>
+              <option value="6" selected>6</option>
+              <option value="12">12</option>
+            </select>
+          </label>
+          <label>Итерации
+            <input name="iterations" type="number" min="200" max="20000" step="100" />
+          </label>
+          <label>Волатильность дохода (%)
+            <input name="incomeVolatility" type="number" min="0" max="200" step="1" />
+          </label>
+          <label>Волатильность расходов (%)
+            <input name="expensesVolatility" type="number" min="0" max="200" step="1" />
+          </label>
+          <label>Seed
+            <input name="seed" type="number" step="1" />
+          </label>
+        </div>
+        <label class="stress-shock-toggle">
+          <input type="checkbox" name="shockEnabled" /> Шок дохода (разовый)
+        </label>
+        <div class="bayes-grid">
+          <label>Вероятность шока (0..1)
+            <input name="shockProbability" type="number" min="0" max="1" step="0.01" />
+          </label>
+          <label>Падение дохода при шоке (%)
+            <input name="shockDropPercent" type="number" min="0" max="100" step="1" />
+          </label>
+        </div>
+      </div>
+      <button class="button" type="submit">Рассчитать</button>
+    `;
+
+    const saved = readStoredParams();
+    const setValue = (name: string, value: string) => {
+      const el = form.querySelector<HTMLInputElement | HTMLSelectElement>(
+        `[name="${name}"]`
+      );
+      if (el) el.value = value;
+    };
+    setValue('horizonMonths', String(saved.horizonMonths));
+    setValue('iterations', String(saved.iterations));
+    setValue('incomeVolatility', String(saved.incomeVolatility));
+    setValue('expensesVolatility', String(saved.expensesVolatility));
+    setValue('seed', String(saved.seed));
+    setValue('shockProbability', String(saved.shock.probability));
+    setValue('shockDropPercent', String(saved.shock.dropPercent));
+    const shockEnabled = form.querySelector<HTMLInputElement>('[name="shockEnabled"]');
+    if (shockEnabled) shockEnabled.checked = saved.shock.enabled;
+
+    const worker = new Worker(
+      new URL('../workers/monteCarloRunway.worker.ts', import.meta.url),
+      { type: 'module' }
+    );
+
+    const mcFields = form.querySelector<HTMLElement>('[data-mc-fields]');
+    const renderMode = () => {
+      const mode = (form.querySelector<HTMLInputElement>('[name="stressMode"]:checked')?.value ?? 'det') as 'det' | 'mc';
+      if (mcFields) mcFields.style.display = mode === 'mc' ? 'grid' : 'none';
+      localStorage.setItem(modeKey, mode);
+    };
+    renderMode();
+
+    form.addEventListener('change', (event) => {
+      const target = event.target as HTMLElement;
+      if (target.matches('[name="stressMode"]')) {
+        renderMode();
+      }
+    });
+
+    worker.addEventListener('message', (event) => {
+      const data = event.data as MonteCarloWorkerResponse;
+      if (!data.result) {
+        renderReport();
+        return;
+      }
+      updateIslandMonteCarlo(id, {
+        horizonMonths: data.result.horizonMonths,
+        iterations: data.result.iterations,
+        ruinProb: data.result.ruinProb,
+        quantiles: data.result.quantiles,
+        histogram: data.result.histogram,
+        config: data.result.config
+      });
+      islandState.mcLast = {
+        horizonMonths: data.result.horizonMonths,
+        iterations: data.result.iterations,
+        ruinProb: data.result.ruinProb,
+        quantiles: data.result.quantiles,
+        histogram: data.result.histogram,
+        config: data.result.config
+      };
+      renderReport();
+    });
+
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const mode = (form.querySelector<HTMLInputElement>('[name="stressMode"]:checked')?.value ?? 'det') as 'det' | 'mc';
+      const input = islandState.input;
+      if (mode === 'det') {
+        const report = safeGetReport(input);
+        updateIslandReport(id, report);
+        islandState.lastReport = report;
+        renderReport();
+        return;
+      }
+
+      const data = new FormData(form);
+      const params: MonteCarloRunwayInput = {
+        horizonMonths: Number(data.get('horizonMonths') ?? 6),
+        iterations: Number(data.get('iterations') ?? 2000),
+        incomeVolatility: Number(data.get('incomeVolatility') ?? 15),
+        expensesVolatility: Number(data.get('expensesVolatility') ?? 8),
+        seed: Number(data.get('seed') ?? 202501),
+        shock: {
+          enabled: data.get('shockEnabled') !== null,
+          probability: Number(data.get('shockProbability') ?? 0.1),
+          dropPercent: Number(data.get('shockDropPercent') ?? 30)
+        }
+      };
+
+      localStorage.setItem(paramsKey, JSON.stringify(params));
+
+      const deterministicRunway = getDeterministicRunwayMonths({
+        reserveCash: parsedFinance.reserveCash,
+        monthlyIncome: parsedFinance.monthlyIncome,
+        monthlyExpenses: parsedFinance.monthlyExpenses,
+        horizonMonths: params.horizonMonths
+      });
+
+      const base = safeGetReport(input);
+      const pending = {
+        ...base,
+        details: [
+          ...base.details,
+          `Monte Carlo: считаю ${Math.min(20000, Math.max(200, Math.round(params.iterations)))} траекторий...`,
+          `Сверка sigma=0: детерминированный runway на горизонте = ${deterministicRunway} мес`
+        ]
+      };
+      updateIslandReport(id, pending);
+      islandState.lastReport = pending;
+      renderReport();
+
+      worker.postMessage({
+        requestId: `${Date.now()}-${Math.random()}`,
+        input: params,
+        finance: parsedFinance
+      });
+    });
   } else if (id === 'causalDag') {
     const parsed = parseCausalDagInput(islandState.input);
     const initialInput: CausalDagInput = { ...defaultCausalDagInput, ...parsed };
@@ -1218,8 +1437,24 @@ export const createIslandPage = (id: IslandId) => {
   const result = document.createElement('section');
   result.className = 'island-result';
 
+  const renderHistogram = () => {
+    if (id !== 'stressTest' || !islandState.mcLast?.histogram?.length) return '';
+    const max = Math.max(...islandState.mcLast.histogram.map((bin) => bin.count), 1);
+    return `
+      <div class="stress-histogram">
+        ${islandState.mcLast.histogram
+          .map((bin) => {
+            const height = Math.max(4, Math.round((bin.count / max) * 80));
+            return `<div class="stress-bin" title="${bin.start.toFixed(1)}-${bin.end.toFixed(1)} мес: ${bin.count}"><span style="height:${height}px"></span></div>`;
+          })
+          .join('')}
+      </div>
+    `;
+  };
+
   const renderReport = () => {
     const report = islandState.lastReport ?? safeGetReport(islandState.input);
+    const mc = id === 'stressTest' ? islandState.mcLast : null;
     result.innerHTML = `
       <div class="result-metrics">
         <div><span>Score</span><strong>${report.score}</strong></div>
@@ -1228,6 +1463,11 @@ export const createIslandPage = (id: IslandId) => {
       <h2>${report.headline}</h2>
       <div class="result-summary">${report.summary}</div>
       <ul>${report.details.map((item) => `<li>${item}</li>`).join('')}</ul>
+      ${
+        mc
+          ? `<section class="stress-mc-result"><h3>Monte Carlo</h3><p>Risk-of-ruin: <strong>${mc.ruinProb.toFixed(2)}%</strong> на горизонте ${mc.horizonMonths} мес (${mc.iterations} итераций)</p><p>Runway quantiles: p10 ${mc.quantiles.p10.toFixed(1)} мес / p50 ${mc.quantiles.p50.toFixed(1)} мес / p90 ${mc.quantiles.p90.toFixed(1)} мес</p>${renderHistogram()}</section>`
+          : ''
+      }
     `;
   };
 
@@ -1237,7 +1477,8 @@ export const createIslandPage = (id: IslandId) => {
     id !== 'optimization' &&
     id !== 'causalDag' &&
     id !== 'decisionTree' &&
-    id !== 'timeseries'
+    id !== 'timeseries' &&
+    id !== 'stressTest'
   ) {
     form.addEventListener('submit', (event) => {
       event.preventDefault();
