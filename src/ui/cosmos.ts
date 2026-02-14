@@ -1,8 +1,8 @@
 import { islandRegistry } from '../core/registry';
 import { getIslandCatalogItem } from '../core/islandsCatalog';
 import { deriveShieldTiles } from '../core/shieldModel';
-import { getState, setCosmosUiFlags } from '../core/store';
-import { IslandId, IslandReport } from '../core/types';
+import { getState, recordCosmosEvent, setCosmosUiFlags } from '../core/store';
+import { CosmosActivityEvent, IslandId, IslandReport } from '../core/types';
 import { createCosmosSfxEngine } from './cosmosSfx';
 
 type OrbitId = 'money' | 'obligations' | 'income' | 'energy' | 'support' | 'flexibility';
@@ -69,6 +69,10 @@ const MIN_ZOOM = 1;
 const MAX_ZOOM = 3.2;
 const PAN_MARGIN = 80;
 const STALE_AFTER_DAYS = 7;
+const TRAIL_WINDOW_DAYS = 7;
+const TRAIL_DOT_MAX = 5;
+const RECENT_ACTION_LIMIT = 5;
+const COMET_INTERVAL_MS = 9000;
 const HOLD_DELAY_MS = 210;
 const DEADZONE_RADIUS = 12;
 const ACTIVATION_RADIUS = 22;
@@ -107,6 +111,49 @@ const inferFreshnessUrgency = (lastRunAt: string | null) => {
 const inferBadge = (hasReport: boolean, riskSeverity: number): PlanetBadge => {
   if (!hasReport) return 'none';
   return riskSeverity >= 0.42 ? 'risk' : 'ok';
+};
+
+
+
+const DAY_MS = 1000 * 60 * 60 * 24;
+
+const getRecentPlanetEvents = (
+  log: CosmosActivityEvent[],
+  islandId: IslandId,
+  max: number
+) => log.filter((event) => event.islandId === islandId).slice(-max).reverse();
+
+const getTrailStats = (log: CosmosActivityEvent[], islandId: IslandId) => {
+  const now = Date.now();
+  const recent = log.filter((event) => {
+    if (event.islandId !== islandId) return false;
+    const ts = new Date(event.ts).getTime();
+    if (!Number.isFinite(ts)) return false;
+    return now - ts <= TRAIL_WINDOW_DAYS * DAY_MS;
+  });
+  const count = Math.min(TRAIL_DOT_MAX, recent.length);
+  const latestTs = recent.length ? new Date(recent.at(-1)!.ts).getTime() : 0;
+  const freshness = latestTs ? clamp01(1 - (now - latestTs) / (TRAIL_WINDOW_DAYS * DAY_MS)) : 0;
+  return { count, freshness };
+};
+
+const formatEventAction = (action: CosmosActivityEvent['action']) => {
+  if (action === 'open') return 'Открыт остров';
+  if (action === 'data') return 'Переход в данные';
+  if (action === 'report') return 'Переход к отчёту';
+  if (action === 'confirm') return 'Подтверждено действие';
+  return 'Отмена';
+};
+
+const formatEventAge = (ts: string) => {
+  const diffMs = Date.now() - new Date(ts).getTime();
+  if (!Number.isFinite(diffMs) || diffMs < 0) return 'только что';
+  const minutes = Math.floor(diffMs / (1000 * 60));
+  if (minutes < 1) return 'только что';
+  if (minutes < 60) return `${minutes}м назад`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}ч назад`;
+  return `${Math.floor(hours / 24)}д назад`;
 };
 
 export const createCosmosScreen = () => {
@@ -154,6 +201,7 @@ export const createCosmosScreen = () => {
     reduceMotion
   };
   const sfx = createCosmosSfxEngine();
+  const cosmosActivityLog = state.cosmosActivityLog ?? [];
 
   const container = document.createElement('div');
   container.className = 'screen cosmos-screen';
@@ -170,12 +218,12 @@ export const createCosmosScreen = () => {
   const controls = document.createElement('section');
   controls.className = 'cosmos-controls';
   controls.innerHTML = `
-    <label><input type="checkbox" data-flag="showAllLabels" aria-label="Показывать все подписи планет" ${uiFlags.showAllLabels ? 'checked' : ''}/> Показывать все подписи</label>
-    <label><input type="checkbox" data-flag="onlyImportant" aria-label="Показывать только важные планеты" ${uiFlags.onlyImportant ? 'checked' : ''}/> Показывать только важные</label>
-    <label><input type="checkbox" data-flag="showHalo" aria-label="Показывать halo планет" ${uiFlags.showHalo ? 'checked' : ''}/> Показывать halo (турбулентность)</label>
-    <label><input type="checkbox" data-flag="soundFx" aria-label="Включить Sound FX в Cosmos" ${uiFlags.soundFxEnabled ? 'checked' : ''}/> Sound FX</label>
-    <label>Volume <input type="range" data-flag="sfxVolume" min="0" max="1" step="0.05" aria-label="Громкость Sound FX в Cosmos" value="${uiFlags.sfxVolume}" /></label>
-    <label><input type="checkbox" data-flag="reduceMotion" aria-label="Сократить анимации Cosmos" ${state.flags.cosmosReduceMotionOverride === true ? 'checked' : ''}/> Reduce motion (override)</label>
+    <label><input type="checkbox" data-flag="showAllLabels" data-testid="cosmos-toggle-showAllLabels" aria-label="Показывать все подписи планет" ${uiFlags.showAllLabels ? 'checked' : ''}/> Показывать все подписи</label>
+    <label><input type="checkbox" data-flag="onlyImportant" data-testid="cosmos-toggle-onlyImportant" aria-label="Показывать только важные планеты" ${uiFlags.onlyImportant ? 'checked' : ''}/> Показывать только важные</label>
+    <label><input type="checkbox" data-flag="showHalo" data-testid="cosmos-toggle-showHalo" aria-label="Показывать halo планет" ${uiFlags.showHalo ? 'checked' : ''}/> Показывать halo (турбулентность)</label>
+    <label><input type="checkbox" data-flag="soundFx" data-testid="cosmos-toggle-soundFx" aria-label="Включить Sound FX в Cosmos" ${uiFlags.soundFxEnabled ? 'checked' : ''}/> Sound FX</label>
+    <label>Volume <input type="range" data-flag="sfxVolume" data-testid="cosmos-toggle-sfxVolume" min="0" max="1" step="0.05" aria-label="Громкость Sound FX в Cosmos" value="${uiFlags.sfxVolume}" /></label>
+    <label><input type="checkbox" data-flag="reduceMotion" data-testid="cosmos-toggle-reduceMotion" aria-label="Сократить анимации Cosmos" ${state.flags.cosmosReduceMotionOverride === true ? 'checked' : ''}/> Reduce motion (override)</label>
   `;
 
   const mapWrap = document.createElement('section');
@@ -204,6 +252,10 @@ export const createCosmosScreen = () => {
   const sparkLayer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
   sparkLayer.setAttribute('class', 'cosmos-spark-layer');
   map.appendChild(sparkLayer);
+
+  const cometLayer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  cometLayer.setAttribute('class', 'cosmos-comet-layer');
+  map.appendChild(cometLayer);
 
   const sun = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
   sun.setAttribute('cx', '260');
@@ -236,11 +288,17 @@ export const createCosmosScreen = () => {
   resetViewButton.textContent = 'Сброс вида';
   resetViewButton.setAttribute('aria-label', 'Сбросить масштаб и позицию карты Cosmos');
 
+
+  const activityPanel = document.createElement('section');
+  activityPanel.className = 'cosmos-activity-panel';
+  activityPanel.innerHTML = '<h3>Последние действия</h3><p class="muted">Выберите планету, чтобы увидеть историю.</p>';
+
   const menu = document.createElement('div');
   menu.className = 'cosmos-menu hidden';
 
   const radialMenu = document.createElement('div');
   radialMenu.className = 'cosmos-radial-menu hidden';
+  radialMenu.setAttribute('data-testid', 'cosmos-radial');
   radialMenu.setAttribute('role', 'menu');
   radialMenu.setAttribute('aria-label', 'Жестовое меню планеты');
 
@@ -272,13 +330,18 @@ export const createCosmosScreen = () => {
       actions.push({ id: 'data', label: 'Данные', href: config.dataHref });
     }
     if (config.reportHref && hasResult) {
-      actions.push({ id: 'result', label: 'Результат', href: config.reportHref });
+      actions.push({ id: 'report', label: 'Результат', href: config.reportHref });
     }
     actions.push({ id: 'close', label: 'Отмена', onSelect: closeMenu });
     return actions;
   };
 
-  const runPlanetAction = (action: PlanetAction) => {
+  const runPlanetAction = (planetId: IslandId, action: PlanetAction) => {
+    if (action.id === 'close') {
+      recordCosmosEvent(planetId, 'cancel');
+    } else if (action.id === 'open' || action.id === 'data' || action.id === 'report') {
+      recordCosmosEvent(planetId, action.id);
+    }
     if (action.onSelect) {
       action.onSelect();
       return;
@@ -313,7 +376,11 @@ export const createCosmosScreen = () => {
   };
 
   const unlockAudioFromGesture = () => {
-    if (sfx.isUnlocked()) return;
+    if (!uiFlags.soundFxEnabled) return;
+    if (sfx.isUnlocked()) {
+      sfx.resume().catch(() => undefined);
+      return;
+    }
     sfx.unlock().catch(() => undefined);
   };
 
@@ -355,7 +422,17 @@ export const createCosmosScreen = () => {
     const title = document.createElement('strong');
     title.textContent = catalogItem.displayName;
 
-    const actions = document.createElement('div');
+    document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      sfx.suspend().catch(() => undefined);
+      return;
+    }
+    if (uiFlags.soundFxEnabled) {
+      sfx.resume().catch(() => undefined);
+    }
+  });
+
+  const actions = document.createElement('div');
     actions.className = 'cosmos-menu-actions';
     actionsList.forEach((action) => {
       if (action.href) {
@@ -382,7 +459,7 @@ export const createCosmosScreen = () => {
             const point = planetPoints.get(config.id);
             if (point) triggerSparkBurst(point.x, point.y);
           }
-          runPlanetAction(action);
+          runPlanetAction(session.planet.id, action);
         });
         actions.appendChild(button);
       }
@@ -550,6 +627,23 @@ export const createCosmosScreen = () => {
   let selectedPlanetId: IslandId | null = null;
   const planetGroups = new Map<IslandId, SVGGElement>();
   const planetPoints = new Map<IslandId, { x: number; y: number }>();
+  const recentEventsByPlanet = new Map<IslandId, CosmosActivityEvent[]>();
+
+  const renderActivityPanel = () => {
+    if (!selectedPlanetId) {
+      activityPanel.innerHTML = '<h3>Последние действия</h3><p class="muted">Выберите планету, чтобы увидеть историю.</p>';
+      return;
+    }
+    const recent = recentEventsByPlanet.get(selectedPlanetId) ?? [];
+    const title = getIslandCatalogItem(selectedPlanetId).displayName;
+    const list = recent.length
+      ? `<ul>${recent
+          .slice(0, RECENT_ACTION_LIMIT)
+          .map((event) => `<li><strong>${formatEventAction(event.action)}</strong> · ${formatEventAge(event.ts)}</li>`)
+          .join('')}</ul>`
+      : '<p class="muted">Нет событий за последнее время.</p>';
+    activityPanel.innerHTML = `<h3>Последние действия · ${title}</h3>${list}`;
+  };
 
   const shouldShowPlanet = (id: IslandId) => !uiFlags.onlyImportant || importantPlanets.has(id);
 
@@ -559,6 +653,7 @@ export const createCosmosScreen = () => {
       group.classList.toggle('show-label', uiFlags.showAllLabels || selectedPlanetId === id || importantPlanets.has(id));
       group.classList.toggle('is-hidden', !shouldShowPlanet(id));
     });
+    renderActivityPanel();
   };
 
   const splitLabel = (text: string): [string, string?] => {
@@ -581,9 +676,13 @@ export const createCosmosScreen = () => {
     const radius = ORBIT_RADIUS[planet.orbitId] * planet.distanceFactor;
     const point = toPoint(planet.angleDeg, radius);
     planetPoints.set(planet.id, point);
+    const recentEvents = getRecentPlanetEvents(cosmosActivityLog, planet.id, RECENT_ACTION_LIMIT);
+    recentEventsByPlanet.set(planet.id, recentEvents);
+    const trail = getTrailStats(cosmosActivityLog, planet.id);
 
     const planetGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     planetGroup.setAttribute('class', 'cosmos-planet');
+    planetGroup.setAttribute('data-testid', `cosmos-planet-${planet.id}`);
     if (!uiFlags.reduceMotion) {
       planetGroup.classList.add('cosmos-planet--twinkle');
       planetGroup.style.setProperty('--twinkle-phase', `${(Math.random() * 2.4).toFixed(2)}s`);
@@ -596,6 +695,21 @@ export const createCosmosScreen = () => {
         instrument.badge === 'risk' ? 'RISK' : instrument.badge === 'ok' ? 'OK' : 'NO DATA'
       }`
     );
+
+
+    if (trail.count > 0) {
+      for (let index = 0; index < trail.count; index += 1) {
+        const offset = index + 1;
+        const trailPoint = toPoint(planet.angleDeg - offset * 6, radius + offset * 2.5);
+        const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        dot.setAttribute('cx', trailPoint.x.toFixed(1));
+        dot.setAttribute('cy', trailPoint.y.toFixed(1));
+        dot.setAttribute('r', String(Math.max(1.4, 2.6 - index * 0.2)));
+        dot.setAttribute('class', `cosmos-history-dot${uiFlags.reduceMotion ? '' : ' cosmos-history-dot--pulse'}`);
+        dot.style.opacity = String(Math.max(0.2, trail.freshness * (1 - index * 0.12)));
+        viewport.appendChild(dot);
+      }
+    }
 
     const body = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
     body.setAttribute('cx', point.x.toFixed(1));
@@ -727,12 +841,14 @@ export const createCosmosScreen = () => {
             playSfx('cancel');
           } else {
             playSfx('confirm');
+            recordCosmosEvent(session.planet.id, 'confirm', action.id);
             const point = planetPoints.get(session.planet.id);
             if (point) triggerSparkBurst(point.x, point.y);
           }
-          runPlanetAction(action);
+          runPlanetAction(session.planet.id, action);
         } else {
           playSfx('cancel');
+          recordCosmosEvent(session.planet.id, 'cancel', 'radial-idle');
         }
         cancelHold();
         return;
@@ -826,6 +942,9 @@ export const createCosmosScreen = () => {
     if (target.dataset.flag === 'soundFx') {
       uiFlags.soundFxEnabled = target.checked;
       setCosmosUiFlags({ cosmosSoundFxEnabled: target.checked });
+      if (!target.checked) {
+        sfx.suspend().catch(() => undefined);
+      }
     }
     if (target.dataset.flag === 'sfxVolume') {
       const volume = Number(target.value);
@@ -950,6 +1069,16 @@ export const createCosmosScreen = () => {
     closeMenu();
   });
 
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      sfx.suspend().catch(() => undefined);
+      return;
+    }
+    if (uiFlags.soundFxEnabled) {
+      sfx.resume().catch(() => undefined);
+    }
+  });
+
   const actions = document.createElement('div');
   actions.className = 'screen-actions';
   actions.innerHTML = `
@@ -958,6 +1087,7 @@ export const createCosmosScreen = () => {
   `;
 
   mapWrap.append(resetViewButton, map, menu, radialMenu);
-  container.append(header, controls, mapWrap, actions);
+  container.append(header, controls, mapWrap, activityPanel, actions);
+  window.addEventListener('beforeunload', () => window.clearInterval(cometIntervalId), { once: true });
   return container;
 };

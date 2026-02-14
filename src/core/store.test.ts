@@ -40,6 +40,7 @@ const makeState = (overrides: Partial<AppState> = {}): AppState => ({
     cosmosSfxVolume: 0.4,
     cosmosReduceMotionOverride: null
   },
+  cosmosActivityLog: [],
   inputData: {
     finance: {
       monthlyIncome: 180000,
@@ -180,5 +181,20 @@ describe('history tracking', () => {
     expect(history).toHaveLength(10);
     expect(history[0]?.score).toBe(42);
     expect(history.at(-1)?.score).toBe(51);
+  });
+});
+
+
+describe('cosmos activity log', () => {
+  it('stores events in FIFO order with cap 200', async () => {
+    const store = await loadStore();
+    for (let index = 0; index < 205; index += 1) {
+      store.recordCosmosEvent('bayes', 'open', `e-${index}`);
+    }
+
+    const state = store.getState();
+    expect(state.cosmosActivityLog).toHaveLength(200);
+    expect(state.cosmosActivityLog[0]?.meta).toBe('e-5');
+    expect(state.cosmosActivityLog.at(-1)?.meta).toBe('e-204');
   });
 });

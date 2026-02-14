@@ -1430,6 +1430,48 @@ body {
   pointer-events: none;
 }
 
+
+.cosmos-history-dot {
+  fill: #9ec5ff;
+  pointer-events: none;
+}
+
+.cosmos-history-dot--pulse {
+  animation: cosmosTrailPulse 2.8s ease-in-out infinite;
+}
+
+.cosmos-comet-layer {
+  pointer-events: none;
+}
+
+.cosmos-comet {
+  fill: #f8fdff;
+  filter: drop-shadow(0 0 4px rgba(198, 231, 255, 0.85));
+  animation: cosmosCometFly 820ms ease-out forwards;
+}
+
+.cosmos-activity-panel {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid #24314d;
+  background: rgba(12, 20, 35, 0.85);
+}
+
+.cosmos-activity-panel h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+
+.cosmos-activity-panel ul {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+  color: #d9e2f4;
+  font-size: 13px;
+}
+
 .cosmos-planet--twinkle {
   transform-box: fill-box;
   transform-origin: center;
@@ -1555,11 +1597,24 @@ body {
   to { opacity: 0; transform: translate(var(--spark-dx, 0px), var(--spark-dy, 0px)) scale(0.35); }
 }
 
+@keyframes cosmosTrailPulse {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.95; }
+}
+
+@keyframes cosmosCometFly {
+  from { opacity: 0; transform: translate(0, 0); }
+  10% { opacity: 1; }
+  to { opacity: 0; transform: translate(var(--comet-dx, 36px), var(--comet-dy, 18px)); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .cosmos-planet--twinkle,
   .cosmos-planet-halo--pulse,
   .cosmos-spark,
-  .cosmos-radial-menu.is-active {
+  .cosmos-radial-menu.is-active,
+  .cosmos-history-dot--pulse,
+  .cosmos-comet {
     animation: none !important;
   }
 }

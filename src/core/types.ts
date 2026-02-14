@@ -79,6 +79,15 @@ export interface IslandRunHistoryEntry {
   confidence: number;
 }
 
+export type CosmosActivityAction = 'open' | 'data' | 'report' | 'confirm' | 'cancel';
+
+export interface CosmosActivityEvent {
+  ts: string;
+  islandId: IslandId;
+  action: CosmosActivityAction;
+  meta?: string;
+}
+
 export interface IslandProgress {
   lastRunAt: string | null;
   runsCount: number;
@@ -106,6 +115,7 @@ export interface AppState {
   inputData: {
     finance: FinanceInputData;
   };
+  cosmosActivityLog: CosmosActivityEvent[];
   islands: Record<IslandId, IslandState>;
 }
 
