@@ -1937,6 +1937,50 @@ body {
   stroke: #9fbcff;
 }
 
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.help-search-input {
+  width: 100%;
+  min-height: 42px;
+  border-radius: 12px;
+  border: 1px solid #24314d;
+  background: #0f1627;
+  color: #e8edf6;
+  padding: 10px 12px;
+}
+
+.help-topic-card details {
+  display: grid;
+  gap: 10px;
+}
+
+.help-topic-header {
+  cursor: pointer;
+  list-style: none;
+}
+
+.help-topic-header::-webkit-details-marker {
+  display: none;
+}
+
+.help-topic-card ul {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+}
+
 .islands-hub-screen-title,
 .islands-hub-title-wrap,
 .help-topic-header {

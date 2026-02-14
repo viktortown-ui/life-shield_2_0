@@ -1,10 +1,10 @@
 import { islandRegistry } from '../core/registry';
 import { getIslandCatalogItem } from '../core/islandsCatalog';
 import { deriveShieldTiles } from '../core/shieldModel';
-import { getState, recordCosmosEvent, setCosmosUiFlags } from '../core/store';
+import { getState, recordCosmosEvent } from '../core/store';
 import { CosmosActivityEvent, IslandId, IslandReport } from '../core/types';
 import { createCosmosSfxEngine } from './cosmosSfx';
-import { formatNumber, t } from './i18n';
+import { formatDateTime, formatNumber, t } from './i18n';
 import { computeTurbulence } from '../core/turbulence';
 import {
   getTurbulenceScore,
@@ -177,15 +177,6 @@ const getDisagreementLabel = (score: number) => {
 
 const formatMonths = (value: number) => `${value.toFixed(1)} мес`;
 
-const formatDateTime = (value: string | null) => {
-  if (!value) return '—';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '—';
-  return `${date.toLocaleDateString('ru-RU')} ${date.toLocaleTimeString('ru-RU', {
-    hour: '2-digit',
-    minute: '2-digit'
-  })}`;
-};
 
 export const createCosmosScreen = () => {
   const state = getState();
@@ -277,37 +268,14 @@ export const createCosmosScreen = () => {
   header.innerHTML = `
     <div>
       <h1>${t('cosmosTitle')}</h1>
-      <p>Карта приоритетов островов: фокус на рисках, свежести и турбулентности.</p>
+      <p>${t('cosmosIntro')}</p>
     </div>
   `;
 
-  const viewSettingsToggle = document.createElement('button');
-  viewSettingsToggle.type = 'button';
-  viewSettingsToggle.className = 'button ghost small cosmos-view-toggle';
-  viewSettingsToggle.textContent = t('viewSettings');
-  viewSettingsToggle.setAttribute('aria-expanded', 'false');
-
-  const controls = document.createElement('section');
-  controls.className = 'cosmos-controls';
-  controls.innerHTML = `
-    <section class="cosmos-controls-group">
-      <h3>Вид и фильтры / View & filters</h3>
-      <label><input type="checkbox" data-flag="showAllLabels" data-testid="cosmos-toggle-showAllLabels" aria-label="Показывать все подписи планет" ${uiFlags.showAllLabels ? 'checked' : ''}/> Подписи всех планет / All labels</label>
-      <label><input type="checkbox" data-flag="onlyImportant" data-testid="cosmos-toggle-onlyImportant" aria-label="Показывать только важные планеты" ${uiFlags.onlyImportant ? 'checked' : ''}/> Только важные / Important only</label>
-      <label><input type="checkbox" data-flag="showHalo" data-testid="cosmos-toggle-showHalo" aria-label="Показывать halo планет" ${uiFlags.showHalo ? 'checked' : ''}/> Halo турбулентности / Turbulence halo</label>
-    </section>
-    <section class="cosmos-controls-group">
-      <h3>Эффекты / Effects</h3>
-      <label><input type="checkbox" data-flag="soundFx" data-testid="cosmos-toggle-soundFx" aria-label="Включить Звуковые эффекты в Cosmos" ${uiFlags.soundFxEnabled ? 'checked' : ''}/> ${t('soundFx')}</label>
-      <label>${t('volume')} <input type="range" data-flag="sfxГромкость" data-testid="cosmos-toggle-sfxГромкость" min="0" max="1" step="0.05" aria-label="Громкость Звуковые эффекты в Cosmos" value="${uiFlags.sfxГромкость}" /></label>
-      <label><input type="checkbox" data-flag="reduceMotion" data-testid="cosmos-toggle-reduceMotion" aria-label="Сократить анимации Cosmos" ${state.flags.cosmosReduceMotionOverride === true ? 'checked' : ''}/> ${t('reduceMotion')}</label>
-      <p class="muted">prefers-reduced-motion учитывается автоматически / follows system setting.</p>
-    </section>
-  `;
-
-  const viewSettingsPanel = document.createElement('section');
-  viewSettingsPanel.className = 'cosmos-view-panel hidden';
-  viewSettingsPanel.appendChild(controls);
+  const settingsLink = document.createElement('a');
+  settingsLink.className = 'button ghost small cosmos-view-toggle';
+  settingsLink.href = '#/settings';
+  settingsLink.textContent = t('helpOpenSettings');
 
   const legend = document.createElement('section');
   legend.className = 'cosmos-legend';
@@ -316,7 +284,7 @@ export const createCosmosScreen = () => {
       ? 'Halo = прогнозная турбулентность (Монте-Карло)'
       : 'Halo = эвристика (без Монте-Карло)'
   }</p>`;
-  viewSettingsPanel.appendChild(legend);
+
 
   const mapWrap = document.createElement('section');
   mapWrap.className = 'cosmos-map-wrap';
@@ -384,7 +352,7 @@ export const createCosmosScreen = () => {
   const activityPanel = document.createElement('section');
   activityPanel.className = 'cosmos-activity-panel';
   activityPanel.innerHTML = '<h3>Последние действия</h3><p class="muted">Выберите планету, чтобы увидеть историю.</p>';
-  viewSettingsPanel.appendChild(activityPanel);
+
 
   const menu = document.createElement('div');
   menu.className = 'cosmos-menu hidden';
@@ -1079,72 +1047,6 @@ export const createCosmosScreen = () => {
 
   updateSelectionState();
 
-  controls.addEventListener('change', (event) => {
-    const target = event.target as HTMLInputElement;
-    if (target.dataset.flag === 'showAllLabels') {
-      uiFlags.showAllLabels = target.checked;
-      if (target.checked) {
-        uiFlags.onlyImportant = false;
-        const onlyImportantInput = controls.querySelector<HTMLInputElement>('input[data-flag="onlyImportant"]');
-        if (onlyImportantInput) onlyImportantInput.checked = false;
-      }
-      setCosmosUiFlags({
-        cosmosShowAllLabels: uiFlags.showAllLabels,
-        cosmosOnlyImportant: uiFlags.onlyImportant
-      });
-    }
-    if (target.dataset.flag === 'onlyImportant') {
-      uiFlags.onlyImportant = target.checked;
-      if (target.checked) {
-        uiFlags.showAllLabels = false;
-        const showAllInput = controls.querySelector<HTMLInputElement>('input[data-flag="showAllLabels"]');
-        if (showAllInput) showAllInput.checked = false;
-      }
-      setCosmosUiFlags({
-        cosmosOnlyImportant: uiFlags.onlyImportant,
-        cosmosShowAllLabels: uiFlags.showAllLabels
-      });
-      planetGroups.forEach((group, id) => {
-        group.setAttribute('tabindex', !uiFlags.onlyImportant || importantPlanets.has(id) ? '0' : '-1');
-      });
-    }
-    if (target.dataset.flag === 'showHalo') {
-      uiFlags.showHalo = target.checked;
-      setCosmosUiFlags({ cosmosShowHalo: target.checked });
-      planetGroups.forEach((group) => {
-        const halo = group.querySelector<SVGCircleElement>('.cosmos-planet-halo');
-        if (halo) {
-          const base = Number(halo.style.getPropertyValue('--halo-base-opacity') || '0.2');
-          halo.style.opacity = target.checked ? String(Math.max(0.16, base)) : '0';
-        }
-      });
-    }
-    if (target.dataset.flag === 'soundFx') {
-      uiFlags.soundFxEnabled = target.checked;
-      setCosmosUiFlags({ cosmosSoundFxEnabled: target.checked });
-      if (!target.checked) {
-        sfx.suspend().catch(() => undefined);
-      }
-    }
-    if (target.dataset.flag === 'sfxГромкость') {
-      const volume = Number(target.value);
-      uiFlags.sfxГромкость = Number.isFinite(volume) ? Math.max(0, Math.min(1, volume)) : uiFlags.sfxГромкость;
-      setCosmosUiFlags({ cosmosSfxГромкость: uiFlags.sfxГромкость });
-    }
-    if (target.dataset.flag === 'reduceMotion') {
-      const override = target.checked ? true : null;
-      setCosmosUiFlags({ cosmosReduceMotionOverride: override });
-      window.location.reload();
-      return;
-    }
-    updateSelectionState();
-  });
-
-  viewSettingsToggle.addEventListener('click', () => {
-    const isHidden = viewSettingsPanel.classList.toggle('hidden');
-    viewSettingsToggle.setAttribute('aria-expanded', String(!isHidden));
-  });
-
   const activePointers = new Map<number, { clientX: number; clientY: number }>();
   let panPointerId: number | null = null;
   let panStart = { x: 0, y: 0, tx: 0, ty: 0 };
@@ -1275,7 +1177,7 @@ export const createCosmosScreen = () => {
   startCometInterval();
 
   mapWrap.append(resetViewButton, map, menu, radialMenu);
-  container.append(header, viewSettingsToggle, viewSettingsPanel, mapWrap);
+  container.append(header, settingsLink, legend, mapWrap, activityPanel);
   window.addEventListener('beforeunload', handleBeforeUnload, { once: true });
   return container;
 };

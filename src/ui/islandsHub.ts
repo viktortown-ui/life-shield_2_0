@@ -1,7 +1,7 @@
 import { islandRegistry } from '../core/registry';
 import { getCatalogByGroup, getIslandCatalogItem } from '../core/islandsCatalog';
 import { getState } from '../core/store';
-import { t } from './i18n';
+import { t, tf } from './i18n';
 import { createHelpIconButton, HelpTopicId } from './help';
 import {
   buildSparklineSvg,
@@ -13,10 +13,15 @@ import {
 
 
 const islandHelpTopicMap: Partial<Record<string, HelpTopicId>> = {
-  timeseries: 'timeseries',
   snapshot: 'snapshot',
   stressTest: 'stressTest',
-  bayes: 'bayes'
+  incomePortfolio: 'incomePortfolio',
+  timeseries: 'timeseries',
+  bayes: 'bayes',
+  hmm: 'hmm',
+  optimization: 'optimization',
+  decisionTree: 'decisionTree',
+  causalDag: 'causalDag'
 };
 
 export const createIslandsHubScreen = () => {
@@ -33,8 +38,8 @@ export const createIslandsHubScreen = () => {
     <div class="islands-hub-screen-title">
       <h1>${t('navIslands')}</h1>
     </div>
-    <p>Выберите модуль и двигайтесь шаг за шагом.</p>
-    <p class="hub-meta">Результатов: ${summary.total} · Ср. индекс: ${summary.avgScore} · Последний запуск: ${formatLastRun(summary.latestRun)}</p>
+    <p>${t('islandsHubIntro')}</p>
+    <p class="hub-meta">${tf('islandsHubSummary', { total: summary.total, avg: summary.avgScore, latest: formatLastRun(summary.latestRun) })}</p>
   `;
 
   titleWrap
@@ -45,7 +50,7 @@ export const createIslandsHubScreen = () => {
   labToggleLabel.className = 'islands-lab-toggle';
   labToggleLabel.innerHTML = `
     <input type="checkbox" data-lab-toggle />
-    <span>Показать лабораторию</span>
+    <span>${t('islandsHubShowLab')}</span>
   `;
 
   header.append(titleWrap, labToggleLabel);
@@ -88,11 +93,11 @@ export const createIslandsHubScreen = () => {
         </div>
         <div class="tile-headline">${catalogItem.shortWhy}</div>
         <div class="tile-progress">
-          <span>Запусков: ${islandState.progress.runsCount}</span>
-          <span>Динамика: ${trend}</span>
+          <span>${tf('islandsHubRuns', { count: islandState.progress.runsCount })}</span>
+          <span>${tf('islandsHubTrend', { trend })}</span>
         </div>
         <div class="tile-sparkline">${buildSparklineSvg(islandState.progress.history)}</div>
-        <div class="tile-next"><a class="button small" href="#/island/${catalogItem.id}">Открыть</a></div>
+        <div class="tile-next"><a class="button small" href="#/island/${catalogItem.id}">${t('helpOpenModule')}</a></div>
       `;
 
       if (helpTopic) {

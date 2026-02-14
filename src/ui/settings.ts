@@ -33,7 +33,7 @@ export const createSettingsScreen = () => {
   const exportBlock = document.createElement('section');
   exportBlock.className = 'settings-block';
   exportBlock.innerHTML = `
-    <h2>Экспорт / Импорт</h2>
+    <h2>Экспорт и импорт</h2>
     <textarea class="settings-textarea" rows="8" placeholder="JSON появится здесь"></textarea>
     <input class="settings-file" type="file" accept="application/json,.json" hidden />
     <div class="settings-actions">
@@ -65,7 +65,7 @@ export const createSettingsScreen = () => {
   const cosmosFxSettings = document.createElement('section');
   cosmosFxSettings.className = 'settings-block';
   cosmosFxSettings.innerHTML = `
-    <h2>${t('cosmosTitle')} ${t('soundFx')}</h2>
+    <h2>${t('cosmosTitle')}: эффекты</h2>
     <div class="cosmos-controls">
       <label>
         <input type="checkbox" data-cosmos-fx="sound" aria-label="Включить звуковые эффекты Cosmos" />
@@ -77,13 +77,35 @@ export const createSettingsScreen = () => {
       </label>
       <label>
         <input type="checkbox" data-cosmos-fx="reduceMotion" aria-label="Сократить анимации Cosmos" />
-        ${t('reduceMotion')} (переопределение)
+        ${t('reduceMotion')}
       </label>
     </div>
-    <p class="settings-hint">Системная настройка prefers-reduced-motion учитывается автоматически.</p>
+    <p class="settings-hint">Системная настройка уменьшения анимации учитывается автоматически.</p>
   `;
 
 
+
+
+  const cosmosViewSettings = document.createElement('section');
+  cosmosViewSettings.className = 'settings-block';
+  cosmosViewSettings.innerHTML = `
+    <h2>${t('cosmosTitle')}: отображение</h2>
+    <div class="cosmos-controls">
+      <label>
+        <input type="checkbox" data-cosmos-view="showAllLabels" aria-label="Показывать подписи всех планет" />
+        Подписи всех планет
+      </label>
+      <label>
+        <input type="checkbox" data-cosmos-view="onlyImportant" aria-label="Показывать только важные планеты" />
+        Только важные планеты
+      </label>
+      <label>
+        <input type="checkbox" data-cosmos-view="showHalo" aria-label="Показывать ореол турбулентности" />
+        Ореол турбулентности
+      </label>
+    </div>
+    <p class="settings-hint">Эти параметры влияют только на экран «Космос».</p>
+  `;
 
   const languageSettings = document.createElement('section');
   languageSettings.className = 'settings-block';
@@ -289,6 +311,42 @@ export const createSettingsScreen = () => {
     });
   }
 
+
+  const showAllLabelsInput = cosmosViewSettings.querySelector<HTMLInputElement>('input[data-cosmos-view="showAllLabels"]');
+  const onlyImportantInput = cosmosViewSettings.querySelector<HTMLInputElement>('input[data-cosmos-view="onlyImportant"]');
+  const showHaloInput = cosmosViewSettings.querySelector<HTMLInputElement>('input[data-cosmos-view="showHalo"]');
+  if (showAllLabelsInput && onlyImportantInput && showHaloInput) {
+    showAllLabelsInput.checked = flags.cosmosShowAllLabels && !flags.cosmosOnlyImportant;
+    onlyImportantInput.checked = flags.cosmosOnlyImportant;
+    showHaloInput.checked = flags.cosmosShowHalo;
+
+    showAllLabelsInput.addEventListener('change', () => {
+      const checked = showAllLabelsInput.checked;
+      if (checked) {
+        onlyImportantInput.checked = false;
+      }
+      setCosmosUiFlags({
+        cosmosShowAllLabels: checked,
+        cosmosOnlyImportant: checked ? false : onlyImportantInput.checked
+      });
+    });
+
+    onlyImportantInput.addEventListener('change', () => {
+      const checked = onlyImportantInput.checked;
+      if (checked) {
+        showAllLabelsInput.checked = false;
+      }
+      setCosmosUiFlags({
+        cosmosOnlyImportant: checked,
+        cosmosShowAllLabels: checked ? false : showAllLabelsInput.checked
+      });
+    });
+
+    showHaloInput.addEventListener('change', () => {
+      setCosmosUiFlags({ cosmosShowHalo: showHaloInput.checked });
+    });
+  }
+
   const updateState = getUpdateState();
   updateButton.disabled = !updateState.ready;
   if (updateState.ready) {
@@ -337,6 +395,6 @@ export const createSettingsScreen = () => {
     </ul>
   `;
 
-  container.append(header, languageSettings, homeSettings, cosmosFxSettings, exportBlock, maintenance, glossary, actions);
+  container.append(header, languageSettings, homeSettings, cosmosViewSettings, cosmosFxSettings, exportBlock, maintenance, glossary, actions);
   return container;
 };
