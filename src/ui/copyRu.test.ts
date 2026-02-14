@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const forbidden = /Runway|HHI|Debt burden|Coverage|Burn-in|Step size|Actions?|Probability|Payoff|Risk tag|\bNet\b|Data freshness/i;
+const forbidden = /Runway|HHI|EV|EL|Debt burden|Coverage|Burn-in|Step size|Actions?|Probability|Payoff|Risk tag|\bNet\b|Data freshness/i;
 
 
 
@@ -26,7 +26,7 @@ describe('RU-first copy with pro terms off', () => {
     document.body.innerHTML = '';
   });
 
-  it('does not render forbidden pro english terms on module screens', async () => {
+  it('does not render forbidden pro english terms on visible RU screens when pro terms are off', async () => {
     const { createIslandPage, updateIslandInput } = await loadModules();
 
     const financeInput = JSON.stringify({

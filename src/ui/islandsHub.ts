@@ -75,7 +75,7 @@ export const createIslandsHubScreen = () => {
           </div>
           <div class="tile-meta-badges">
             <span class="tile-status tile-status--chip ${status.tone}">${status.label}</span>
-            <span class="islands-hub-score-badge">Балл ${Math.round(islandState.lastReport?.score ?? 0)}/100</span>
+            <span class="islands-hub-score-badge">Уровень ${Math.round(islandState.lastReport?.score ?? 0)}/100</span>
             ${badge}
           </div>
         </div>

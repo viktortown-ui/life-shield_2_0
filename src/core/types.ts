@@ -95,6 +95,8 @@ export interface IslandReport {
   headline: string;
   summary: string;
   details: string[];
+  reasons?: string[];
+  nextSteps?: string[];
   actions?: ActionItem[];
   insights?: Insight[];
 }
