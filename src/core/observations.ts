@@ -83,6 +83,39 @@ const sanitizeForecastMonthly = (
     .filter((item): item is CashflowForecastLastState['monthly'][number] => Boolean(item));
 };
 
+
+const sanitizeForecastMethod = (value: unknown): CashflowForecastLastState['methodsUsed'][number] | null => {
+  if (value === 'iid_bootstrap' || value === 'moving_block_bootstrap' || value === 'linear_trend_bootstrap') {
+    return value;
+  }
+  return null;
+};
+
+const sanitizePerMethodSummary = (value: unknown): NonNullable<CashflowForecastLastState['perMethodSummary']> => {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null;
+      const row = item as Record<string, unknown>;
+      const method = sanitizeForecastMethod(row.method);
+      if (!method) return null;
+      const quantiles = row.quantiles && typeof row.quantiles === 'object'
+        ? (row.quantiles as Record<string, unknown>)
+        : {};
+      return {
+        method,
+        probNetNegative: clamp01(row.probNetNegative),
+        uncertainty: Number.isFinite(Number(row.uncertainty)) ? Math.max(0, Number(row.uncertainty)) : 0,
+        quantiles: {
+          p10: Number.isFinite(Number(quantiles.p10)) ? Number(quantiles.p10) : 0,
+          p50: Number.isFinite(Number(quantiles.p50)) ? Number(quantiles.p50) : 0,
+          p90: Number.isFinite(Number(quantiles.p90)) ? Number(quantiles.p90) : 0
+        }
+      };
+    })
+    .filter((item): item is NonNullable<CashflowForecastLastState['perMethodSummary']>[number] => Boolean(item));
+};
+
 const sanitizeCashflowForecastLast = (value: unknown): CashflowForecastLastState | undefined => {
   if (!value || typeof value !== 'object') return undefined;
   const row = value as Record<string, unknown>;
@@ -106,7 +139,8 @@ const sanitizeCashflowForecastLast = (value: unknown): CashflowForecastLastState
     paramsUsed: {
       iterations: Number.isFinite(iterationsRaw) ? Math.max(1, Math.floor(iterationsRaw)) : 2000,
       sourceMonths: Number.isFinite(sourceMonthsRaw) ? Math.max(0, Math.floor(sourceMonthsRaw)) : 0,
-      ...(Number.isFinite(seedRaw) ? { seed: Math.floor(seedRaw) } : {})
+      ...(Number.isFinite(seedRaw) ? { seed: Math.floor(seedRaw) } : {}),
+      ...(paramsUsed.mode === 'single' || paramsUsed.mode === 'ensemble' ? { mode: paramsUsed.mode } : {})
     },
     probNetNegative: clamp01(row.probNetNegative),
     quantiles: {
@@ -115,6 +149,19 @@ const sanitizeCashflowForecastLast = (value: unknown): CashflowForecastLastState
       p90: Number.isFinite(Number(quantiles.p90)) ? Number(quantiles.p90) : 0
     },
     uncertainty: Number.isFinite(Number(row.uncertainty)) ? Math.max(0, Number(row.uncertainty)) : 0,
+    ...(Array.isArray(row.methodsUsed)
+      ? {
+          methodsUsed: row.methodsUsed
+            .map((item) => sanitizeForecastMethod(item))
+            .filter((item): item is NonNullable<CashflowForecastLastState['methodsUsed']>[number] => Boolean(item))
+        }
+      : {}),
+    ...(Number.isFinite(Number(row.disagreementScore))
+      ? { disagreementScore: Math.max(0, Math.min(1, Number(row.disagreementScore))) }
+      : {}),
+    ...(Array.isArray(row.perMethodSummary)
+      ? { perMethodSummary: sanitizePerMethodSummary(row.perMethodSummary) }
+      : {}),
     monthly: sanitizeForecastMonthly(row.monthly)
   };
 };

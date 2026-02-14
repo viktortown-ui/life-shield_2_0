@@ -167,6 +167,12 @@ const formatEventAge = (ts: string) => {
 const HISTORY_DRIFT_RISK_THRESHOLD = 0.5;
 const FORECAST_RISK_BADGE_THRESHOLD = 0.5;
 
+const getDisagreementLabel = (score: number) => {
+  if (score >= 0.66) return 'низкое';
+  if (score >= 0.33) return 'среднее';
+  return 'высокое';
+};
+
 const formatMonths = (value: number) => `${value.toFixed(1)} мес`;
 
 const formatDateTime = (value: string | null) => {
@@ -194,16 +200,17 @@ export const createCosmosScreen = () => {
       const forecast = state.observations.cashflowForecastLast;
       const driftScore = drift?.score ?? 0;
       const forecastRisk = forecast?.probNetNegative ?? 0;
+      const disagreement = forecast?.disagreementScore ?? 0;
       const hasRiskDrift = Boolean(drift?.detected && driftScore >= HISTORY_DRIFT_RISK_THRESHOLD);
       const hasForecastRisk = forecastRisk >= FORECAST_RISK_BADGE_THRESHOLD;
       acc.set('history', {
         id: 'history',
-        badge: count === 0 ? 'none' : hasRiskDrift || hasForecastRisk ? 'risk' : 'ok',
-        riskSeverity: Math.max(driftScore, forecastRisk),
+        badge: count === 0 ? 'none' : hasRiskDrift || hasForecastRisk || disagreement >= 0.66 ? 'risk' : 'ok',
+        riskSeverity: Math.max(driftScore, forecastRisk, disagreement * 0.85),
         confidence: count > 0 ? 100 : null,
         freshnessUrgency: count > 0 ? 0.2 : 1,
         proximityUrgency,
-        turbulence: count > 0 ? Math.max(driftScore, forecastRisk * 0.9) : null
+        turbulence: count > 0 ? Math.max(driftScore, forecastRisk * 0.85, disagreement) : null
       });
       return acc;
     }
@@ -748,9 +755,11 @@ export const createCosmosScreen = () => {
               ? (() => {
                   const span = Math.max(1, forecast.quantiles.p90 - forecast.quantiles.p10);
                   const medianPos = Math.max(0, Math.min(100, ((forecast.quantiles.p50 - forecast.quantiles.p10) / span) * 100));
+                  const disagreement = forecast.disagreementScore ?? 0;
+                  const agreement = getDisagreementLabel(disagreement);
                   return `<p>Forecast risk: <strong>${(forecast.probNetNegative * 100).toFixed(1)}%</strong> (RISK от ${(FORECAST_RISK_BADGE_THRESHOLD * 100).toFixed(
                     0
-                  )}%)</p><p>Net p10/p50/p90: ${Math.round(forecast.quantiles.p10).toLocaleString('ru-RU')} / ${Math.round(
+                  )}%)</p><p>Согласие моделей: <strong>${agreement}</strong> (${Math.round(disagreement * 100)}%)</p><p class="muted">Почему: сравниваем p50 разных методов (IID/MBB/Trend). Чем больше разброс, тем выше турбулентность halo.</p><p>Net p10/p50/p90: ${Math.round(forecast.quantiles.p10).toLocaleString('ru-RU')} / ${Math.round(
                     forecast.quantiles.p50
                   ).toLocaleString('ru-RU')} / ${Math.round(forecast.quantiles.p90).toLocaleString('ru-RU')}</p><div class="cosmos-interval" role="img" aria-label="Интервал прогноза net cashflow p10-p90"><span class="cosmos-interval-range" style="left:0%;width:100%"></span><span class="cosmos-interval-median" style="left:${medianPos}%"></span></div>`;
                 })()

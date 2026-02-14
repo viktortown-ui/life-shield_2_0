@@ -59,10 +59,13 @@ describe('cosmos history forecast panel', () => {
     setCashflowForecastLast({
       ts: '2026-01-01T00:00:00.000Z',
       horizonMonths: 6,
-      paramsUsed: { iterations: 2000, sourceMonths: 12, seed: 42 },
+      paramsUsed: { iterations: 2000, sourceMonths: 12, seed: 42, mode: 'ensemble' },
       probNetNegative: 0.65,
       quantiles: { p10: -10000, p50: -2000, p90: 5000 },
-      uncertainty: 15000,
+      uncertainty: 1.3,
+      methodsUsed: ['iid_bootstrap', 'moving_block_bootstrap', 'linear_trend_bootstrap'],
+      disagreementScore: 0.74,
+      perMethodSummary: [],
       monthly: []
     });
 
@@ -77,5 +80,6 @@ describe('cosmos history forecast panel', () => {
     expect(panel?.textContent).toContain('History прогноз');
     expect(panel?.textContent).toContain('Forecast risk');
     expect(panel?.textContent).toContain('Net p10/p50/p90');
+    expect(panel?.textContent).toContain('Согласие моделей');
   });
 });

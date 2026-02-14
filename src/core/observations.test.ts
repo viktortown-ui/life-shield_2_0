@@ -65,10 +65,13 @@ describe('sanitizeCashflowMonthly', () => {
       cashflowForecastLast: {
         ts: '2026-01-01T00:00:00.000Z',
         horizonMonths: '6',
-        paramsUsed: { iterations: '2000', sourceMonths: '12', seed: '77' },
+        paramsUsed: { iterations: '2000', sourceMonths: '12', seed: '77', mode: 'ensemble' },
         probNetNegative: 5,
         quantiles: { p10: '1', p50: '2', p90: '3' },
         uncertainty: '10',
+        methodsUsed: ['iid_bootstrap', 'moving_block_bootstrap', 'bad'],
+        disagreementScore: '0.45',
+        perMethodSummary: [{ method: 'iid_bootstrap', probNetNegative: 2, uncertainty: '3', quantiles: { p10: '1', p50: '2', p90: '3' } }],
         monthly: [{ month: '1', p10: '1', p50: '2', p90: '3' }]
       }
     });
@@ -76,6 +79,10 @@ describe('sanitizeCashflowMonthly', () => {
     expect(result.cashflowForecastLast?.horizonMonths).toBe(6);
     expect(result.cashflowForecastLast?.probNetNegative).toBe(1);
     expect(result.cashflowForecastLast?.paramsUsed.seed).toBe(77);
+    expect(result.cashflowForecastLast?.paramsUsed.mode).toBe('ensemble');
+    expect(result.cashflowForecastLast?.methodsUsed).toEqual(['iid_bootstrap', 'moving_block_bootstrap']);
+    expect(result.cashflowForecastLast?.disagreementScore).toBe(0.45);
+    expect(result.cashflowForecastLast?.perMethodSummary?.[0]?.probNetNegative).toBe(1);
     expect(result.cashflowForecastLast?.monthly[0]?.month).toBe(1);
   });
 

@@ -52,6 +52,7 @@ export interface CashflowForecastLastState {
     iterations: number;
     seed?: number;
     sourceMonths: number;
+    mode?: 'single' | 'ensemble';
   };
   probNetNegative: number;
   quantiles: {
@@ -60,6 +61,18 @@ export interface CashflowForecastLastState {
     p90: number;
   };
   uncertainty: number;
+  methodsUsed?: Array<'iid_bootstrap' | 'moving_block_bootstrap' | 'linear_trend_bootstrap'>;
+  disagreementScore?: number;
+  perMethodSummary?: Array<{
+    method: 'iid_bootstrap' | 'moving_block_bootstrap' | 'linear_trend_bootstrap';
+    probNetNegative: number;
+    uncertainty: number;
+    quantiles: {
+      p10: number;
+      p50: number;
+      p90: number;
+    };
+  }>;
   monthly: Array<{
     month: number;
     p10: number;
