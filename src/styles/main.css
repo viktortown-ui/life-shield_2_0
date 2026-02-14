@@ -1481,6 +1481,10 @@ body {
   margin: 0;
 }
 
+.cosmos-drift-alert {
+  color: #ffd17d;
+}
+
 .cosmos-interval {
   position: relative;
   height: 12px;
@@ -1722,4 +1726,42 @@ body {
   width: 100%;
   background: linear-gradient(180deg, #7ef7e6, #4f8bff);
   border-radius: 4px 4px 0 0;
+}
+
+.stress-mc-history {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed #24314d;
+}
+
+.stress-mc-sparkline {
+  width: 100%;
+  height: 48px;
+  margin: 6px 0 8px;
+}
+
+.stress-mc-sparkline polyline {
+  fill: none;
+  stroke: #7ef7e6;
+  stroke-width: 2;
+}
+
+.stress-mc-history ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+
+.stress-mc-history li {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 10px;
+  font-size: 0.9rem;
+}
+
+.stress-mc-history em {
+  font-style: normal;
+  color: #98a7c2;
 }

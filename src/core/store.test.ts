@@ -198,3 +198,32 @@ describe('cosmos activity log', () => {
     expect(state.cosmosActivityLog.at(-1)?.meta).toBe('e-204');
   });
 });
+
+describe('stress monte carlo history', () => {
+  it('stores only the last 50 mc runs for stressTest', async () => {
+    const store = await loadStore();
+    for (let index = 0; index < 55; index += 1) {
+      store.updateIslandMonteCarlo('stressTest', {
+        horizonMonths: 6,
+        iterations: 2000,
+        ruinProb: index,
+        quantiles: { p10: 1, p50: 5 + index, p90: 8 },
+        histogram: [],
+        config: {
+          horizonMonths: 6,
+          iterations: 2000,
+          incomeVolatility: 15,
+          expensesVolatility: 8,
+          seed: index,
+          shock: { enabled: false, probability: 0.1, dropPercent: 30 }
+        }
+      });
+    }
+
+    const state = store.getState();
+    const mcHistory = state.islands.stressTest.mcHistory ?? [];
+    expect(mcHistory).toHaveLength(50);
+    expect(mcHistory[0]?.ruinProb).toBe(5);
+    expect(mcHistory.at(-1)?.ruinProb).toBe(54);
+  });
+});
