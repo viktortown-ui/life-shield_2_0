@@ -13,6 +13,7 @@ import { createIslandsHubScreen } from './islandsHub';
 import { createReportScreen } from './report';
 import { createFinanceScreen } from './finance';
 import { createHistoryScreen } from './history';
+import { onLangChange, t } from './i18n';
 
 const parseRoute = () => {
   const hash = window.location.hash.replace('#', '') || '/';
@@ -64,12 +65,12 @@ const createBottomNav = (route: Route) => {
   nav.setAttribute('aria-label', 'Нижняя навигация');
 
   nav.innerHTML = `
-    <a class="bottom-nav-link ${route.name === 'shield' || route.name === 'home' || route.name === 'cosmos' ? 'active' : ''}" href="#/">Home</a>
-    <a class="bottom-nav-link ${route.name === 'island' || route.name === 'islands' ? 'active' : ''}" href="#/islands">Острова</a>
-    <a class="bottom-nav-link ${route.name === 'finance' ? 'active' : ''}" href="#/finance">Финансы</a>
-    <a class="bottom-nav-link ${route.name === 'history' ? 'active' : ''}" href="#/history">История</a>
-    <a class="bottom-nav-link ${route.name === 'report' ? 'active' : ''}" href="#/report">Отчёт</a>
-    <a class="bottom-nav-link ${route.name === 'settings' ? 'active' : ''}" href="#/settings">Настройки</a>
+    <a class="bottom-nav-link ${route.name === 'shield' || route.name === 'home' || route.name === 'cosmos' ? 'active' : ''}" href="#/">${t('navHome')}</a>
+    <a class="bottom-nav-link ${route.name === 'island' || route.name === 'islands' ? 'active' : ''}" href="#/islands">${t('navIslands')}</a>
+    <a class="bottom-nav-link ${route.name === 'finance' ? 'active' : ''}" href="#/finance">${t('navFinance')}</a>
+    <a class="bottom-nav-link ${route.name === 'history' ? 'active' : ''}" href="#/history">${t('navHistory')}</a>
+    <a class="bottom-nav-link ${route.name === 'report' ? 'active' : ''}" href="#/report">${t('navReport')}</a>
+    <a class="bottom-nav-link ${route.name === 'settings' ? 'active' : ''}" href="#/settings">${t('navSettings')}</a>
   `;
 
   return nav;
@@ -188,7 +189,7 @@ export const initRouter = (root: HTMLElement) => {
         <div class="screen">
           <h1>Произошла ошибка</h1>
           <p>Не удалось отрисовать экран. Попробуйте сбросить данные.</p>
-          <button class="button" data-reset>Reset app data</button>
+          <button class="button" data-reset>Сбросить данные приложения</button>
         </div>
       `;
       const resetButton = root.querySelector<HTMLButtonElement>('[data-reset]');
@@ -200,5 +201,6 @@ export const initRouter = (root: HTMLElement) => {
   };
 
   window.addEventListener('hashchange', render);
+  onLangChange(render);
   render();
 };

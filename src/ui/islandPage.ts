@@ -191,11 +191,11 @@ export const createIslandPage = (id: IslandId) => {
             <input name="mcmcSamples" type="number" min="500" step="100" value="${initialInput.mcmcSamples}" />
           </label>
           <label>
-            Burn-in
+            Прогрев
             <input name="mcmcBurnIn" type="number" min="100" step="50" value="${initialInput.mcmcBurnIn}" />
           </label>
           <label>
-            Step size
+            Шаг
             <input name="mcmcStep" type="number" min="0.05" max="1" step="0.01" value="${initialInput.mcmcStep}" />
           </label>
           <label>
@@ -206,7 +206,7 @@ export const createIslandPage = (id: IslandId) => {
       </details>
       <div class="bayes-controls">
         <button class="button" type="submit">Запустить</button>
-        <button class="button ghost" type="button" data-stop>Stop</button>
+        <button class="button ghost" type="button" data-stop>Стоп</button>
         <span class="bayes-status" data-status></span>
       </div>
     `;
@@ -825,7 +825,7 @@ export const createIslandPage = (id: IslandId) => {
         } /> Детерминированный</label>
         <label><input type="radio" name="stressMode" value="mc" ${
           readStoredMode() === 'mc' ? 'checked' : ''
-        } /> Вероятностный (Monte Carlo)</label>
+        } /> Вероятностный (Монте-Карло)</label>
       </fieldset>
       <div class="stress-mc-fields" data-mc-fields>
         <div class="bayes-grid">
@@ -981,7 +981,7 @@ export const createIslandPage = (id: IslandId) => {
         ...base,
         details: [
           ...base.details,
-          `Monte Carlo: считаю ${Math.min(20000, Math.max(200, Math.round(params.iterations)))} траекторий...`,
+          `Монте-Карло: считаю ${Math.min(20000, Math.max(200, Math.round(params.iterations)))} траекторий...`,
           `Сверка sigma=0: детерминированный runway на горизонте = ${deterministicRunway} мес`
         ]
       };
@@ -1277,11 +1277,11 @@ export const createIslandPage = (id: IslandId) => {
           <input name="horizon" type="number" min="1" step="1" value="${parsedInput.horizon ?? 12}" />
         </label>
         <label>
-          Season length
+          Сезонность
           <input name="seasonLength" type="number" min="0" step="1" value="${parsedInput.seasonLength ?? ''}" />
         </label>
         <label>
-          Test size
+          Доля теста
           <input name="testSize" type="number" min="0" step="1" value="${parsedInput.testSize ?? ''}" />
         </label>
         <label>
@@ -1310,8 +1310,8 @@ export const createIslandPage = (id: IslandId) => {
       if (statusLabel) statusLabel.textContent = message;
     };
 
-    const formatNumber = (value: number) =>
-      Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(value);
+    const formatValue = (value: number) =>
+      formatNumber(value, { maximumFractionDigits: 2 });
 
     const renderOutput = (
       analysisBundle?: TimeseriesAnalysisBundle,
@@ -1324,21 +1324,21 @@ export const createIslandPage = (id: IslandId) => {
       }
       const primary = analysisBundle.primary;
       const metricLabel = primary.metric
-        ? `${primary.metric.name}: ${formatNumber(primary.metric.value)}`
+        ? `${primary.metric.name}: ${formatValue(primary.metric.value)}`
         : 'нет метрики';
-      const trendLabel = formatNumber(primary.trendSlope);
-      const volatilityLabel = formatNumber(primary.volatilityChange);
-      const forecastLabel = primary.forecast.map((value) => formatNumber(value)).join(', ');
+      const trendLabel = formatValue(primary.trendSlope);
+      const volatilityLabel = formatValue(primary.volatilityChange);
+      const forecastLabel = primary.forecast.map((value) => formatValue(value)).join(', ');
       const confidenceLabel =
         reportConfidence !== undefined ? `${reportConfidence}%` : '—';
 
       outputBlock.innerHTML = `
         <div class="result-metrics">
-          <div><span>Forecast</span><strong>${forecastLabel}</strong></div>
+          <div><span>Прогноз</span><strong>${forecastLabel}</strong></div>
           <div><span>Metric</span><strong>${metricLabel}</strong></div>
           <div><span>Trend</span><strong>${trendLabel}</strong></div>
           <div><span>Volatility</span><strong>${volatilityLabel}</strong></div>
-          <div><span>Confidence</span><strong>${confidenceLabel}</strong></div>
+          <div><span>Доверие</span><strong>${confidenceLabel}</strong></div>
         </div>
       `;
     };
@@ -1471,7 +1471,7 @@ export const createIslandPage = (id: IslandId) => {
     if (id !== 'stressTest') return '';
     const history = (islandState.mcHistory ?? []).slice(-10);
     if (!history.length) {
-      return '<section class="stress-mc-history"><h4>История Monte Carlo (последние 10)</h4><p class="muted">История запусков появится после расчётов.</p></section>';
+      return '<section class="stress-mc-history"><h4>История Монте-Карло (последние 10)</h4><p class="muted">История запусков появится после расчётов.</p></section>';
     }
 
     const points = history
@@ -1497,7 +1497,7 @@ export const createIslandPage = (id: IslandId) => {
       })
       .join('');
 
-    return `<section class="stress-mc-history"><h4>История Monte Carlo (последние 10)</h4><svg viewBox="0 0 100 100" class="stress-mc-sparkline" role="img" aria-label="Динамика risk-of-ruin по последним запускам"><polyline points="${points}"></polyline></svg><ul>${rows}</ul></section>`;
+    return `<section class="stress-mc-history"><h4>История Монте-Карло (последние 10)</h4><svg viewBox="0 0 100 100" class="stress-mc-sparkline" role="img" aria-label="Динамика риска разорения по последним запускам"><polyline points="${points}"></polyline></svg><ul>${rows}</ul></section>`;
   };
 
   const renderReport = () => {
@@ -1510,8 +1510,8 @@ export const createIslandPage = (id: IslandId) => {
         : '';
     result.innerHTML = `
       <div class="result-metrics">
-        <div><span>Score</span><strong>${report.score}</strong></div>
-        <div><span>Confidence</span><strong>${report.confidence}%</strong></div>
+        <div><span>Балл</span><strong>${report.score}</strong></div>
+        <div><span>Доверие</span><strong>${report.confidence}%</strong></div>
       </div>
       <h2>${report.headline}</h2>
       <div class="result-summary">${report.summary}</div>
@@ -1519,7 +1519,7 @@ export const createIslandPage = (id: IslandId) => {
       ${historyHint}
       ${
         mc
-          ? `<section class="stress-mc-result"><h3>Monte Carlo</h3><p>Risk-of-ruin: <strong>${mc.ruinProb.toFixed(2)}%</strong> на горизонте ${mc.horizonMonths} мес (${mc.iterations} итераций)</p><p>Runway quantiles: p10 ${mc.quantiles.p10.toFixed(1)} мес / p50 ${mc.quantiles.p50.toFixed(1)} мес / p90 ${mc.quantiles.p90.toFixed(1)} мес</p>${renderHistogram()}${renderMcHistory()}</section>`
+          ? `<section class="stress-mc-result"><h3>Монте-Карло</h3><p>Risk-of-ruin: <strong>${mc.ruinProb.toFixed(2)}%</strong> на горизонте ${mc.horizonMonths} мес (${mc.iterations} итераций)</p><p>Квантили запаса хода: p10 ${mc.quantiles.p10.toFixed(1)} мес / p50 ${mc.quantiles.p50.toFixed(1)} мес / p90 ${mc.quantiles.p90.toFixed(1)} мес</p>${renderHistogram()}${renderMcHistory()}</section>`
           : ''
       }
     `;

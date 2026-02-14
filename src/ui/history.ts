@@ -11,6 +11,7 @@ import {
   CashflowForecastWorkerResponse
 } from '../workers/cashflowForecast';
 import { computeTurbulence } from '../core/turbulence';
+import { formatNumber } from './i18n';
 
 const FORECAST_MIN_MONTHS = 6;
 const FORECAST_ITERATIONS = 2000;
@@ -34,7 +35,7 @@ const getDriftLevelLabel = (score: number) => {
   return 'низкий';
 };
 
-const formatSigned = (value: number) => `${value >= 0 ? '+' : ''}${Math.round(value).toLocaleString('ru-RU')}`;
+const formatSigned = (value: number) => `${value >= 0 ? '+' : ''}${formatNumber(Math.round(value))}`;
 
 const buildNetSparkline = (values: number[], ariaLabel: string, className = 'history-sparkline') => {
   if (!values.length) {
@@ -138,9 +139,9 @@ export const createHistoryScreen = () => {
                   .map(
                     (row) => `<tr>
                       <td>${row.ym}</td>
-                      <td>${row.income.toLocaleString('ru-RU')}</td>
-                      <td>${row.expense.toLocaleString('ru-RU')}</td>
-                      <td>${(row.income - row.expense).toLocaleString('ru-RU')}</td>
+                      <td>${formatNumber(row.income)}</td>
+                      <td>${formatNumber(row.expense)}</td>
+                      <td>${formatNumber(row.income - row.expense)}</td>
                       <td><button class="button ghost" type="button" data-remove="${row.ym}">удалить</button></td>
                     </tr>`
                   )
@@ -159,7 +160,7 @@ export const createHistoryScreen = () => {
       .slice(0, 3);
     const turbulenceBlock = `<div class="history-turbulence"><p><strong>Индекс турбулентности:</strong> ${(
       turbulence.overallScore * 100
-    ).toFixed(0)}% · confidence ${(turbulence.overallConfidence * 100).toFixed(0)}%</p>${
+    ).toFixed(0)}% · доверие ${(turbulence.overallConfidence * 100).toFixed(0)}%</p>${
       keySignals.length
         ? `<ul>${keySignals
             .map((signal) => `<li>${signal.label}: ${(signal.score * 100).toFixed(0)}% — ${signal.explanation}</li>`)
@@ -169,7 +170,7 @@ export const createHistoryScreen = () => {
     const drift = state.observations.cashflowDriftLast;
     const driftAlert =
       drift?.detected
-        ? `<div class="history-drift-alert"><strong>Смена режима net cashflow обнаружена.</strong><p>Месяц: ${drift.ym ?? '—'} · уровень: ${getDriftLevelLabel(
+        ? `<div class="history-drift-alert"><strong>Смена режима чистого потока обнаружена.</strong><p>Месяц: ${drift.ym ?? '—'} · уровень: ${getDriftLevelLabel(
             drift.score
           )} (${(drift.score * 100).toFixed(0)}%)</p></div>`
         : '';
@@ -213,7 +214,7 @@ export const createHistoryScreen = () => {
           }</p>`;
 
     forecastCard.innerHTML = `
-      <h3>Прогноз net cashflow</h3>
+      <h3>Прогноз чистого потока</h3>
       <div class="history-forecast-actions">
         <div class="history-horizon-switch">${horizonControls}</div>
         <div class="history-horizon-switch">${modeControls}</div>
