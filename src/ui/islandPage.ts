@@ -61,6 +61,7 @@ import { formatDateTime, formatNumber, formatPercent } from './format';
 import { createHelpIconButton, getHelpTopicByIslandId } from './help';
 import { getLang, getProTerms, t } from './i18n';
 import { getMetricLabel } from '../i18n/glossary';
+import { sanitizeRuVisibleCopy } from './ruCopyGuard';
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
@@ -98,20 +99,12 @@ const buildIslandErrorReport = (id: IslandId, error: unknown) => ({
 
 const sanitizeRuTerms = (text: string) => {
   if (getLang() !== 'ru' || getProTerms()) return text;
-  return text
-    .replace(/Runway/gi, 'запас')
-    .replace(/HHI/gi, 'концентрация')
-    .replace(/Debt burden/gi, 'долговая нагрузка')
-    .replace(/Coverage/gi, 'покрытие')
-    .replace(/Burn-in/gi, 'прогрев')
-    .replace(/Step size/gi, 'шаг');
+  return sanitizeRuVisibleCopy(text);
 };
-
-const forbiddenAdvancedTerms = /\b(EV|EL|HHI|Runway|Coverage)\b/gi;
 
 const toVisibleRu = (text: string) =>
   getLang() === 'ru' && !getProTerms()
-    ? sanitizeRuTerms(text).replace(forbiddenAdvancedTerms, '').replace(/\s{2,}/g, ' ').trim()
+    ? sanitizeRuTerms(text)
     : sanitizeRuTerms(text);
 
 const hasDataInReport = (report: { score: number; confidence: number; details: string[] }) =>
@@ -610,16 +603,16 @@ export const createIslandPage = (id: IslandId) => {
           <div class="decision-tree-action" data-action-index="${actionIndex}">
             <div class="decision-tree-action-header">
               <label>
-                Вариант
+                Название хода
                 <input
                   name="action-name-${actionIndex}"
                   type="text"
                   value="${action.name}"
-                  placeholder="Вариант A/B/C"
+                  placeholder="Например: A или B"
                 />
               </label>
               <button class="button ghost" type="button" data-remove-action="${actionIndex}">
-                Удалить действие
+                Удалить ход
               </button>
             </div>
             <div class="decision-tree-outcomes">
@@ -628,7 +621,7 @@ export const createIslandPage = (id: IslandId) => {
                   (outcome, outcomeIndex) => `
                 <div class="decision-tree-outcome" data-outcome-index="${outcomeIndex}">
                   <label>
-                    Вероятность
+                    Шанс
                     <input
                       name="outcome-prob-${actionIndex}-${outcomeIndex}"
                       type="number"
@@ -641,7 +634,7 @@ export const createIslandPage = (id: IslandId) => {
                     />
                   </label>
                   <label>
-                    Выигрыш (польза)
+                    Награда (баллы)
                     <input
                       name="outcome-payoff-${actionIndex}-${outcomeIndex}"
                       type="number"
@@ -650,13 +643,14 @@ export const createIslandPage = (id: IslandId) => {
                     />
                   </label>
                   <label>
-                    Риск (низкий/средний/высокий)
-                    <input
+                    Риск
+                    <select
                       name="outcome-risk-${actionIndex}-${outcomeIndex}"
-                      type="text"
-                      value="${outcome.riskTag}"
-                      placeholder="low/med/high"
-                    />
+                    >
+                      <option value="low" ${outcome.riskTag === 'low' ? 'selected' : ''}>низкий</option>
+                      <option value="med" ${outcome.riskTag === 'med' ? 'selected' : ''}>средний</option>
+                      <option value="high" ${outcome.riskTag === 'high' ? 'selected' : ''}>высокий</option>
+                    </select>
                   </label>
                   <button
                     class="button ghost"
@@ -672,13 +666,14 @@ export const createIslandPage = (id: IslandId) => {
             </div>
             <div class="decision-tree-action-footer">
               <div class="decision-tree-hint">
-                Проверь: вероятности вместе должны дать 1 (100%).
+                Сумма шансов должна быть 1.0
               </div>
               <div class="decision-tree-total">
-                Σp: <strong data-prob-total="${actionIndex}">${formatProbability(
+                Сумма: <strong data-prob-total="${actionIndex}">${formatProbability(
                   totalProb
                 )}</strong>
               </div>
+              <p class="decision-tree-error" data-prob-error="${actionIndex}" role="status" aria-live="polite"></p>
               <button class="button ghost" type="button" data-add-outcome="${actionIndex}">
                 Добавить исход
               </button>
@@ -722,7 +717,7 @@ export const createIslandPage = (id: IslandId) => {
           const payoffInput = outcomeRow.querySelector<HTMLInputElement>(
             `[name="outcome-payoff-${actionIndex}-${outcomeIndex}"]`
           );
-          const riskInput = outcomeRow.querySelector<HTMLInputElement>(
+          const riskInput = outcomeRow.querySelector<HTMLSelectElement>(
             `[name="outcome-risk-${actionIndex}-${outcomeIndex}"]`
           );
 
@@ -753,14 +748,22 @@ export const createIslandPage = (id: IslandId) => {
           `[data-prob-total="${actionIndex}"]`
         );
         if (totalNode) totalNode.textContent = formatProbability(total);
+        const errorNode = actionRows.querySelector<HTMLParagraphElement>(
+          `[data-prob-error="${actionIndex}"]`
+        );
+        if (!errorNode) return;
+        const mismatch = Math.abs(total - 1) > 0.01;
+        errorNode.textContent = mismatch
+          ? 'Ошибка: сумма шансов не равна 1.0. Исправьте значения в поле «Шанс», чтобы вместе получилось 1.0.'
+          : '';
       });
     };
 
     form.innerHTML = `
       <div class="decision-tree-header">
-        <h3>Варианты</h3>
+        <h3>Ходы</h3>
         <button class="button ghost" type="button" data-add-action>
-          Добавить действие
+          Добавить ход
         </button>
       </div>
     `;

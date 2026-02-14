@@ -135,6 +135,21 @@ export const createSettingsScreen = () => {
     </label>
   `;
 
+
+  const proTermsInfo = document.createElement('p');
+  proTermsInfo.className = 'settings-hint';
+  const renderProTermsInfo = (enabled: boolean) => {
+    if (!enabled) {
+      proTermsInfo.textContent = '';
+      return;
+    }
+    proTermsInfo.textContent =
+      getLang() === 'ru'
+        ? 'Режим для продвинутых показывает профессиональные подписи рядом с простыми названиями. Примеры: «Запас (runway)», «Концентрация дохода (HHI)», «Покрытие расходов (coverage)». '
+        : 'Advanced mode shows professional labels next to plain terms.';
+  };
+  proTermsSettings.appendChild(proTermsInfo);
+
   const maintenance = document.createElement('section');
   maintenance.className = 'settings-block';
   maintenance.innerHTML = `
@@ -394,8 +409,10 @@ export const createSettingsScreen = () => {
   const proTermsInput = proTermsSettings.querySelector<HTMLInputElement>('input[name="pro-terms"]');
   if (proTermsInput) {
     proTermsInput.checked = getProTerms();
+    renderProTermsInfo(proTermsInput.checked);
     proTermsInput.addEventListener('change', () => {
       setProTerms(proTermsInput.checked);
+      renderProTermsInfo(proTermsInput.checked);
     });
   }
 
