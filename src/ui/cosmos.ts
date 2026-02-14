@@ -277,20 +277,37 @@ export const createCosmosScreen = () => {
   header.innerHTML = `
     <div>
       <h1>${t('cosmosTitle')}</h1>
-      <p>Инструмент приоритетов: риск, свежесть данных и сигналы турбулентности.</p>
+      <p>Карта приоритетов островов: фокус на рисках, свежести и турбулентности.</p>
     </div>
   `;
+
+  const viewSettingsToggle = document.createElement('button');
+  viewSettingsToggle.type = 'button';
+  viewSettingsToggle.className = 'button ghost small cosmos-view-toggle';
+  viewSettingsToggle.textContent = 'Настройки вида / View settings';
+  viewSettingsToggle.setAttribute('aria-expanded', 'false');
 
   const controls = document.createElement('section');
   controls.className = 'cosmos-controls';
   controls.innerHTML = `
-    <label><input type="checkbox" data-flag="showAllLabels" data-testid="cosmos-toggle-showAllLabels" aria-label="Показывать все подписи планет" ${uiFlags.showAllLabels ? 'checked' : ''}/> Показывать все подписи</label>
-    <label><input type="checkbox" data-flag="onlyImportant" data-testid="cosmos-toggle-onlyImportant" aria-label="Показывать только важные планеты" ${uiFlags.onlyImportant ? 'checked' : ''}/> Показывать только важные</label>
-    <label><input type="checkbox" data-flag="showHalo" data-testid="cosmos-toggle-showHalo" aria-label="Показывать halo планет" ${uiFlags.showHalo ? 'checked' : ''}/> Показывать halo (турбулентность)</label>
-    <label><input type="checkbox" data-flag="soundFx" data-testid="cosmos-toggle-soundFx" aria-label="Включить Звуковые эффекты в Cosmos" ${uiFlags.soundFxEnabled ? 'checked' : ''}/> Звуковые эффекты</label>
-    <label>Громкость <input type="range" data-flag="sfxГромкость" data-testid="cosmos-toggle-sfxГромкость" min="0" max="1" step="0.05" aria-label="Громкость Звуковые эффекты в Cosmos" value="${uiFlags.sfxГромкость}" /></label>
-    <label><input type="checkbox" data-flag="reduceMotion" data-testid="cosmos-toggle-reduceMotion" aria-label="Сократить анимации Cosmos" ${state.flags.cosmosReduceMotionOverride === true ? 'checked' : ''}/> ${t('reduceMotion')} (переопределение)</label>
+    <section class="cosmos-controls-group">
+      <h3>Вид и фильтры / View & filters</h3>
+      <label><input type="checkbox" data-flag="showAllLabels" data-testid="cosmos-toggle-showAllLabels" aria-label="Показывать все подписи планет" ${uiFlags.showAllLabels ? 'checked' : ''}/> Подписи всех планет / All labels</label>
+      <label><input type="checkbox" data-flag="onlyImportant" data-testid="cosmos-toggle-onlyImportant" aria-label="Показывать только важные планеты" ${uiFlags.onlyImportant ? 'checked' : ''}/> Только важные / Important only</label>
+      <label><input type="checkbox" data-flag="showHalo" data-testid="cosmos-toggle-showHalo" aria-label="Показывать halo планет" ${uiFlags.showHalo ? 'checked' : ''}/> Halo турбулентности / Turbulence halo</label>
+    </section>
+    <section class="cosmos-controls-group">
+      <h3>Эффекты / Effects</h3>
+      <label><input type="checkbox" data-flag="soundFx" data-testid="cosmos-toggle-soundFx" aria-label="Включить Звуковые эффекты в Cosmos" ${uiFlags.soundFxEnabled ? 'checked' : ''}/> Sound FX / Звуковые эффекты</label>
+      <label>Volume / Громкость <input type="range" data-flag="sfxГромкость" data-testid="cosmos-toggle-sfxГромкость" min="0" max="1" step="0.05" aria-label="Громкость Звуковые эффекты в Cosmos" value="${uiFlags.sfxГромкость}" /></label>
+      <label><input type="checkbox" data-flag="reduceMotion" data-testid="cosmos-toggle-reduceMotion" aria-label="Сократить анимации Cosmos" ${state.flags.cosmosReduceMotionOverride === true ? 'checked' : ''}/> Reduce motion / Меньше анимации</label>
+      <p class="muted">prefers-reduced-motion учитывается автоматически / follows system setting.</p>
+    </section>
   `;
+
+  const viewSettingsPanel = document.createElement('section');
+  viewSettingsPanel.className = 'cosmos-view-panel hidden';
+  viewSettingsPanel.appendChild(controls);
 
   const legend = document.createElement('section');
   legend.className = 'cosmos-legend';
@@ -299,6 +316,7 @@ export const createCosmosScreen = () => {
       ? 'Halo = прогнозная турбулентность (Монте-Карло)'
       : 'Halo = эвристика (без Монте-Карло)'
   }</p>`;
+  viewSettingsPanel.appendChild(legend);
 
   const mapWrap = document.createElement('section');
   mapWrap.className = 'cosmos-map-wrap';
@@ -366,6 +384,7 @@ export const createCosmosScreen = () => {
   const activityPanel = document.createElement('section');
   activityPanel.className = 'cosmos-activity-panel';
   activityPanel.innerHTML = '<h3>Последние действия</h3><p class="muted">Выберите планету, чтобы увидеть историю.</p>';
+  viewSettingsPanel.appendChild(activityPanel);
 
   const menu = document.createElement('div');
   menu.className = 'cosmos-menu hidden';
@@ -1121,6 +1140,11 @@ export const createCosmosScreen = () => {
     updateSelectionState();
   });
 
+  viewSettingsToggle.addEventListener('click', () => {
+    const isHidden = viewSettingsPanel.classList.toggle('hidden');
+    viewSettingsToggle.setAttribute('aria-expanded', String(!isHidden));
+  });
+
   const activePointers = new Map<number, { clientX: number; clientY: number }>();
   let panPointerId: number | null = null;
   let panStart = { x: 0, y: 0, tx: 0, ty: 0 };
@@ -1250,15 +1274,8 @@ export const createCosmosScreen = () => {
 
   startCometInterval();
 
-  const actions = document.createElement('div');
-  actions.className = 'screen-actions';
-  actions.innerHTML = `
-    <a class="button ghost" href="#/">Домой</a>
-    <a class="button ghost" href="#/shield">К щиту</a>
-  `;
-
   mapWrap.append(resetViewButton, map, menu, radialMenu);
-  container.append(header, controls, legend, mapWrap, activityPanel, actions);
+  container.append(header, viewSettingsToggle, viewSettingsPanel, mapWrap);
   window.addEventListener('beforeunload', handleBeforeUnload, { once: true });
   return container;
 };

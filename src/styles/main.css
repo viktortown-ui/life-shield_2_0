@@ -1380,12 +1380,35 @@ body {
   position: relative;
 }
 
+.cosmos-view-toggle {
+  margin-bottom: 10px;
+}
+
+.cosmos-view-panel {
+  margin-bottom: 10px;
+  border: 1px solid #24314d;
+  border-radius: 12px;
+  background: rgba(14, 22, 40, 0.72);
+  padding: 10px 12px;
+}
+
 .cosmos-controls {
   display: grid;
-  gap: 8px;
-  margin-bottom: 10px;
+  gap: 10px;
+  margin-bottom: 8px;
   color: #c6d3ec;
   font-size: 14px;
+}
+
+.cosmos-controls-group {
+  display: grid;
+  gap: 6px;
+}
+
+.cosmos-controls-group h3 {
+  margin: 0;
+  font-size: 13px;
+  color: #9fb2d7;
 }
 
 .cosmos-controls label {
@@ -1515,7 +1538,7 @@ body {
 
 
 .cosmos-legend {
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   color: #9fb2d7;
   font-size: 13px;
 }
