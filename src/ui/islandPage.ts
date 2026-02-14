@@ -372,13 +372,13 @@ export const createIslandPage = (id: IslandId) => {
           <input name="maxHours" type="number" min="0" step="1" value="${initialInput.maxHours}" />
         </label>
         <label>
-          maxMoney
+          Макс. бюджет
           <input name="maxMoney" type="number" min="0" step="1" value="${initialInput.maxMoney}" />
         </label>
       </div>
       <div class="optimization-header">
         <span>Действия</span>
-        <span class="optimization-columns">hoursCost / moneyCost / impactScore</span>
+        <span class="optimization-columns">часы / бюджет / эффект</span>
       </div>
     `;
 
@@ -1273,7 +1273,7 @@ export const createIslandPage = (id: IslandId) => {
           <textarea name="expenses" rows="${textareaRows}" placeholder="120000, 135000">${formatSeriesInput(parsedInput.expenses)}</textarea>
         </label>
         <label>
-          Horizon
+          Горизонт
           <input name="horizon" type="number" min="1" step="1" value="${parsedInput.horizon ?? 12}" />
         </label>
         <label>
@@ -1285,7 +1285,7 @@ export const createIslandPage = (id: IslandId) => {
           <input name="testSize" type="number" min="0" step="1" value="${parsedInput.testSize ?? ''}" />
         </label>
         <label>
-          Auto
+          Авто
           <input name="auto" type="checkbox" ${parsedInput.auto === false ? '' : 'checked'} />
         </label>
       </div>

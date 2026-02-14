@@ -67,7 +67,7 @@ type Route =
 const createBottomNav = (route: Route) => {
   const nav = document.createElement('nav');
   nav.className = 'bottom-nav';
-  nav.setAttribute('aria-label', 'Нижняя навигация');
+  nav.setAttribute('aria-label', t('bottomNav'));
 
   nav.innerHTML = `
     <a class="bottom-nav-link ${route.name === 'shield' || route.name === 'home' || route.name === 'cosmos' ? 'active' : ''}" href="#/">${t('navHome')}</a>
@@ -86,7 +86,7 @@ const createBuildFooter = () => {
   const footer = document.createElement('div');
   footer.className = 'build-footer';
   footer.innerHTML = `
-    <span>Build ${buildInfo.id}</span>
+    <span>${t('buildLabel')} ${buildInfo.id}</span>
     <span>${buildInfo.builtAt}</span>
   `;
   return footer;
@@ -170,7 +170,7 @@ export const initRouter = (root: HTMLElement) => {
       }
       root.innerHTML = `
         <div class="screen">
-          <h1>Произошла ошибка</h1>
+          <h1>Ошибка</h1>
           <p>Не удалось отрисовать экран. Попробуйте сбросить данные.</p>
           <button class="button" data-reset>Сбросить данные приложения</button>
         </div>

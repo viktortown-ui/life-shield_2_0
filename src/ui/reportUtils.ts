@@ -1,5 +1,6 @@
 import { islandRegistry } from '../core/registry';
 import { AppState, IslandId, IslandReport, IslandRunHistoryEntry } from '../core/types';
+import { formatDateTime } from './i18n';
 
 export const STALE_AFTER_DAYS = 7;
 
@@ -21,10 +22,13 @@ export const formatLastRun = (value: string | null) => {
   if (!value) return '—';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '—';
-  return `${date.toLocaleDateString('ru-RU')} ${date.toLocaleTimeString('ru-RU', {
+  return formatDateTime(date, {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
     hour: '2-digit',
     minute: '2-digit'
-  })}`;
+  });
 };
 
 const formatMetric = (report: IslandReport | null) => {

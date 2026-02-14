@@ -25,8 +25,8 @@ export const createSettingsScreen = () => {
   header.className = 'screen-header';
   header.innerHTML = `
     <div>
-      <h1>Настройки</h1>
-      <p>Экспорт, импорт и обслуживание приложения.</p>
+      <h1>${t('settingsTitle')}</h1>
+      <p>${t('settingsSubtitle')}</p>
     </div>
   `;
 
@@ -65,15 +65,15 @@ export const createSettingsScreen = () => {
   const cosmosFxSettings = document.createElement('section');
   cosmosFxSettings.className = 'settings-block';
   cosmosFxSettings.innerHTML = `
-    <h2>${t('cosmosTitle')} FX</h2>
+    <h2>${t('cosmosTitle')} ${t('soundFx')}</h2>
     <div class="cosmos-controls">
       <label>
         <input type="checkbox" data-cosmos-fx="sound" aria-label="Включить звуковые эффекты Cosmos" />
-        Звуковые эффекты
+        ${t('soundFx')}
       </label>
       <label>
-        Громкость
-        <input type="range" min="0" max="1" step="0.05" data-cosmos-fx="volume" aria-label="Громкость звуковых эффектов Cosmos" />
+        ${t('volume')}
+        <input type="range" min="0" max="1" step="0.05" data-cosmos-fx="volume" aria-label="${t('volume')} звуковых эффектов Cosmos" />
       </label>
       <label>
         <input type="checkbox" data-cosmos-fx="reduceMotion" aria-label="Сократить анимации Cosmos" />
@@ -309,7 +309,7 @@ export const createSettingsScreen = () => {
 
   const actions = document.createElement('div');
   actions.className = 'screen-actions';
-  actions.innerHTML = '<a class="button ghost" href="#/">К щиту</a>';
+  actions.innerHTML = `<a class="button ghost" href="#/">${t('navHome')}</a>`;
 
     const lang = getLang();
   const langInputs = languageSettings.querySelectorAll<HTMLInputElement>('input[name="lang"]');
