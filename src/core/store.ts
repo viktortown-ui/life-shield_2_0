@@ -20,6 +20,7 @@ import { getSnapshotReport } from '../islands/snapshot';
 import { getStressTestReport } from '../islands/stressTest';
 import { getIncomePortfolioReport } from '../islands/incomePortfolio';
 import { getCurrentYm, getNextYm, sanitizeObservations } from './observations';
+import { buildCashflowDriftLast } from './cashflowDrift';
 
 const STORAGE_KEY = 'lifeShieldV2';
 const XP_PER_LEVEL = 120;
@@ -76,7 +77,8 @@ const makeEmptyState = (): AppState => ({
     finance: { ...defaultFinanceInput }
   },
   observations: {
-    cashflowMonthly: []
+    cashflowMonthly: [],
+    cashflowDriftLast: buildCashflowDriftLast([])
   },
   cosmosActivityLog: [],
   islands: {
@@ -658,10 +660,12 @@ export const upsertCashflowObservation = (value: { ym: string; income?: number; 
   const income = Math.max(0, Number.isFinite(value.income) ? Number(value.income) : current?.income ?? 0);
   const expense = Math.max(0, Number.isFinite(value.expense) ? Number(value.expense) : current?.expense ?? 0);
 
+  const cashflowMonthly = updateCashflowMonth(state.observations.cashflowMonthly, value.ym, income, expense);
   updateState({
     ...state,
     observations: {
-      cashflowMonthly: updateCashflowMonth(state.observations.cashflowMonthly, value.ym, income, expense)
+      cashflowMonthly,
+      cashflowDriftLast: buildCashflowDriftLast(cashflowMonthly)
     }
   });
 };
@@ -673,25 +677,30 @@ export const addCashflowObservationMonth = () => {
   const ym = lastYm ? getNextYm(lastYm) : getCurrentYm();
   const existing = history.find((entry) => entry.ym === ym);
 
+  const cashflowMonthly = updateCashflowMonth(
+    history,
+    ym,
+    existing?.income ?? 0,
+    existing?.expense ?? 0
+  );
+
   updateState({
     ...state,
     observations: {
-      cashflowMonthly: updateCashflowMonth(
-        history,
-        ym,
-        existing?.income ?? 0,
-        existing?.expense ?? 0
-      )
+      cashflowMonthly,
+      cashflowDriftLast: buildCashflowDriftLast(cashflowMonthly)
     }
   });
 };
 
 export const removeCashflowObservationMonth = (ym: string) => {
   const state = getState();
+  const cashflowMonthly = state.observations.cashflowMonthly.filter((entry) => entry.ym !== ym);
   updateState({
     ...state,
     observations: {
-      cashflowMonthly: state.observations.cashflowMonthly.filter((entry) => entry.ym !== ym)
+      cashflowMonthly,
+      cashflowDriftLast: buildCashflowDriftLast(cashflowMonthly)
     }
   });
 };
@@ -700,7 +709,10 @@ export const clearCashflowObservations = () => {
   const state = getState();
   updateState({
     ...state,
-    observations: { cashflowMonthly: [] }
+    observations: {
+      cashflowMonthly: [],
+      cashflowDriftLast: buildCashflowDriftLast([])
+    }
   });
 };
 

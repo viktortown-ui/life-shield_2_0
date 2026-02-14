@@ -164,6 +164,8 @@ const formatEventAge = (ts: string) => {
   return `${Math.floor(hours / 24)}д назад`;
 };
 
+const HISTORY_DRIFT_RISK_THRESHOLD = 0.5;
+
 const formatMonths = (value: number) => `${value.toFixed(1)} мес`;
 
 const formatDateTime = (value: string | null) => {
@@ -187,14 +189,17 @@ export const createCosmosScreen = () => {
 
     if (planet.id === 'history') {
       const count = state.observations.cashflowMonthly.length;
+      const drift = state.observations.cashflowDriftLast;
+      const driftScore = drift?.score ?? 0;
+      const hasRiskDrift = Boolean(drift?.detected && driftScore >= HISTORY_DRIFT_RISK_THRESHOLD);
       acc.set('history', {
         id: 'history',
-        badge: count > 0 ? 'ok' : 'none',
-        riskSeverity: 0,
+        badge: count === 0 ? 'none' : hasRiskDrift ? 'risk' : 'ok',
+        riskSeverity: driftScore,
         confidence: count > 0 ? 100 : null,
         freshnessUrgency: count > 0 ? 0.2 : 1,
         proximityUrgency,
-        turbulence: null
+        turbulence: count > 0 ? driftScore : null
       });
       return acc;
     }
@@ -725,7 +730,23 @@ export const createCosmosScreen = () => {
             )} / ${formatMonths(mc.quantiles.p50)} / ${formatMonths(mc.quantiles.p90)}</p><p>Неопределённость: <strong>${uncertaintyLabel}</strong></p>${driftMessage}<div class="cosmos-interval" role="img" aria-label="Интервал runway p10-p90 и медиана p50"><span class="cosmos-interval-range" style="left:${intervalStart}%;width:${intervalWidth}%"></span><span class="cosmos-interval-median" style="left:${medianPos}%"></span></div></section>`;
           })()
         : '';
-    activityPanel.innerHTML = `<h3>Последние действия · ${title}</h3>${list}${mcForecastBlock}`;
+    const historyDriftBlock =
+      selectedPlanetId === 'history'
+        ? (() => {
+            const drift = state.observations.cashflowDriftLast;
+            if (!drift) {
+              return '<section class="cosmos-forecast-block"><h4>Режим cashflow</h4><p class="muted">Сигнал появится после накопления наблюдений.</p></section>';
+            }
+            const status = drift.detected ? 'обнаружена смена режима' : 'режим без сигнала';
+            const meaning = drift.detected
+              ? 'Вероятно изменился финансовый режим: проверьте структуру доходов/расходов и причины сдвига.'
+              : 'Существенного сдвига net cashflow не найдено по последней истории.';
+            return `<section class="cosmos-forecast-block"><h4>Режим cashflow</h4><p>Статус: <strong>${status}</strong></p><p>Score: <strong>${(drift.score * 100).toFixed(
+              0
+            )}%</strong>${drift.ym ? ` · месяц ${drift.ym}` : ''}</p><p class="muted">${meaning}</p></section>`;
+          })()
+        : '';
+    activityPanel.innerHTML = `<h3>Последние действия · ${title}</h3>${list}${mcForecastBlock}${historyDriftBlock}`;
   };
 
   const shouldShowPlanet = (id: IslandId) => !uiFlags.onlyImportant || importantPlanets.has(id);

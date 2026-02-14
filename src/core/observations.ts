@@ -1,4 +1,4 @@
-import { CashflowMonthlyEntry, ObservationsState } from './types';
+import { CashflowDriftLastState, CashflowMonthlyEntry, ObservationsState } from './types';
 
 export const CASHFLOW_MONTHLY_CAP = 36;
 
@@ -18,6 +18,39 @@ const sanitizeAmount = (value: unknown): number => {
     return 0;
   }
   return Math.max(0, numeric);
+};
+
+
+const sanitizeDriftParams = (value: unknown): CashflowDriftLastState['paramsUsed'] => {
+  const source = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+  const delta = Number(source.delta);
+  const lambda = Number(source.lambda);
+  const minN = Number(source.minN);
+  return {
+    delta: Number.isFinite(delta) ? delta : 0.03,
+    lambda: Number.isFinite(lambda) ? lambda : 4.2,
+    minN: Number.isFinite(minN) ? Math.max(2, Math.floor(minN)) : 8
+  };
+};
+
+const sanitizeCashflowDriftLast = (value: unknown): CashflowDriftLastState | undefined => {
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+  const row = value as Record<string, unknown>;
+  const ts = typeof row.ts === 'string' && row.ts.trim() ? row.ts : null;
+  if (!ts) {
+    return undefined;
+  }
+  const ym = row.ym == null ? null : sanitizeYm(row.ym);
+  const score = Number(row.score);
+  return {
+    detected: Boolean(row.detected),
+    score: Number.isFinite(score) ? Math.max(0, Math.min(1, score)) : 0,
+    ym,
+    ts,
+    paramsUsed: sanitizeDriftParams(row.paramsUsed)
+  };
 };
 
 export const sanitizeCashflowMonthly = (
@@ -53,8 +86,10 @@ export const sanitizeCashflowMonthly = (
 
 export const sanitizeObservations = (value: unknown): ObservationsState => {
   const source = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+  const cashflowDriftLast = sanitizeCashflowDriftLast(source.cashflowDriftLast);
   return {
-    cashflowMonthly: sanitizeCashflowMonthly(source.cashflowMonthly)
+    cashflowMonthly: sanitizeCashflowMonthly(source.cashflowMonthly),
+    ...(cashflowDriftLast ? { cashflowDriftLast } : {})
   };
 };
 
