@@ -4,6 +4,7 @@ import { deriveShieldTiles } from '../core/shieldModel';
 import { getState, recordCosmosEvent, setCosmosUiFlags } from '../core/store';
 import { CosmosActivityEvent, IslandId, IslandReport } from '../core/types';
 import { createCosmosSfxEngine } from './cosmosSfx';
+import { computeTurbulence } from '../core/turbulence';
 import {
   getTurbulenceScore,
   getUncertaintyLabel,
@@ -164,7 +165,7 @@ const formatEventAge = (ts: string) => {
   return `${Math.floor(hours / 24)}д назад`;
 };
 
-const HISTORY_DRIFT_RISK_THRESHOLD = 0.5;
+const TURBULENCE_RISK_THRESHOLD = 0.5;
 const FORECAST_RISK_BADGE_THRESHOLD = 0.5;
 
 const getDisagreementLabel = (score: number) => {
@@ -187,6 +188,8 @@ const formatDateTime = (value: string | null) => {
 
 export const createCosmosScreen = () => {
   const state = getState();
+  const turbulence = computeTurbulence(state);
+  const turbulenceSignalById = new Map(turbulence.signals.map((signal) => [signal.id, signal]));
   const tiles = deriveShieldTiles(state);
   const orbitTitleById = new Map(tiles.map((tile) => [tile.id, tile.title]));
 
@@ -196,21 +199,18 @@ export const createCosmosScreen = () => {
 
     if (planet.id === 'history') {
       const count = state.observations.cashflowMonthly.length;
-      const drift = state.observations.cashflowDriftLast;
-      const forecast = state.observations.cashflowForecastLast;
-      const driftScore = drift?.score ?? 0;
-      const forecastRisk = forecast?.probNetNegative ?? 0;
-      const disagreement = forecast?.disagreementScore ?? 0;
-      const hasRiskDrift = Boolean(drift?.detected && driftScore >= HISTORY_DRIFT_RISK_THRESHOLD);
-      const hasForecastRisk = forecastRisk >= FORECAST_RISK_BADGE_THRESHOLD;
+      const historyScore = Math.max(
+        Number(turbulenceSignalById.get('cashflowDrift')?.score ?? 0),
+        Number(turbulenceSignalById.get('cashflowForecast')?.score ?? 0)
+      );
       acc.set('history', {
         id: 'history',
-        badge: count === 0 ? 'none' : hasRiskDrift || hasForecastRisk || disagreement >= 0.66 ? 'risk' : 'ok',
-        riskSeverity: Math.max(driftScore, forecastRisk, disagreement * 0.85),
+        badge: count === 0 ? 'none' : historyScore >= TURBULENCE_RISK_THRESHOLD ? 'risk' : 'ok',
+        riskSeverity: historyScore,
         confidence: count > 0 ? 100 : null,
         freshnessUrgency: count > 0 ? 0.2 : 1,
         proximityUrgency,
-        turbulence: count > 0 ? Math.max(driftScore, forecastRisk * 0.85, disagreement) : null
+        turbulence: count > 0 ? historyScore : null
       });
       return acc;
     }
@@ -715,6 +715,15 @@ export const createCosmosScreen = () => {
           .map((event) => `<li><strong>${formatEventAction(event.action)}</strong> · ${formatEventAge(event.ts)}</li>`)
           .join('')}</ul>`
       : '<p class="muted">Нет событий за последнее время.</p>';
+    const signalsList = turbulence.signals
+      .slice(0, 5)
+      .map((signal) => `<li><strong>${signal.label}</strong> · ${(signal.score * 100).toFixed(0)}% — ${signal.explanation}</li>`)
+      .join('');
+    const signalsBlock = `<section class="cosmos-forecast-block"><h4>Сигналы турбулентности</h4><p>Индекс: <strong>${(
+      turbulence.overallScore * 100
+    ).toFixed(0)}%</strong> · confidence ${(turbulence.overallConfidence * 100).toFixed(0)}%</p>${
+      signalsList ? `<ul>${signalsList}</ul>` : '<p class="muted">Сигналы появятся после накопления данных.</p>'
+    }</section>`;
     const mcForecastBlock =
       selectedPlanetId === 'stressTest'
         ? (() => {
@@ -744,12 +753,12 @@ export const createCosmosScreen = () => {
     const historyDriftBlock =
       selectedPlanetId === 'history'
         ? (() => {
-            const drift = state.observations.cashflowDriftLast;
             const forecast = state.observations.cashflowForecastLast;
-            const driftBlock = drift
-              ? `<p>Режим: <strong>${drift.detected ? 'обнаружена смена' : 'без сигнала'}</strong></p><p>Drift score: <strong>${(drift.score * 100).toFixed(
-                  0
-                )}%</strong>${drift.ym ? ` · месяц ${drift.ym}` : ''}</p>`
+            const driftSignal = turbulenceSignalById.get('cashflowDrift');
+            const driftBlock = driftSignal
+              ? `<p>Режим: <strong>${Boolean(driftSignal.evidence?.driftDetected) ? 'обнаружена смена' : 'без сигнала'}</strong></p><p>Drift score: <strong>${(
+                  driftSignal.score * 100
+                ).toFixed(0)}%</strong>${driftSignal.ym ? ` · месяц ${driftSignal.ym}` : ''}</p>`
               : '<p class="muted">Сигнал режима появится после накопления наблюдений.</p>';
             const forecastBlock = forecast
               ? (() => {
@@ -767,7 +776,7 @@ export const createCosmosScreen = () => {
             return `<section class="cosmos-forecast-block"><h4>History прогноз</h4>${driftBlock}${forecastBlock}</section>`;
           })()
         : '';
-    activityPanel.innerHTML = `<h3>Последние действия · ${title}</h3>${list}${mcForecastBlock}${historyDriftBlock}`;
+    activityPanel.innerHTML = `<h3>Последние действия · ${title}</h3>${list}${mcForecastBlock}${historyDriftBlock}${signalsBlock}`;
   };
 
   const shouldShowPlanet = (id: IslandId) => !uiFlags.onlyImportant || importantPlanets.has(id);

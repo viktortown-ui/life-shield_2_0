@@ -49,6 +49,7 @@ describe('cosmos stress panel forecast', () => {
     expect(panel?.textContent).toContain('Прогноз Monte Carlo');
     expect(panel?.textContent).toContain('Вероятность провала');
     expect(panel?.textContent).toContain('Runway p10/p50/p90');
+    expect(panel?.textContent).toContain('Сигналы турбулентности');
   });
 });
 
@@ -81,5 +82,6 @@ describe('cosmos history forecast panel', () => {
     expect(panel?.textContent).toContain('Forecast risk');
     expect(panel?.textContent).toContain('Net p10/p50/p90');
     expect(panel?.textContent).toContain('Согласие моделей');
+    expect(panel?.textContent).toContain('Сигналы турбулентности');
   });
 });

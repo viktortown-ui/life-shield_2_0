@@ -10,6 +10,7 @@ import {
   CashflowForecastResult,
   CashflowForecastWorkerResponse
 } from '../workers/cashflowForecast';
+import { computeTurbulence } from '../core/turbulence';
 
 const FORECAST_MIN_MONTHS = 6;
 const FORECAST_ITERATIONS = 2000;
@@ -152,6 +153,19 @@ export const createHistoryScreen = () => {
 
     const recentForSpark = rows.slice(-12);
     const sparkValues = recentForSpark.map((row) => row.income - row.expense);
+    const turbulence = computeTurbulence(state);
+    const keySignals = turbulence.signals
+      .filter((signal) => signal.id === 'cashflowDrift' || signal.id === 'cashflowForecast' || signal.id === 'freshness')
+      .slice(0, 3);
+    const turbulenceBlock = `<div class="history-turbulence"><p><strong>Индекс турбулентности:</strong> ${(
+      turbulence.overallScore * 100
+    ).toFixed(0)}% · confidence ${(turbulence.overallConfidence * 100).toFixed(0)}%</p>${
+      keySignals.length
+        ? `<ul>${keySignals
+            .map((signal) => `<li>${signal.label}: ${(signal.score * 100).toFixed(0)}% — ${signal.explanation}</li>`)
+            .join('')}</ul>`
+        : '<p class="muted">Сигналы пока недоступны.</p>'
+    }</div>`;
     const drift = state.observations.cashflowDriftLast;
     const driftAlert =
       drift?.detected
@@ -163,6 +177,7 @@ export const createHistoryScreen = () => {
       <h3>Net за 12 месяцев</h3>
       ${buildNetSparkline(sparkValues, 'Динамика net за 12 месяцев')}
       ${driftAlert}
+      ${turbulenceBlock}
       <p class="muted">данных: ${rows.length} месяцев</p>
     `;
 
