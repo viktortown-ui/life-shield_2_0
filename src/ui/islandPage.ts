@@ -1,5 +1,5 @@
 import { findIsland } from '../core/registry';
-import { parseFinanceInput } from '../islands/finance';
+import { parseFinanceInput, serializeFinanceInput } from '../islands/finance';
 import {
   getState,
   updateIslandInput,
@@ -64,6 +64,24 @@ import { getMetricLabel } from '../i18n/glossary';
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
+
+const parseLocaleNumber = (raw: FormDataEntryValue | string | null, fallback: number) => {
+  const normalized = String(raw ?? '')
+    .trim()
+    .replace(/\s+/g, '')
+    .replace(',', '.');
+  if (!normalized) return fallback;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const normalizeNumberInput = (input: HTMLInputElement) => {
+  const normalized = input.value.trim().replace(/\s+/g, '').replace(',', '.');
+  if (!normalized) return;
+  const parsed = Number(normalized);
+  if (!Number.isFinite(parsed)) return;
+  input.value = String(parsed);
+};
 
 const buildIslandErrorReport = (id: IslandId, error: unknown) => ({
   id,
@@ -582,12 +600,12 @@ export const createIslandPage = (id: IslandId) => {
           <div class="decision-tree-action" data-action-index="${actionIndex}">
             <div class="decision-tree-action-header">
               <label>
-                Action
+                Вариант
                 <input
                   name="action-name-${actionIndex}"
                   type="text"
                   value="${action.name}"
-                  placeholder="A/B/C"
+                  placeholder="Вариант A/B/C"
                 />
               </label>
               <button class="button ghost" type="button" data-remove-action="${actionIndex}">
@@ -600,7 +618,7 @@ export const createIslandPage = (id: IslandId) => {
                   (outcome, outcomeIndex) => `
                 <div class="decision-tree-outcome" data-outcome-index="${outcomeIndex}">
                   <label>
-                    Probability
+                    Вероятность
                     <input
                       name="outcome-prob-${actionIndex}-${outcomeIndex}"
                       type="number"
@@ -613,7 +631,7 @@ export const createIslandPage = (id: IslandId) => {
                     />
                   </label>
                   <label>
-                    Payoff
+                    Выигрыш (польза)
                     <input
                       name="outcome-payoff-${actionIndex}-${outcomeIndex}"
                       type="number"
@@ -622,7 +640,7 @@ export const createIslandPage = (id: IslandId) => {
                     />
                   </label>
                   <label>
-                    Risk tag
+                    Риск (низкий/средний/высокий)
                     <input
                       name="outcome-risk-${actionIndex}-${outcomeIndex}"
                       type="text"
@@ -644,7 +662,7 @@ export const createIslandPage = (id: IslandId) => {
             </div>
             <div class="decision-tree-action-footer">
               <div class="decision-tree-hint">
-                сумма вероятностей должна быть 1.0
+                Проверь: вероятности вместе должны дать 1 (100%).
               </div>
               <div class="decision-tree-total">
                 Σp: <strong data-prob-total="${actionIndex}">${formatProbability(
@@ -665,7 +683,7 @@ export const createIslandPage = (id: IslandId) => {
       const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
       const index = actions.length;
       if (index < alphabet.length) return alphabet[index];
-      return `Action ${index + 1}`;
+      return `Вариант ${index + 1}`;
     };
 
     const readNumberInput = (input: HTMLInputElement | null) => {
@@ -730,7 +748,7 @@ export const createIslandPage = (id: IslandId) => {
 
     form.innerHTML = `
       <div class="decision-tree-header">
-        <h3>Actions</h3>
+        <h3>Варианты</h3>
         <button class="button ghost" type="button" data-add-action>
           Добавить действие
         </button>
@@ -818,6 +836,218 @@ export const createIslandPage = (id: IslandId) => {
       renderReport();
     });
 
+  } else if (id === 'snapshot') {
+    const parsedFinance = parseFinanceInput(islandState.input);
+    form.innerHTML = `
+      <div class="island-intro"><p>Заполните базовые цифры за месяц. Этого достаточно для первого результата.</p></div>
+      <div class="bayes-grid">
+        <label>Доход в месяц
+          <input name="monthlyIncome" type="text" inputmode="decimal" value="${parsedFinance.monthlyIncome}" required />
+          <small>Сколько обычно приходит за месяц.</small>
+        </label>
+        <label>Расходы в месяц
+          <input name="monthlyExpenses" type="text" inputmode="decimal" value="${parsedFinance.monthlyExpenses}" required />
+          <small>Сколько уходит в обычный месяц.</small>
+        </label>
+        <label>Резерв
+          <input name="reserveCash" type="text" inputmode="decimal" value="${parsedFinance.reserveCash}" required />
+          <small>Деньги, которые можно использовать в случае просадки.</small>
+        </label>
+        <label>Платёж по долгам
+          <input name="monthlyDebtPayment" type="text" inputmode="decimal" value="${parsedFinance.monthlyDebtPayment}" required />
+        </label>
+        <label>Сколько источников дохода
+          <input name="incomeSourcesCount" type="number" min="1" step="1" value="${parsedFinance.incomeSourcesCount}" required />
+        </label>
+      </div>
+      <details class="island-advanced">
+        <summary>Вставить данные (JSON)</summary>
+        <label>Импорт/экспорт для продвинутых
+          <textarea name="financeJson" rows="6">${serializeFinanceInput(parsedFinance)}</textarea>
+        </label>
+      </details>
+      <button class="button" type="submit">Рассчитать</button>
+    `;
+
+    form.querySelectorAll<HTMLInputElement>('input[type="text"]').forEach((input) => {
+      input.addEventListener('blur', () => normalizeNumberInput(input));
+    });
+
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const data = new FormData(form);
+      const next = {
+        monthlyIncome: Math.max(0, parseLocaleNumber(data.get('monthlyIncome'), parsedFinance.monthlyIncome)),
+        monthlyExpenses: Math.max(0, parseLocaleNumber(data.get('monthlyExpenses'), parsedFinance.monthlyExpenses)),
+        reserveCash: Math.max(0, parseLocaleNumber(data.get('reserveCash'), parsedFinance.reserveCash)),
+        monthlyDebtPayment: Math.max(0, parseLocaleNumber(data.get('monthlyDebtPayment'), parsedFinance.monthlyDebtPayment)),
+        incomeSourcesCount: Math.max(1, Math.round(parseLocaleNumber(data.get('incomeSourcesCount'), parsedFinance.incomeSourcesCount))),
+        top1Share: parsedFinance.top1Share,
+        top3Share: parsedFinance.top3Share,
+        incomeSources: parsedFinance.incomeSources
+      };
+      const jsonRaw = String(data.get('financeJson') ?? '').trim();
+      const input = jsonRaw ? jsonRaw : serializeFinanceInput(next);
+      updateIslandInput(id, input);
+      const report = safeGetReport(input);
+      updateIslandReport(id, report);
+      islandState.input = input;
+      islandState.lastReport = report;
+      renderReport();
+    });
+  } else if (id === 'incomePortfolio') {
+    const parsedFinance = parseFinanceInput(islandState.input);
+    const initialSources = parsedFinance.incomeSources?.length
+      ? parsedFinance.incomeSources.map((source, index) => ({
+          name: source.name ?? `Источник ${index + 1}`,
+          amount: source.amount,
+          stability: Math.round(((source.stability - 1) / 4) * 100)
+        }))
+      : [
+          { name: 'Работа', amount: Math.round(parsedFinance.monthlyIncome * 0.65), stability: 85 },
+          { name: 'Подработка', amount: Math.round(parsedFinance.monthlyIncome * 0.2), stability: 60 },
+          { name: 'Проект', amount: Math.round(parsedFinance.monthlyIncome * 0.15), stability: 45 }
+        ];
+
+    const rows = document.createElement('div');
+    rows.className = 'income-source-list';
+
+    const renderRows = (items: Array<{ name: string; amount: number; stability: number }>) => {
+      rows.innerHTML = items
+        .map((item, index) => `
+          <div class="income-source-row" data-source-index="${index}">
+            <label>Название источника
+              <input name="source-name-${index}" type="text" value="${item.name}" placeholder="Работа" />
+            </label>
+            <label>Сумма в месяц
+              <input name="source-amount-${index}" type="text" inputmode="decimal" value="${item.amount}" />
+            </label>
+            <label>Стабильность: <span data-stability-label="${index}">${item.stability}</span>%
+              <input name="source-stability-${index}" type="range" min="0" max="100" step="1" value="${item.stability}" />
+              <small>Насколько это надёжно.</small>
+            </label>
+            <button class="button ghost" type="button" data-remove-source="${index}">Удалить</button>
+          </div>
+        `)
+        .join('');
+    };
+
+    const collectRows = () => {
+      const nodes = Array.from(rows.querySelectorAll<HTMLElement>('[data-source-index]'));
+      return nodes.map((node, index) => {
+        const name = node.querySelector<HTMLInputElement>(`[name="source-name-${index}"]`)?.value.trim() ?? '';
+        const amountRaw = node.querySelector<HTMLInputElement>(`[name="source-amount-${index}"]`)?.value ?? '';
+        const stabilityRaw = node.querySelector<HTMLInputElement>(`[name="source-stability-${index}"]`)?.value ?? '';
+        const amount = Math.max(0, parseLocaleNumber(amountRaw, 0));
+        const stability = clamp(parseLocaleNumber(stabilityRaw, 60), 0, 100);
+        return { name: name || `Источник ${index + 1}`, amount, stability };
+      });
+    };
+
+    form.innerHTML = `
+      <div class="island-intro"><p>Добавьте источники дохода: название, сумму и надёжность.</p></div>
+      <div class="income-portfolio-header">
+        <button class="button ghost" type="button" data-add-source>Добавить источник</button>
+        <button class="button ghost" type="button" data-fill-example>Заполнить пример</button>
+      </div>
+      <p class="muted" data-total-income></p>
+      <details class="island-advanced">
+        <summary>Импорт/экспорт (для продвинутых)</summary>
+        <label>Вставить данные (JSON)
+          <textarea name="financeJson" rows="6"></textarea>
+        </label>
+      </details>
+      <button class="button" type="submit">Рассчитать</button>
+    `;
+
+    form.insertBefore(rows, form.querySelector('.income-portfolio-header')?.nextSibling ?? null);
+    renderRows(initialSources);
+
+    const totalIncomeEl = form.querySelector<HTMLElement>('[data-total-income]');
+    const syncTotal = () => {
+      const total = collectRows().reduce((sum, item) => sum + item.amount, 0);
+      if (totalIncomeEl) {
+        totalIncomeEl.textContent = `Сумма всех источников: ${formatNumber(total, { maximumFractionDigits: 0 })}`;
+      }
+      rows.querySelectorAll<HTMLInputElement>('input[type="range"]').forEach((slider, index) => {
+        const label = rows.querySelector<HTMLElement>(`[data-stability-label="${index}"]`);
+        if (label) label.textContent = slider.value;
+      });
+    };
+    syncTotal();
+
+    rows.addEventListener('input', (event) => {
+      const target = event.target as HTMLElement;
+      if (target instanceof HTMLInputElement && target.type === 'text') {
+        return;
+      }
+      syncTotal();
+    });
+
+    rows.addEventListener('blur', (event) => {
+      const target = event.target as HTMLElement;
+      if (target instanceof HTMLInputElement && target.name.includes('source-amount')) {
+        normalizeNumberInput(target);
+        syncTotal();
+      }
+    }, true);
+
+    form.addEventListener('click', (event) => {
+      const target = event.target as HTMLElement;
+      if (target.matches('[data-add-source]')) {
+        const next = collectRows();
+        next.push({ name: `Источник ${next.length + 1}`, amount: 0, stability: 60 });
+        renderRows(next);
+        syncTotal();
+      }
+      if (target.matches('[data-fill-example]')) {
+        renderRows([
+          { name: 'Работа', amount: 120000, stability: 85 },
+          { name: 'Подработка', amount: 35000, stability: 60 },
+          { name: 'Проект', amount: 25000, stability: 45 }
+        ]);
+        syncTotal();
+      }
+      if (target.matches('[data-remove-source]')) {
+        const index = Number(target.getAttribute('data-remove-source'));
+        const next = collectRows().filter((_, current) => current !== index);
+        renderRows(next.length ? next : [{ name: 'Источник 1', amount: 0, stability: 60 }]);
+        syncTotal();
+      }
+    });
+
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const sources = collectRows().filter((item) => item.amount > 0);
+      const incomeSources = sources.map((source) => ({
+        name: source.name,
+        amount: source.amount,
+        stability: clamp(1 + source.stability / 25, 1, 5)
+      }));
+      const monthlyIncome = incomeSources.reduce((sum, source) => sum + source.amount, 0);
+      const sorted = [...incomeSources].sort((a, b) => b.amount - a.amount);
+      const top1Share = monthlyIncome > 0 ? (sorted[0]?.amount ?? 0) / monthlyIncome : 1;
+      const top3Share = monthlyIncome > 0
+        ? sorted.slice(0, 3).reduce((sum, source) => sum + source.amount, 0) / monthlyIncome
+        : 1;
+      const payload = {
+        ...parsedFinance,
+        monthlyIncome,
+        incomeSourcesCount: Math.max(1, incomeSources.length),
+        top1Share,
+        top3Share,
+        incomeSources
+      };
+      const data = new FormData(form);
+      const jsonRaw = String(data.get('financeJson') ?? '').trim();
+      const serialized = jsonRaw || serializeFinanceInput(payload);
+      updateIslandInput(id, serialized);
+      islandState.input = serialized;
+      const report = safeGetReport(serialized);
+      updateIslandReport(id, report);
+      islandState.lastReport = report;
+      renderReport();
+    });
   } else if (id === 'stressTest') {
     const modeKey = 'ls2.stressTest.mode';
     const paramsKey = 'ls2.stressTest.mc';
@@ -863,48 +1093,67 @@ export const createIslandPage = (id: IslandId) => {
     };
 
     form.innerHTML = `
+      <div class="island-intro"><p>Сначала заполните базовые данные, затем выберите тип проверки.</p></div>
+      <div class="bayes-grid">
+        <label>Доход в месяц
+          <input name="monthlyIncome" type="text" inputmode="decimal" value="${parsedFinance.monthlyIncome}" required />
+        </label>
+        <label>Расходы в месяц
+          <input name="monthlyExpenses" type="text" inputmode="decimal" value="${parsedFinance.monthlyExpenses}" required />
+        </label>
+        <label>Резерв
+          <input name="reserveCash" type="text" inputmode="decimal" value="${parsedFinance.reserveCash}" required />
+        </label>
+      </div>
       <fieldset class="stress-mode-toggle">
         <label><input type="radio" name="stressMode" value="det" ${
           readStoredMode() === 'det' ? 'checked' : ''
-        } /> Детерминированный</label>
+        } /> Простой сценарий</label>
         <label><input type="radio" name="stressMode" value="mc" ${
           readStoredMode() === 'mc' ? 'checked' : ''
-        } /> Вероятностный (Монте-Карло)</label>
+        } /> Вероятностный сценарий</label>
       </fieldset>
       <div class="stress-mc-fields" data-mc-fields>
         <div class="bayes-grid">
-          <label>Горизонт (мес)
+          <label>Период проверки (мес)
             <select name="horizonMonths">
               <option value="3">3</option>
               <option value="6" selected>6</option>
               <option value="12">12</option>
             </select>
           </label>
-          <label>Итерации
+          <label>Сколько расчётов
             <input name="iterations" type="number" min="200" max="20000" step="100" />
           </label>
-          <label>Волатильность дохода (%)
+          <label>Колебания дохода (%)
             <input name="incomeVolatility" type="number" min="0" max="200" step="1" />
           </label>
-          <label>Волатильность расходов (%)
+          <label>Колебания расходов (%)
             <input name="expensesVolatility" type="number" min="0" max="200" step="1" />
           </label>
-          <label>Seed
+          <label>Случайное число (seed)
             <input name="seed" type="number" step="1" />
           </label>
         </div>
         <label class="stress-shock-toggle">
-          <input type="checkbox" name="shockEnabled" /> Шок дохода (разовый)
+          <input type="checkbox" name="shockEnabled" /> Учесть резкое падение дохода
         </label>
         <div class="bayes-grid">
-          <label>Вероятность шока (0..1)
+          <label>Вероятность падения (0..1)
             <input name="shockProbability" type="number" min="0" max="1" step="0.01" />
+            <small>Как часто так бывает.</small>
           </label>
-          <label>Падение дохода при шоке (%)
+          <label>Насколько падает доход (%)
             <input name="shockDropPercent" type="number" min="0" max="100" step="1" />
           </label>
         </div>
       </div>
+      <details class="island-advanced">
+        <summary>Вставить данные (JSON)</summary>
+        <label>Импорт/экспорт для продвинутых
+          <textarea name="financeJson" rows="6">${serializeFinanceInput(parsedFinance)}</textarea>
+        </label>
+      </details>
       <button class="button" type="submit">Рассчитать</button>
     `;
 
@@ -985,10 +1234,24 @@ export const createIslandPage = (id: IslandId) => {
       renderReport();
     });
 
+    form.querySelectorAll<HTMLInputElement>('input[type="text"]').forEach((input) => {
+      input.addEventListener('blur', () => normalizeNumberInput(input));
+    });
+
     form.addEventListener('submit', (event) => {
       event.preventDefault();
       const mode = (form.querySelector<HTMLInputElement>('[name="stressMode"]:checked')?.value ?? 'det') as 'det' | 'mc';
-      const input = islandState.input;
+      const data = new FormData(form);
+      const financeInput = {
+        ...parsedFinance,
+        monthlyIncome: Math.max(0, parseLocaleNumber(data.get('monthlyIncome'), parsedFinance.monthlyIncome)),
+        monthlyExpenses: Math.max(0, parseLocaleNumber(data.get('monthlyExpenses'), parsedFinance.monthlyExpenses)),
+        reserveCash: Math.max(0, parseLocaleNumber(data.get('reserveCash'), parsedFinance.reserveCash))
+      };
+      const jsonRaw = String(data.get('financeJson') ?? '').trim();
+      const input = jsonRaw || serializeFinanceInput(financeInput);
+      updateIslandInput(id, input);
+      islandState.input = input;
       if (mode === 'det') {
         const report = safeGetReport(input);
         updateIslandReport(id, report);
@@ -997,7 +1260,6 @@ export const createIslandPage = (id: IslandId) => {
         return;
       }
 
-      const data = new FormData(form);
       const params: MonteCarloRunwayInput = {
         horizonMonths: Number(data.get('horizonMonths') ?? 6),
         iterations: Number(data.get('iterations') ?? 2000),
@@ -1014,9 +1276,9 @@ export const createIslandPage = (id: IslandId) => {
       localStorage.setItem(paramsKey, JSON.stringify(params));
 
       const deterministicRunway = getDeterministicRunwayMonths({
-        reserveCash: parsedFinance.reserveCash,
-        monthlyIncome: parsedFinance.monthlyIncome,
-        monthlyExpenses: parsedFinance.monthlyExpenses,
+        reserveCash: financeInput.reserveCash,
+        monthlyIncome: financeInput.monthlyIncome,
+        monthlyExpenses: financeInput.monthlyExpenses,
         horizonMonths: params.horizonMonths
       });
 
@@ -1036,7 +1298,7 @@ export const createIslandPage = (id: IslandId) => {
       worker.postMessage({
         requestId: `${Date.now()}-${Math.random()}`,
         input: params,
-        finance: parsedFinance
+        finance: financeInput
       });
     });
   } else if (id === 'causalDag') {

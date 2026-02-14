@@ -2125,3 +2125,50 @@ body {
   align-items: center;
   gap: 8px;
 }
+
+.income-portfolio-header {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 12px 0;
+}
+
+.income-source-list {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.income-source-row {
+  display: grid;
+  gap: 8px;
+  border: 1px solid #24314d;
+  border-radius: 12px;
+  padding: 10px;
+  background: #0f1627;
+}
+
+.income-source-row input[type='text'],
+.income-source-row input[type='range'] {
+  width: 100%;
+}
+
+.island-advanced {
+  margin: 8px 0 12px;
+}
+
+.island .screen-actions {
+  position: sticky;
+  bottom: 72px;
+  z-index: 5;
+  background: rgba(11, 18, 32, 0.92);
+  padding: 8px;
+  border-radius: 12px;
+}
+
+@media (min-width: 720px) {
+  .income-source-row {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+    align-items: end;
+  }
+}

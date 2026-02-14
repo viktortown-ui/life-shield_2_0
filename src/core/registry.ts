@@ -24,8 +24,8 @@ export const islandRegistry: IslandDefinition[] = [
     id: 'snapshot',
     title: getIslandCatalogItem('snapshot').displayName,
     description: getIslandCatalogItem('snapshot').shortWhy,
-    inputLabel: 'Финансовые данные (JSON или строки key:value)',
-    placeholder: 'monthlyIncome: 210000\nmonthlyExpenses: 130000\nreserveCash: 420000',
+    inputLabel: 'Финансовые данные',
+    placeholder: 'Заполните поля формы',
     getReport: getSnapshotReport
   },
   {
@@ -33,7 +33,7 @@ export const islandRegistry: IslandDefinition[] = [
     title: getIslandCatalogItem('stressTest').displayName,
     description: getIslandCatalogItem('stressTest').shortWhy,
     inputLabel: 'Те же финансовые данные',
-    placeholder: 'monthlyIncome: 210000\nmonthlyExpenses: 130000\nreserveCash: 420000',
+    placeholder: 'Заполните поля формы',
     getReport: getStressTestReport
   },
   {
@@ -41,8 +41,7 @@ export const islandRegistry: IslandDefinition[] = [
     title: getIslandCatalogItem('incomePortfolio').displayName,
     description: getIslandCatalogItem('incomePortfolio').shortWhy,
     inputLabel: 'Доли/источники доходов',
-    placeholder:
-      '{"monthlyIncome":210000,"incomeSourcesCount":3,"top1Share":0.55,"top3Share":0.92}',
+    placeholder: 'Добавьте источники дохода в форму',
     getReport: getIncomePortfolioReport
   },
   {

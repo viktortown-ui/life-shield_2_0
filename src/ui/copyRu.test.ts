@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const forbidden = /Runway|HHI|Debt burden|Coverage|Burn-in|Step size/;
+const forbidden = /Runway|HHI|Debt burden|Coverage|Burn-in|Step size|Actions?|Probability|Payoff|Risk tag|\bNet\b|Data freshness/i;
 
 
 

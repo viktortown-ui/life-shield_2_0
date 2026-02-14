@@ -10,6 +10,7 @@ export type IslandId =
   | 'causalDag';
 
 export interface IncomeSource {
+  name?: string;
   amount: number;
   stability: number;
 }
