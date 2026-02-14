@@ -51,6 +51,19 @@ export const createCosmosSfxEngine = () => {
     return unlocked;
   };
 
+
+  const suspend = async () => {
+    if (!context || context.state !== 'running') return;
+    await context.suspend();
+  };
+
+  const resume = async () => {
+    const audioContext = ensureContext();
+    if (!audioContext || audioContext.state === 'running') return;
+    await audioContext.resume();
+    unlocked = audioContext.state === 'running';
+  };
+
   const play = (tone: CosmosSfxTone, volume: number) => {
     if (!unlocked || volume <= 0) return;
     const audioContext = ensureContext();
@@ -85,6 +98,9 @@ export const createCosmosSfxEngine = () => {
   return {
     unlock,
     play,
+    suspend,
+    resume,
+    hasContext: () => context !== null,
     isUnlocked: () => unlocked
   };
 };

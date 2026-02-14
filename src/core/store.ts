@@ -1,6 +1,8 @@
 import { migrate, schemaVersion } from './migrations';
 import {
   AppState,
+  CosmosActivityAction,
+  CosmosActivityEvent,
   FinanceInputData,
   IslandId,
   IslandReport,
@@ -21,6 +23,7 @@ import { getIncomePortfolioReport } from '../islands/incomePortfolio';
 const STORAGE_KEY = 'lifeShieldV2';
 const XP_PER_LEVEL = 120;
 const RUN_HISTORY_LIMIT = 10;
+const COSMOS_ACTIVITY_LIMIT = 200;
 
 interface ExportPayload {
   schemaVersion: number;
@@ -55,6 +58,7 @@ const makeEmptyState = (): AppState => ({
   inputData: {
     finance: { ...defaultFinanceInput }
   },
+  cosmosActivityLog: [],
   islands: {
     snapshot: { input: '', lastReport: null, progress: makeIslandProgress() },
     stressTest: { input: '', lastReport: null, progress: makeIslandProgress() },
@@ -112,6 +116,59 @@ const appendHistory = (
     return next;
   }
   return next.slice(next.length - RUN_HISTORY_LIMIT);
+};
+
+
+const isIslandId = (value: string): value is IslandId => {
+  return (
+    value === 'snapshot' ||
+    value === 'stressTest' ||
+    value === 'incomePortfolio' ||
+    value === 'bayes' ||
+    value === 'hmm' ||
+    value === 'timeseries' ||
+    value === 'optimization' ||
+    value === 'decisionTree' ||
+    value === 'causalDag'
+  );
+};
+
+const safeCosmosActivityAction = (value: unknown): CosmosActivityAction | null => {
+  if (value === 'open' || value === 'data' || value === 'report' || value === 'confirm' || value === 'cancel') {
+    return value;
+  }
+  return null;
+};
+
+const safeCosmosActivityEvent = (value: unknown): CosmosActivityEvent | null => {
+  if (!isRecord(value) || typeof value.ts !== 'string') {
+    return null;
+  }
+  const action = safeCosmosActivityAction(value.action);
+  if (!action) {
+    return null;
+  }
+  const islandIdRaw = safeString(value.islandId, '').trim();
+  if (!isIslandId(islandIdRaw)) {
+    return null;
+  }
+  return {
+    ts: value.ts,
+    islandId: islandIdRaw,
+    action,
+    ...(typeof value.meta === 'string' && value.meta.trim() ? { meta: value.meta.trim() } : {})
+  };
+};
+
+const appendCosmosActivity = (
+  history: CosmosActivityEvent[],
+  entry: CosmosActivityEvent
+) => {
+  const next = [...history, entry];
+  if (next.length <= COSMOS_ACTIVITY_LIMIT) {
+    return next;
+  }
+  return next.slice(next.length - COSMOS_ACTIVITY_LIMIT);
 };
 
 const mergeProgress = (
@@ -211,6 +268,12 @@ const mergeWithDefaults = (
           : {})
       }
     },
+    cosmosActivityLog: Array.isArray(incoming.cosmosActivityLog)
+      ? (incoming.cosmosActivityLog
+          .map(safeCosmosActivityEvent)
+          .filter(Boolean)
+          .slice(-COSMOS_ACTIVITY_LIMIT) as CosmosActivityEvent[])
+      : base.cosmosActivityLog,
     islands: {
       snapshot: mergeIslandState(base.islands.snapshot, islands.snapshot),
       stressTest: mergeIslandState(base.islands.stressTest, islands.stressTest),
@@ -459,6 +522,24 @@ export const setCosmosUiFlags = (value: {
         ? { cosmosReduceMotionOverride: value.cosmosReduceMotionOverride }
         : {})
     }
+  });
+};
+
+
+export const recordCosmosEvent = (
+  islandId: IslandId,
+  action: CosmosActivityAction,
+  meta?: string
+) => {
+  const state = getState();
+  updateState({
+    ...state,
+    cosmosActivityLog: appendCosmosActivity(state.cosmosActivityLog, {
+      ts: new Date().toISOString(),
+      islandId,
+      action,
+      ...(meta?.trim() ? { meta: meta.trim() } : {})
+    })
   });
 };
 

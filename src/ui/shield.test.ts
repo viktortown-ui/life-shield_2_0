@@ -26,6 +26,7 @@ const makeState = (): AppState => ({
     cosmosSfxVolume: 0.4,
     cosmosReduceMotionOverride: null
   },
+  cosmosActivityLog: [],
   inputData: {
     finance: {
       monthlyIncome: 180000,

@@ -1,6 +1,6 @@
-import { AppState } from './types';
+import { AppState, CosmosActivityEvent } from './types';
 
-export const schemaVersion = 7;
+export const schemaVersion = 8;
 
 export type Migration = (state: AppState) => AppState;
 
@@ -90,7 +90,15 @@ export const migrations: Migration[] = [
           ? state.flags.cosmosReduceMotionOverride
           : null
     }
+  }),
+  (state) => ({
+    ...state,
+    schemaVersion: 8,
+    cosmosActivityLog: Array.isArray((state as { cosmosActivityLog?: CosmosActivityEvent[] }).cosmosActivityLog)
+      ? ((state as { cosmosActivityLog?: CosmosActivityEvent[] }).cosmosActivityLog as CosmosActivityEvent[]).slice(-200)
+      : []
   })
+
 
 ];
 
