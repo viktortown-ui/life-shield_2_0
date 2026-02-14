@@ -103,6 +103,7 @@ const createAppShell = (
 
   const main = document.createElement('main');
   main.className = 'app-main';
+  screen.classList.add('app-screen-transition');
   main.append(screen);
 
   const footer = document.createElement('footer');

@@ -6,7 +6,6 @@ import { createHelpIconButton, getHelpTopicByIslandId } from './help';
 import {
   buildSparklineSvg,
   formatLastRun,
-  getHistoryTail,
   getIslandStatus,
   getReportSummary
 } from './reportUtils';
@@ -60,7 +59,6 @@ export const createIslandsHubScreen = () => {
         islandState.progress.lastRunAt,
         Boolean(islandState.lastReport)
       );
-      const trend = getHistoryTail(state, catalogItem.id).join(' → ') || '—';
       const helpTopic = getHelpTopicByIslandId(catalogItem.id);
 
       const badge = catalogItem.badge
@@ -68,7 +66,8 @@ export const createIslandsHubScreen = () => {
         : '';
 
       const card = document.createElement('article');
-      card.className = 'shield-tile islands-hub-card';
+      const statusAccent = status.tone.replace('status--', 'islands-hub-card--');
+      card.className = `shield-tile islands-hub-card ${statusAccent}`;
       card.innerHTML = `
         <div class="tile-header islands-hub-card-header">
           <div class="islands-hub-title-wrap">
@@ -76,13 +75,13 @@ export const createIslandsHubScreen = () => {
           </div>
           <div class="tile-meta-badges">
             <span class="tile-status tile-status--chip ${status.tone}">${status.label}</span>
+            <span class="islands-hub-score-badge">Балл ${Math.round(islandState.lastReport?.score ?? 0)}/100</span>
             ${badge}
           </div>
         </div>
         <div class="tile-headline">${catalogItem.shortWhy}</div>
         <div class="tile-progress">
           <span>${tf('islandsHubRuns', { count: islandState.progress.runsCount })}</span>
-          <span>${tf('islandsHubTrend', { trend })}</span>
         </div>
         <div class="tile-sparkline">${buildSparklineSvg(islandState.progress.history)}</div>
         <div class="tile-next"><a class="button small" href="#/island/${catalogItem.id}">${t('helpOpenModule')}</a></div>
