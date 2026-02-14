@@ -27,6 +27,8 @@ const makeState = (finance: AppState['inputData']['finance']): AppState => ({
     cosmosReduceMotionOverride: null
   },
   inputData: { finance },
+  observations: { cashflowMonthly: [] },
+  cosmosActivityLog: [],
   islands: {
     snapshot: { input: '', lastReport: null, progress: makeProgress() },
     stressTest: { input: '', lastReport: null, progress: makeProgress() },

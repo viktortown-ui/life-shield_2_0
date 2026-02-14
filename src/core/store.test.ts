@@ -40,6 +40,7 @@ const makeState = (overrides: Partial<AppState> = {}): AppState => ({
     cosmosSfxVolume: 0.4,
     cosmosReduceMotionOverride: null
   },
+  observations: { cashflowMonthly: [] },
   cosmosActivityLog: [],
   inputData: {
     finance: {

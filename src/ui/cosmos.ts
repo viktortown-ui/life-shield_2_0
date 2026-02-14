@@ -11,11 +11,12 @@ import {
 } from './cosmosTurbulence';
 
 type OrbitId = 'money' | 'obligations' | 'income' | 'energy' | 'support' | 'flexibility';
+type PlanetRefId = IslandId | 'history';
 
 type PlanetBadge = 'ok' | 'risk' | 'none';
 
 interface PlanetConfig {
-  id: IslandId;
+  id: PlanetRefId;
   orbitId: OrbitId;
   angleDeg: number;
   distanceFactor: number;
@@ -30,7 +31,7 @@ interface ViewTransform {
 }
 
 interface PlanetInstrumentStatus {
-  id: IslandId;
+  id: PlanetRefId;
   badge: PlanetBadge;
   riskSeverity: number;
   confidence: number | null;
@@ -48,7 +49,8 @@ const PLANETS: PlanetConfig[] = [
   { id: 'timeseries', orbitId: 'support', angleDeg: 302, distanceFactor: 0.76, reportHref: '#/report' },
   { id: 'optimization', orbitId: 'flexibility', angleDeg: 342, distanceFactor: 0.9, reportHref: '#/report' },
   { id: 'decisionTree', orbitId: 'support', angleDeg: 42, distanceFactor: 0.94, reportHref: '#/report' },
-  { id: 'causalDag', orbitId: 'obligations', angleDeg: 136, distanceFactor: 0.68, reportHref: '#/report' }
+  { id: 'causalDag', orbitId: 'obligations', angleDeg: 136, distanceFactor: 0.68, reportHref: '#/report' },
+  { id: 'history', orbitId: 'income', angleDeg: 196, distanceFactor: 0.76, dataHref: '#/history' }
 ];
 
 const ORBIT_RADIUS: Record<OrbitId, number> = {
@@ -69,7 +71,7 @@ const ORBIT_LABELS: Record<OrbitId, string> = {
   flexibility: 'Гибкость'
 };
 
-const FALLBACK_IMPORTANT: IslandId[] = PLANETS.slice(0, 7).map((planet) => planet.id);
+const FALLBACK_IMPORTANT: PlanetRefId[] = PLANETS.slice(0, 7).map((planet) => planet.id);
 const VIEWBOX_SIZE = 520;
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 3.2;
@@ -180,12 +182,27 @@ export const createCosmosScreen = () => {
   const orbitTitleById = new Map(tiles.map((tile) => [tile.id, tile.title]));
 
   const statuses = PLANETS.reduce((acc, planet) => {
+    const maxRadius = Math.max(...Object.values(ORBIT_RADIUS));
+    const proximityUrgency = clamp01(1 - (ORBIT_RADIUS[planet.orbitId] * planet.distanceFactor) / maxRadius);
+
+    if (planet.id === 'history') {
+      const count = state.observations.cashflowMonthly.length;
+      acc.set('history', {
+        id: 'history',
+        badge: count > 0 ? 'ok' : 'none',
+        riskSeverity: 0,
+        confidence: count > 0 ? 100 : null,
+        freshnessUrgency: count > 0 ? 0.2 : 1,
+        proximityUrgency,
+        turbulence: null
+      });
+      return acc;
+    }
+
     const islandState = state.islands[planet.id];
     const riskSeverity = inferRiskSeverity(islandState.lastReport);
     const confidence = inferConfidence(islandState.lastReport, islandState.input);
     const freshnessUrgency = inferFreshnessUrgency(islandState.progress.lastRunAt);
-    const maxRadius = Math.max(...Object.values(ORBIT_RADIUS));
-    const proximityUrgency = clamp01(1 - (ORBIT_RADIUS[planet.orbitId] * planet.distanceFactor) / maxRadius);
     const mcTurbulence =
       planet.id === 'stressTest'
         ? getTurbulenceScore(islandState.mcLast, islandState.mcHistory ?? [])
@@ -206,7 +223,7 @@ export const createCosmosScreen = () => {
       turbulence: mcTurbulence?.turbulence ?? null
     });
     return acc;
-  }, new Map<IslandId, PlanetInstrumentStatus>());
+  }, new Map<PlanetRefId, PlanetInstrumentStatus>());
 
   const stressMc = state.islands.stressTest.mcLast;
   const hasMonteCarloStress = Boolean(stressMc);
@@ -216,7 +233,7 @@ export const createCosmosScreen = () => {
     score: status.riskSeverity * 0.5 + status.freshnessUrgency * 0.35 + status.proximityUrgency * 0.15
   }));
   const hasAnyData = [...statuses.values()].some((status) => status.badge !== 'none');
-  const importantPlanets = new Set<IslandId>(
+  const importantPlanets = new Set<PlanetRefId>(
     hasAnyData
       ? scored.sort((a, b) => b.score - a.score).slice(0, 7).map((item) => item.id)
       : FALLBACK_IMPORTANT
@@ -362,9 +379,9 @@ export const createCosmosScreen = () => {
   };
 
   const buildPlanetActions = (config: PlanetConfig): PlanetAction[] => {
-    const hasResult = Boolean(state.islands[config.id]?.lastReport);
+    const hasResult = config.id === 'history' ? false : Boolean(state.islands[config.id]?.lastReport);
     const actions: PlanetAction[] = [
-      { id: 'open', label: 'Открыть', href: `#/island/${config.id}` }
+      { id: 'open', label: 'Открыть', href: config.id === 'history' ? '#/history' : `#/island/${config.id}` }
     ];
     if (config.dataHref) {
       actions.push({ id: 'data', label: 'Данные', href: config.dataHref });
@@ -376,11 +393,11 @@ export const createCosmosScreen = () => {
     return actions;
   };
 
-  const runPlanetAction = (planetId: IslandId, action: PlanetAction) => {
+  const runPlanetAction = (planetId: PlanetRefId, action: PlanetAction) => {
     if (action.id === 'close') {
-      recordCosmosEvent(planetId, 'cancel');
+      if (planetId !== 'history') recordCosmosEvent(planetId, 'cancel');
     } else if (action.id === 'open' || action.id === 'data' || action.id === 'report') {
-      recordCosmosEvent(planetId, action.id);
+      if (planetId !== 'history') recordCosmosEvent(planetId, action.id);
     }
     if (action.onSelect) {
       action.onSelect();
@@ -454,13 +471,13 @@ export const createCosmosScreen = () => {
 
   const openMenu = (config: PlanetConfig, x: number, y: number) => {
     playSfx('menuOpen');
-    const catalogItem = getIslandCatalogItem(config.id);
+    const catalogItem = config.id === 'history' ? null : getIslandCatalogItem(config.id);
     const actionsList = buildPlanetActions(config);
     menu.classList.remove('hidden');
     menu.innerHTML = '';
 
     const title = document.createElement('strong');
-    title.textContent = catalogItem.displayName;
+    title.textContent = catalogItem?.displayName ?? "История";
 
     document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
@@ -480,7 +497,7 @@ export const createCosmosScreen = () => {
         link.className = `button small ${action.id === 'open' ? '' : 'ghost'}`.trim();
         link.href = action.href;
         link.textContent = action.label;
-        link.setAttribute('aria-label', `${catalogItem.displayName}: ${action.label}`);
+        link.setAttribute('aria-label', `${catalogItem?.displayName ?? "История"}: ${action.label}`);
         link.addEventListener('click', () => {
           playSfx('confirm');
           const point = planetPoints.get(config.id);
@@ -492,7 +509,7 @@ export const createCosmosScreen = () => {
         button.className = 'button small ghost';
         button.type = 'button';
         button.textContent = action.label;
-        button.setAttribute('aria-label', `${catalogItem.displayName}: ${action.label}`);
+        button.setAttribute('aria-label', `${catalogItem?.displayName ?? "История"}: ${action.label}`);
         button.addEventListener('click', () => {
           playSfx(action.id === 'close' ? 'cancel' : 'confirm');
           if (action.id !== 'close') {
@@ -521,7 +538,7 @@ export const createCosmosScreen = () => {
   const radialState: {
     active: RadialSession | null;
     items: HTMLElement[];
-    suppressClickFor: IslandId | null;
+    suppressClickFor: PlanetRefId | null;
   } = {
     active: null,
     items: [],
@@ -664,10 +681,10 @@ export const createCosmosScreen = () => {
 
   resetViewButton.addEventListener('click', resetView);
 
-  let selectedPlanetId: IslandId | null = null;
+  let selectedPlanetId: PlanetRefId | null = null;
   const planetGroups = new Map<IslandId, SVGGElement>();
   const planetPoints = new Map<IslandId, { x: number; y: number }>();
-  const recentEventsByPlanet = new Map<IslandId, CosmosActivityEvent[]>();
+  const recentEventsByPlanet = new Map<PlanetRefId, CosmosActivityEvent[]>();
 
   const renderActivityPanel = () => {
     if (!selectedPlanetId) {
@@ -675,7 +692,7 @@ export const createCosmosScreen = () => {
       return;
     }
     const recent = recentEventsByPlanet.get(selectedPlanetId) ?? [];
-    const title = getIslandCatalogItem(selectedPlanetId).displayName;
+    const title = selectedPlanetId === 'history' ? 'История' : getIslandCatalogItem(selectedPlanetId).displayName;
     const list = recent.length
       ? `<ul>${recent
           .slice(0, RECENT_ACTION_LIMIT)
@@ -736,9 +753,9 @@ export const createCosmosScreen = () => {
     return [first.join(' '), second || undefined];
   };
 
-  PLANETS.filter((item) => islandRegistry.some((island) => island.id === item.id)).forEach((planet) => {
+  PLANETS.filter((item) => item.id === 'history' || islandRegistry.some((island) => island.id === item.id)).forEach((planet) => {
     const instrument = statuses.get(planet.id)!;
-    const catalogItem = getIslandCatalogItem(planet.id);
+    const catalogItem = planet.id === 'history' ? null : getIslandCatalogItem(planet.id);
     const radius = ORBIT_RADIUS[planet.orbitId] * planet.distanceFactor;
     const point = toPoint(planet.angleDeg, radius);
     planetPoints.set(planet.id, point);
@@ -757,7 +774,7 @@ export const createCosmosScreen = () => {
     planetGroup.setAttribute('role', 'button');
     planetGroup.setAttribute(
       'aria-label',
-      `${catalogItem.displayName}: ${
+      `${catalogItem?.displayName ?? "История"}: ${
         instrument.badge === 'risk' ? 'RISK' : instrument.badge === 'ok' ? 'OK' : 'NO DATA'
       }`
     );
@@ -821,7 +838,7 @@ export const createCosmosScreen = () => {
     label.setAttribute('text-anchor', 'middle');
     label.setAttribute('class', 'cosmos-planet-label');
 
-    const [line1, line2] = splitLabel(catalogItem.displayName);
+    const [line1, line2] = splitLabel(catalogItem?.displayName ?? "История");
     const tspan1 = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
     tspan1.setAttribute('x', labelX.toFixed(1));
     tspan1.textContent = line1;

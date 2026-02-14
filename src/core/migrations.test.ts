@@ -9,6 +9,7 @@ const legacyState = {
   level: 1,
   streakDays: 0,
   flags: { onboarded: false, demoLoaded: false },
+  observations: { cashflowMonthly: [] },
   cosmosActivityLog: [],
   islands: {}
 } as unknown as AppState;

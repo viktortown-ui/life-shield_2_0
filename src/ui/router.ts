@@ -12,6 +12,7 @@ import { createOnboardingModal } from './onboarding';
 import { createIslandsHubScreen } from './islandsHub';
 import { createReportScreen } from './report';
 import { createFinanceScreen } from './finance';
+import { createHistoryScreen } from './history';
 
 const parseRoute = () => {
   const hash = window.location.hash.replace('#', '') || '/';
@@ -37,6 +38,9 @@ const parseRoute = () => {
   if (parts[0] === 'finance') {
     return { name: 'finance' } as const;
   }
+  if (parts[0] === 'history') {
+    return { name: 'history' } as const;
+  }
   if (parts[0] === 'shield') {
     return { name: 'shield' } as const;
   }
@@ -51,7 +55,8 @@ type Route =
   | { name: 'island'; id: IslandId }
   | { name: 'islands' }
   | { name: 'report' }
-  | { name: 'finance' };
+  | { name: 'finance' }
+  | { name: 'history' };
 
 const createBottomNav = (route: Route) => {
   const nav = document.createElement('nav');
@@ -62,6 +67,7 @@ const createBottomNav = (route: Route) => {
     <a class="bottom-nav-link ${route.name === 'shield' || route.name === 'home' || route.name === 'cosmos' ? 'active' : ''}" href="#/">Home</a>
     <a class="bottom-nav-link ${route.name === 'island' || route.name === 'islands' ? 'active' : ''}" href="#/islands">Острова</a>
     <a class="bottom-nav-link ${route.name === 'finance' ? 'active' : ''}" href="#/finance">Финансы</a>
+    <a class="bottom-nav-link ${route.name === 'history' ? 'active' : ''}" href="#/history">История</a>
     <a class="bottom-nav-link ${route.name === 'report' ? 'active' : ''}" href="#/report">Отчёт</a>
     <a class="bottom-nav-link ${route.name === 'settings' ? 'active' : ''}" href="#/settings">Настройки</a>
   `;
@@ -154,6 +160,8 @@ export const initRouter = (root: HTMLElement) => {
         root.appendChild(createAppShell(createFinanceScreen(), route, showBuildInfo));
       } else if (route.name === 'cosmos') {
         root.appendChild(createAppShell(createCosmosScreen(), route, showBuildInfo));
+      } else if (route.name === 'history') {
+        root.appendChild(createAppShell(createHistoryScreen(), route, showBuildInfo));
       } else if (route.name === 'shield') {
         root.appendChild(createAppShell(createShieldScreen(), route, showBuildInfo));
       } else {

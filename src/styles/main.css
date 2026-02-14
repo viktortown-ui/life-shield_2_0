@@ -1765,3 +1765,39 @@ body {
   font-style: normal;
   color: #98a7c2;
 }
+
+.history-quick-form .screen-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.history-table-wrap {
+  overflow-x: auto;
+}
+
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.history-table th,
+.history-table td {
+  padding: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  text-align: left;
+}
+
+.history-sparkline {
+  width: 100%;
+  max-width: 320px;
+  height: 72px;
+}
+
+.history-sparkline polyline {
+  fill: none;
+  stroke: #7ef7e6;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}

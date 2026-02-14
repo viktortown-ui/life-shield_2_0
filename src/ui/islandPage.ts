@@ -1503,6 +1503,11 @@ export const createIslandPage = (id: IslandId) => {
   const renderReport = () => {
     const report = islandState.lastReport ?? safeGetReport(islandState.input);
     const mc = id === 'stressTest' ? islandState.mcLast : null;
+    const observationsCount = getState().observations.cashflowMonthly.length;
+    const historyHint =
+      id === 'stressTest' && observationsCount >= 6
+        ? '<p class="muted">Можно будет строить прогнозы по истории.</p>'
+        : '';
     result.innerHTML = `
       <div class="result-metrics">
         <div><span>Score</span><strong>${report.score}</strong></div>
@@ -1511,6 +1516,7 @@ export const createIslandPage = (id: IslandId) => {
       <h2>${report.headline}</h2>
       <div class="result-summary">${report.summary}</div>
       <ul>${report.details.map((item) => `<li>${item}</li>`).join('')}</ul>
+      ${historyHint}
       ${
         mc
           ? `<section class="stress-mc-result"><h3>Monte Carlo</h3><p>Risk-of-ruin: <strong>${mc.ruinProb.toFixed(2)}%</strong> на горизонте ${mc.horizonMonths} мес (${mc.iterations} итераций)</p><p>Runway quantiles: p10 ${mc.quantiles.p10.toFixed(1)} мес / p50 ${mc.quantiles.p50.toFixed(1)} мес / p90 ${mc.quantiles.p90.toFixed(1)} мес</p>${renderHistogram()}${renderMcHistory()}</section>`

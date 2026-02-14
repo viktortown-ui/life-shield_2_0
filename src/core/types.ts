@@ -25,6 +25,16 @@ export interface FinanceInputData {
   incomeSources?: IncomeSource[];
 }
 
+export interface CashflowMonthlyEntry {
+  ym: string;
+  income: number;
+  expense: number;
+}
+
+export interface ObservationsState {
+  cashflowMonthly: CashflowMonthlyEntry[];
+}
+
 export interface IslandReport {
   id: IslandId;
   score: number;
@@ -164,6 +174,7 @@ export interface AppState {
   inputData: {
     finance: FinanceInputData;
   };
+  observations: ObservationsState;
   cosmosActivityLog: CosmosActivityEvent[];
   islands: Record<IslandId, IslandState>;
 }
