@@ -24,6 +24,7 @@ const STORAGE_KEY = 'lifeShieldV2';
 const XP_PER_LEVEL = 120;
 const RUN_HISTORY_LIMIT = 10;
 const COSMOS_ACTIVITY_LIMIT = 200;
+const MC_HISTORY_LIMIT = 50;
 
 interface ExportPayload {
   schemaVersion: number;
@@ -36,6 +37,21 @@ const makeIslandProgress = () => ({
   runsCount: 0,
   bestScore: 0,
   history: []
+});
+
+const makeMonteCarloHistoryEntry = (
+  mcLast: NonNullable<AppState['islands'][IslandId]['mcLast']>
+) => ({
+  ts: new Date().toISOString(),
+  horizonMonths: mcLast.horizonMonths,
+  iterations: mcLast.iterations,
+  sigmaIncome: mcLast.config.incomeVolatility,
+  sigmaExpense: mcLast.config.expensesVolatility,
+  shock: mcLast.config.shock,
+  ruinProb: mcLast.ruinProb,
+  p10: mcLast.quantiles.p10,
+  p50: mcLast.quantiles.p50,
+  p90: mcLast.quantiles.p90
 });
 
 const makeEmptyState = (): AppState => ({
@@ -60,25 +76,27 @@ const makeEmptyState = (): AppState => ({
   },
   cosmosActivityLog: [],
   islands: {
-    snapshot: { input: '', lastReport: null, progress: makeIslandProgress(), mcLast: null },
-    stressTest: { input: '', lastReport: null, progress: makeIslandProgress(), mcLast: null },
-    incomePortfolio: { input: '', lastReport: null, progress: makeIslandProgress(), mcLast: null },
-    bayes: { input: '', lastReport: null, progress: makeIslandProgress(), mcLast: null },
-    hmm: { input: '', lastReport: null, progress: makeIslandProgress(), mcLast: null },
-    timeseries: { input: '', lastReport: null, progress: makeIslandProgress(), mcLast: null },
+    snapshot: { input: '', lastReport: null, progress: makeIslandProgress(), mcLast: null, mcHistory: [] },
+    stressTest: { input: '', lastReport: null, progress: makeIslandProgress(), mcLast: null, mcHistory: [] },
+    incomePortfolio: { input: '', lastReport: null, progress: makeIslandProgress(), mcLast: null, mcHistory: [] },
+    bayes: { input: '', lastReport: null, progress: makeIslandProgress(), mcLast: null, mcHistory: [] },
+    hmm: { input: '', lastReport: null, progress: makeIslandProgress(), mcLast: null, mcHistory: [] },
+    timeseries: { input: '', lastReport: null, progress: makeIslandProgress(), mcLast: null, mcHistory: [] },
     optimization: {
       input: '',
       lastReport: null,
       progress: makeIslandProgress(),
-      mcLast: null
+      mcLast: null,
+      mcHistory: []
     },
     decisionTree: {
       input: '',
       lastReport: null,
       progress: makeIslandProgress(),
-      mcLast: null
+      mcLast: null,
+      mcHistory: []
     },
-    causalDag: { input: '', lastReport: null, progress: makeIslandProgress(), mcLast: null }
+    causalDag: { input: '', lastReport: null, progress: makeIslandProgress(), mcLast: null, mcHistory: [] }
   }
 });
 
@@ -109,6 +127,32 @@ const safeHistoryEntry = (
   };
 };
 
+const safeMcHistoryEntry = (
+  value: unknown
+): NonNullable<AppState['islands'][IslandId]['mcHistory']>[number] | null => {
+  if (!isRecord(value) || typeof value.ts !== 'string') {
+    return null;
+  }
+  return {
+    ts: value.ts,
+    horizonMonths: safeNumber(value.horizonMonths, 0),
+    iterations: safeNumber(value.iterations, 0),
+    sigmaIncome: safeNumber(value.sigmaIncome, 0),
+    sigmaExpense: safeNumber(value.sigmaExpense, 0),
+    shock: isRecord(value.shock)
+      ? {
+          enabled: Boolean(value.shock.enabled),
+          probability: safeNumber(value.shock.probability, 0),
+          dropPercent: safeNumber(value.shock.dropPercent, 0)
+        }
+      : undefined,
+    ruinProb: safeNumber(value.ruinProb, 0),
+    p10: safeNumber(value.p10, 0),
+    p50: safeNumber(value.p50, 0),
+    p90: safeNumber(value.p90, 0)
+  };
+};
+
 const appendHistory = (
   history: IslandRunHistoryEntry[],
   entry: IslandRunHistoryEntry
@@ -118,6 +162,17 @@ const appendHistory = (
     return next;
   }
   return next.slice(next.length - RUN_HISTORY_LIMIT);
+};
+
+const appendMcHistory = (
+  history: NonNullable<AppState['islands'][IslandId]['mcHistory']>,
+  entry: NonNullable<AppState['islands'][IslandId]['mcHistory']>[number]
+) => {
+  const next = [...history, entry];
+  if (next.length <= MC_HISTORY_LIMIT) {
+    return next;
+  }
+  return next.slice(next.length - MC_HISTORY_LIMIT);
 };
 
 
@@ -206,7 +261,13 @@ const mergeIslandState = (
     input: safeString(incoming.input, base.input),
     lastReport: incoming.lastReport ?? base.lastReport,
     progress: mergeProgress(base.progress, incoming.progress),
-    mcLast: incoming.mcLast ?? base.mcLast ?? null
+    mcLast: incoming.mcLast ?? base.mcLast ?? null,
+    mcHistory: Array.isArray(incoming.mcHistory)
+      ? (incoming.mcHistory
+          .map(safeMcHistoryEntry)
+          .filter(Boolean)
+          .slice(-MC_HISTORY_LIMIT) as NonNullable<AppState['islands'][IslandId]['mcHistory']>)
+      : base.mcHistory ?? []
   };
 };
 
@@ -475,13 +536,19 @@ export const updateIslandMonteCarlo = (
   mcLast: AppState['islands'][IslandId]['mcLast']
 ) => {
   const state = getState();
+  const islandState = state.islands[id];
+  const nextMcHistory =
+    id === 'stressTest' && mcLast
+      ? appendMcHistory(islandState.mcHistory ?? [], makeMonteCarloHistoryEntry(mcLast))
+      : islandState.mcHistory ?? [];
   updateState({
     ...state,
     islands: {
       ...state.islands,
       [id]: {
         ...state.islands[id],
-        mcLast
+        mcLast,
+        mcHistory: nextMcHistory
       }
     }
   });

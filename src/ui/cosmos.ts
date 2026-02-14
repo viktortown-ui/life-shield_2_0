@@ -164,6 +164,16 @@ const formatEventAge = (ts: string) => {
 
 const formatMonths = (value: number) => `${value.toFixed(1)} мес`;
 
+const formatDateTime = (value: string | null) => {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return `${date.toLocaleDateString('ru-RU')} ${date.toLocaleTimeString('ru-RU', {
+    hour: '2-digit',
+    minute: '2-digit'
+  })}`;
+};
+
 export const createCosmosScreen = () => {
   const state = getState();
   const tiles = deriveShieldTiles(state);
@@ -176,7 +186,10 @@ export const createCosmosScreen = () => {
     const freshnessUrgency = inferFreshnessUrgency(islandState.progress.lastRunAt);
     const maxRadius = Math.max(...Object.values(ORBIT_RADIUS));
     const proximityUrgency = clamp01(1 - (ORBIT_RADIUS[planet.orbitId] * planet.distanceFactor) / maxRadius);
-    const mcTurbulence = planet.id === 'stressTest' ? getTurbulenceScore(islandState.mcLast) : null;
+    const mcTurbulence =
+      planet.id === 'stressTest'
+        ? getTurbulenceScore(islandState.mcLast, islandState.mcHistory ?? [])
+        : null;
     const stressRiskBadge = planet.id === 'stressTest' && mcTurbulence ? mcTurbulence.hasRiskBadge : null;
     acc.set(planet.id, {
       id: planet.id,
@@ -676,9 +689,14 @@ export const createCosmosScreen = () => {
             if (!mc) {
               return '<section class="cosmos-forecast-block"><h4>Прогноз Monte Carlo</h4><p class="muted">Запусти Monte Carlo в Стресс-тесте.</p></section>';
             }
-            const turbulence = getTurbulenceScore(mc);
+            const turbulence = getTurbulenceScore(mc, state.islands.stressTest.mcHistory ?? []);
             const uncertainty = turbulence?.uncertainty ?? 0;
             const uncertaintyLabel = getUncertaintyLabel(uncertainty);
+            const driftMessage = turbulence?.driftDetected
+              ? `<p class="cosmos-drift-alert">Смена режима риска обнаружена · ${formatDateTime(
+                  turbulence.driftTs
+                )}</p>`
+              : '<p class="muted">Смена режима риска не обнаружена.</p>';
             const span = Math.max(1, mc.quantiles.p90 - mc.quantiles.p10);
             const intervalStart = 0;
             const intervalWidth = 100;
@@ -687,7 +705,7 @@ export const createCosmosScreen = () => {
               1
             )}%</strong> (RISK от ${(MC_RISK_BADGE_THRESHOLD * 100).toFixed(0)}%)</p><p>Runway p10/p50/p90: ${formatMonths(
               mc.quantiles.p10
-            )} / ${formatMonths(mc.quantiles.p50)} / ${formatMonths(mc.quantiles.p90)}</p><p>Неопределённость: <strong>${uncertaintyLabel}</strong></p><div class="cosmos-interval" role="img" aria-label="Интервал runway p10-p90 и медиана p50"><span class="cosmos-interval-range" style="left:${intervalStart}%;width:${intervalWidth}%"></span><span class="cosmos-interval-median" style="left:${medianPos}%"></span></div></section>`;
+            )} / ${formatMonths(mc.quantiles.p50)} / ${formatMonths(mc.quantiles.p90)}</p><p>Неопределённость: <strong>${uncertaintyLabel}</strong></p>${driftMessage}<div class="cosmos-interval" role="img" aria-label="Интервал runway p10-p90 и медиана p50"><span class="cosmos-interval-range" style="left:${intervalStart}%;width:${intervalWidth}%"></span><span class="cosmos-interval-median" style="left:${medianPos}%"></span></div></section>`;
           })()
         : '';
     activityPanel.innerHTML = `<h3>Последние действия · ${title}</h3>${list}${mcForecastBlock}`;

@@ -923,6 +923,21 @@ export const createIslandPage = (id: IslandId) => {
         histogram: data.result.histogram,
         config: data.result.config
       };
+      islandState.mcHistory = [
+        ...(islandState.mcHistory ?? []),
+        {
+          ts: new Date().toISOString(),
+          horizonMonths: data.result.horizonMonths,
+          iterations: data.result.iterations,
+          sigmaIncome: data.result.config.incomeVolatility,
+          sigmaExpense: data.result.config.expensesVolatility,
+          shock: data.result.config.shock,
+          ruinProb: data.result.ruinProb,
+          p10: data.result.quantiles.p10,
+          p50: data.result.quantiles.p50,
+          p90: data.result.quantiles.p90
+        }
+      ].slice(-50);
       renderReport();
     });
 
@@ -1452,6 +1467,39 @@ export const createIslandPage = (id: IslandId) => {
     `;
   };
 
+  const renderMcHistory = () => {
+    if (id !== 'stressTest') return '';
+    const history = (islandState.mcHistory ?? []).slice(-10);
+    if (!history.length) {
+      return '<section class="stress-mc-history"><h4>История Monte Carlo (последние 10)</h4><p class="muted">История запусков появится после расчётов.</p></section>';
+    }
+
+    const points = history
+      .map((entry, index) => {
+        const x = history.length === 1 ? 0 : (index / (history.length - 1)) * 100;
+        const y = Math.max(0, Math.min(100, entry.ruinProb));
+        return `${x.toFixed(2)},${(100 - y).toFixed(2)}`;
+      })
+      .join(' ');
+
+    const rows = history
+      .slice()
+      .reverse()
+      .map((entry) => {
+        const date = new Date(entry.ts);
+        const ts = Number.isNaN(date.getTime())
+          ? '—'
+          : `${date.toLocaleDateString('ru-RU')} ${date.toLocaleTimeString('ru-RU', {
+              hour: '2-digit',
+              minute: '2-digit'
+            })}`;
+        return `<li><span>${ts}</span><strong>${entry.ruinProb.toFixed(1)}%</strong><em>p50 ${entry.p50.toFixed(1)} мес</em></li>`;
+      })
+      .join('');
+
+    return `<section class="stress-mc-history"><h4>История Monte Carlo (последние 10)</h4><svg viewBox="0 0 100 100" class="stress-mc-sparkline" role="img" aria-label="Динамика risk-of-ruin по последним запускам"><polyline points="${points}"></polyline></svg><ul>${rows}</ul></section>`;
+  };
+
   const renderReport = () => {
     const report = islandState.lastReport ?? safeGetReport(islandState.input);
     const mc = id === 'stressTest' ? islandState.mcLast : null;
@@ -1465,7 +1513,7 @@ export const createIslandPage = (id: IslandId) => {
       <ul>${report.details.map((item) => `<li>${item}</li>`).join('')}</ul>
       ${
         mc
-          ? `<section class="stress-mc-result"><h3>Monte Carlo</h3><p>Risk-of-ruin: <strong>${mc.ruinProb.toFixed(2)}%</strong> на горизонте ${mc.horizonMonths} мес (${mc.iterations} итераций)</p><p>Runway quantiles: p10 ${mc.quantiles.p10.toFixed(1)} мес / p50 ${mc.quantiles.p50.toFixed(1)} мес / p90 ${mc.quantiles.p90.toFixed(1)} мес</p>${renderHistogram()}</section>`
+          ? `<section class="stress-mc-result"><h3>Monte Carlo</h3><p>Risk-of-ruin: <strong>${mc.ruinProb.toFixed(2)}%</strong> на горизонте ${mc.horizonMonths} мес (${mc.iterations} итераций)</p><p>Runway quantiles: p10 ${mc.quantiles.p10.toFixed(1)} мес / p50 ${mc.quantiles.p50.toFixed(1)} мес / p90 ${mc.quantiles.p90.toFixed(1)} мес</p>${renderHistogram()}${renderMcHistory()}</section>`
           : ''
       }
     `;

@@ -72,6 +72,24 @@ export interface IslandState {
   lastReport: IslandReport | null;
   progress: IslandProgress;
   mcLast?: StressMonteCarloResult | null;
+  mcHistory?: StressMonteCarloHistoryEntry[];
+}
+
+export interface StressMonteCarloHistoryEntry {
+  ts: string;
+  horizonMonths: number;
+  iterations: number;
+  sigmaIncome: number;
+  sigmaExpense: number;
+  shock?: {
+    enabled: boolean;
+    probability: number;
+    dropPercent: number;
+  };
+  ruinProb: number;
+  p10: number;
+  p50: number;
+  p90: number;
 }
 
 export interface StressMonteCarloHistogramBin {

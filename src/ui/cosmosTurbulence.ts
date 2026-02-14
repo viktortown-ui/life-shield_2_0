@@ -1,8 +1,10 @@
-import { StressMonteCarloResult } from '../core/types';
+import { StressMonteCarloHistoryEntry, StressMonteCarloResult } from '../core/types';
+import { detectRiskRegimeShift } from './riskRegimeShift';
 
 export const MC_RISK_BADGE_THRESHOLD = 0.2;
-const TURBULENCE_RUIN_WEIGHT = 0.7;
-const TURBULENCE_UNCERTAINTY_WEIGHT = 0.3;
+const TURBULENCE_RUIN_WEIGHT = 0.6;
+const TURBULENCE_UNCERTAINTY_WEIGHT = 0.25;
+const TURBULENCE_DRIFT_WEIGHT = 0.15;
 
 const clamp01 = (value: number) => {
   if (!Number.isFinite(value)) return 0;
@@ -19,15 +21,29 @@ export const getUncertaintyScore = (quantiles: StressMonteCarloResult['quantiles
   return clamp01(spread / Math.max(1, quantiles.p50));
 };
 
-export const getTurbulenceScore = (mcLast: StressMonteCarloResult | null | undefined) => {
+export const getTurbulenceScore = (
+  mcLast: StressMonteCarloResult | null | undefined,
+  mcHistory: StressMonteCarloHistoryEntry[] = []
+) => {
   if (!mcLast) return null;
   const ruin = normalizeRuinProb(mcLast.ruinProb);
   const uncertainty = getUncertaintyScore(mcLast.quantiles);
-  const turbulence = clamp01(ruin * TURBULENCE_RUIN_WEIGHT + uncertainty * TURBULENCE_UNCERTAINTY_WEIGHT);
+  const drift = detectRiskRegimeShift(
+    mcHistory.map((entry) => entry.ruinProb),
+    mcHistory.map((entry) => entry.ts)
+  );
+  const turbulence = clamp01(
+    ruin * TURBULENCE_RUIN_WEIGHT +
+      uncertainty * TURBULENCE_UNCERTAINTY_WEIGHT +
+      drift.driftScore * TURBULENCE_DRIFT_WEIGHT
+  );
 
   return {
     ruin,
     uncertainty,
+    drift: drift.driftScore,
+    driftDetected: drift.driftDetected,
+    driftTs: drift.driftTs,
     turbulence,
     hasRiskBadge: ruin >= MC_RISK_BADGE_THRESHOLD
   };

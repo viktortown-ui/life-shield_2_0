@@ -21,7 +21,7 @@ describe('getTurbulenceScore', () => {
 
     expect(result).not.toBeNull();
     expect(result?.uncertainty).toBeCloseTo(0.6);
-    expect(result?.turbulence).toBeCloseTo(0.18);
+    expect(result?.turbulence).toBeCloseTo(0.15);
   });
 
   it('uses only ruin part when uncertainty is zero', () => {
@@ -43,7 +43,7 @@ describe('getTurbulenceScore', () => {
 
     expect(result).not.toBeNull();
     expect(result?.uncertainty).toBe(0);
-    expect(result?.turbulence).toBeCloseTo(0.28);
+    expect(result?.turbulence).toBeCloseTo(0.24);
   });
 
   it('clamps edge values and avoids NaN/Infinity', () => {
