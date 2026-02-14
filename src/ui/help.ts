@@ -219,20 +219,24 @@ const createHelpDetails = (topic: HelpTopic) => {
   details.className = 'help-sections';
   details.innerHTML = `
     <section>
-      <h3>${t('helpWhy')}</h3>
-      <p>${textByLang(topic.why)}</p>
+      <h3>${t('helpWhatIs')}</h3>
+      <p>${textByLang(topic.oneLiner)}</p>
     </section>
     <section>
       <h3>${t('helpInput')}</h3>
       <ul>${topic.input.map((item) => `<li>${textByLang(item)}</li>`).join('')}</ul>
     </section>
     <section>
+      <h3>${t('helpExample')}</h3>
+      <p>${textByLang(topic.example)}</p>
+    </section>
+    <section>
       <h3>${t('helpOutput')}</h3>
       <ul>${topic.output.map((item) => `<li>${textByLang(item)}</li>`).join('')}</ul>
     </section>
     <section>
-      <h3>${t('helpExample')}</h3>
-      <p>${textByLang(topic.example)}</p>
+      <h3>${t('helpNext')}</h3>
+      <p>${textByLang(topic.why)}</p>
     </section>
   `;
   return details;

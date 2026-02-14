@@ -311,20 +311,15 @@ export const getDecisionTreeReport = (rawInput: string): IslandReport => {
   );
 
   details.push(
-    `Best by EV: ${bestByEV.name}. Robust (maximin): ${robustChoice.name}.`
+    `Лучший по среднему результату: ${bestByEV.name}. Осторожный выбор: ${robustChoice.name}.`
   );
 
   return {
     id: 'decisionTree',
     score: Math.round(score),
     confidence: Math.round(confidence * 100),
-    headline: `Лучший ход: ${bestByEV.name} (EV=${formatNumber(
-      bestByEV.ev
-    )}, downside p=${formatNumber(bestByEV.probLoss, 2)} / EL=${formatNumber(
-      bestByEV.expectedLoss,
-      2
-    )})`,
-    summary: `Robust выбор: ${robustChoice.name}. Вероятности: ${
+    headline: `Лучший вариант: ${bestByEV.name} (средний итог=${formatNumber(bestByEV.ev)}, риск потери=${formatNumber(bestByEV.probLoss, 2)})`,
+    summary: `Осторожный вариант: ${robustChoice.name}. Вероятности: ${
       probabilityMismatch ? 'есть расхождения' : 'суммы в норме'
     }.`,
     details,

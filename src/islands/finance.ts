@@ -48,6 +48,7 @@ export const parseFinanceInput = (raw: string): FinanceInputData => {
       incomeSources: Array.isArray(parsed.incomeSources)
         ? parsed.incomeSources
             .map((source) => ({
+              name: typeof source?.name === 'string' ? source.name.trim() : '',
               amount: readNumber(source?.amount, 0),
               stability: clamp(readNumber(source?.stability, 3), 1, 5)
             }))

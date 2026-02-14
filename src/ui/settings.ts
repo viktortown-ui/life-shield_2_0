@@ -16,7 +16,6 @@ import {
 import { reportCaughtError } from '../core/reportError';
 import { safeClear } from '../core/storage';
 import { getLang, getProTerms, setLang, setProTerms, t } from './i18n';
-import { getMetricLabel } from '../i18n/glossary';
 
 export const createSettingsScreen = () => {
   const container = document.createElement('div');
@@ -400,17 +399,6 @@ export const createSettingsScreen = () => {
     });
   }
 
-  const glossaryKeys = ['runway', 'debtBurden', 'coverage', 'hhi', 'topShare', 'avgStability', 'burnIn', 'stepSize', 'simulations', 'horizon', 'seasonLength', 'testSize', 'auto'] as const;
-  const glossaryItems = glossaryKeys
-    .map((key) => `<li>${getMetricLabel(key, { lang: getLang(), proTerms: getProTerms() }).label}</li>`)
-    .join('');
-  const glossary = document.createElement('section');
-  glossary.className = 'settings-block';
-  glossary.innerHTML = `
-    <h2>${t('glossaryTitle')}</h2>
-    <ul class="settings-glossary">${glossaryItems}</ul>
-  `;
-
-  container.append(header, languageSettings, proTermsSettings, homeSettings, cosmosViewSettings, cosmosFxSettings, exportBlock, maintenance, glossary, actions);
+  container.append(header, languageSettings, proTermsSettings, homeSettings, cosmosViewSettings, cosmosFxSettings, exportBlock, maintenance, actions);
   return container;
 };
