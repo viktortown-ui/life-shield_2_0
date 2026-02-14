@@ -59,4 +59,24 @@ describe('sanitizeCashflowMonthly', () => {
     expect(result.cashflowDriftLast?.paramsUsed.minN).toBe(2);
   });
 
+  it('sanitizes cashflowForecastLast payload', () => {
+    const result = sanitizeObservations({
+      cashflowMonthly: [],
+      cashflowForecastLast: {
+        ts: '2026-01-01T00:00:00.000Z',
+        horizonMonths: '6',
+        paramsUsed: { iterations: '2000', sourceMonths: '12', seed: '77' },
+        probNetNegative: 5,
+        quantiles: { p10: '1', p50: '2', p90: '3' },
+        uncertainty: '10',
+        monthly: [{ month: '1', p10: '1', p50: '2', p90: '3' }]
+      }
+    });
+
+    expect(result.cashflowForecastLast?.horizonMonths).toBe(6);
+    expect(result.cashflowForecastLast?.probNetNegative).toBe(1);
+    expect(result.cashflowForecastLast?.paramsUsed.seed).toBe(77);
+    expect(result.cashflowForecastLast?.monthly[0]?.month).toBe(1);
+  });
+
 });

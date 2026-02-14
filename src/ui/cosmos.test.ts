@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createCosmosScreen } from './cosmos';
-import { resetState, updateIslandMonteCarlo } from '../core/store';
+import { resetState, setCashflowForecastLast, updateIslandMonteCarlo, upsertCashflowObservation } from '../core/store';
 
 beforeEach(() => {
   resetState();
@@ -49,5 +49,33 @@ describe('cosmos stress panel forecast', () => {
     expect(panel?.textContent).toContain('Прогноз Monte Carlo');
     expect(panel?.textContent).toContain('Вероятность провала');
     expect(panel?.textContent).toContain('Runway p10/p50/p90');
+  });
+});
+
+
+describe('cosmos history forecast panel', () => {
+  it('shows history forecast metrics and risk badge', () => {
+    upsertCashflowObservation({ ym: '2025-01', income: 100, expense: 120 });
+    setCashflowForecastLast({
+      ts: '2026-01-01T00:00:00.000Z',
+      horizonMonths: 6,
+      paramsUsed: { iterations: 2000, sourceMonths: 12, seed: 42 },
+      probNetNegative: 0.65,
+      quantiles: { p10: -10000, p50: -2000, p90: 5000 },
+      uncertainty: 15000,
+      monthly: []
+    });
+
+    const screen = createCosmosScreen();
+    document.body.appendChild(screen);
+
+    const planet = screen.querySelector<SVGGElement>('[data-testid="cosmos-planet-history"]');
+    expect(planet?.getAttribute('aria-label')).toContain('RISK');
+    planet?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    const panel = screen.querySelector('.cosmos-activity-panel');
+    expect(panel?.textContent).toContain('History прогноз');
+    expect(panel?.textContent).toContain('Forecast risk');
+    expect(panel?.textContent).toContain('Net p10/p50/p90');
   });
 });

@@ -2,7 +2,7 @@ import { AppState, CosmosActivityEvent } from './types';
 import { sanitizeObservations } from './observations';
 import { buildCashflowDriftLast } from './cashflowDrift';
 
-export const schemaVersion = 10;
+export const schemaVersion = 11;
 
 export type Migration = (state: AppState) => AppState;
 
@@ -115,7 +115,13 @@ export const migrations: Migration[] = [
         cashflowDriftLast: buildCashflowDriftLast(observations.cashflowMonthly)
       }
     };
-  }
+  },
+  (state) => ({
+    ...state,
+    schemaVersion: 11,
+    observations: sanitizeObservations((state as { observations?: unknown }).observations)
+  })
+
 ];
 
 export const migrate = (state: AppState): AppState => {

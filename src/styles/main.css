@@ -1819,3 +1819,34 @@ body {
 .history-drift-alert p {
   margin: 6px 0 0;
 }
+
+.history-forecast-card {
+  display: grid;
+  gap: 8px;
+}
+
+.history-forecast-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.history-horizon-switch {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.history-horizon-switch .is-selected {
+  border-color: #7ef7e6;
+  color: #7ef7e6;
+}
+
+.history-interval {
+  max-width: 340px;
+}
+
+.history-sparkline--forecast polyline {
+  stroke: #9fbcff;
+}

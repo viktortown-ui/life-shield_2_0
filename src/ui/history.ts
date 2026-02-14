@@ -3,8 +3,17 @@ import {
   clearCashflowObservations,
   getState,
   removeCashflowObservationMonth,
+  setCashflowForecastLast,
   upsertCashflowObservation
 } from '../core/store';
+import {
+  CashflowForecastResult,
+  CashflowForecastWorkerResponse
+} from '../workers/cashflowForecast';
+
+const FORECAST_MIN_MONTHS = 6;
+const FORECAST_ITERATIONS = 2000;
+const FORECAST_SEED = 42;
 
 const toAmount = (value: string): number => {
   const num = Number(value);
@@ -18,7 +27,9 @@ const getDriftLevelLabel = (score: number) => {
   return 'низкий';
 };
 
-const buildNetSparkline = (values: number[], driftIndex: number | null) => {
+const formatSigned = (value: number) => `${value >= 0 ? '+' : ''}${Math.round(value).toLocaleString('ru-RU')}`;
+
+const buildNetSparkline = (values: number[], ariaLabel: string, className = 'history-sparkline') => {
   if (!values.length) {
     return '<p class="muted">Нет данных для мини-графика.</p>';
   }
@@ -34,20 +45,17 @@ const buildNetSparkline = (values: number[], driftIndex: number | null) => {
     })
     .join(' ');
 
-  const marker =
-    driftIndex !== null && driftIndex >= 0 && driftIndex < values.length
-      ? (() => {
-          const x = values.length === 1 ? 0 : (driftIndex / (values.length - 1)) * 100;
-          return `<line x1="${x.toFixed(2)}" y1="0" x2="${x.toFixed(2)}" y2="100" class="history-sparkline-marker"></line>`;
-        })()
-      : '';
-
   return `
-    <svg viewBox="0 0 100 100" class="history-sparkline" role="img" aria-label="Динамика net за 12 месяцев">
+    <svg viewBox="0 0 100 100" class="${className}" role="img" aria-label="${ariaLabel}">
       <polyline points="${points}"></polyline>
-      ${marker}
     </svg>
   `;
+};
+
+const buildIntervalBar = (p10: number, p50: number, p90: number, className = 'cosmos-interval') => {
+  const span = Math.max(1, p90 - p10);
+  const medianPos = Math.max(0, Math.min(100, ((p50 - p10) / span) * 100));
+  return `<div class="${className}" role="img" aria-label="Интервал p10-p90 и медиана p50"><span class="cosmos-interval-range" style="left:0%;width:100%"></span><span class="cosmos-interval-median" style="left:${medianPos}%"></span></div>`;
 };
 
 export const createHistoryScreen = () => {
@@ -71,6 +79,12 @@ export const createHistoryScreen = () => {
 
   const summary = document.createElement('section');
   summary.className = 'quest-card';
+
+  const forecastCard = document.createElement('section');
+  forecastCard.className = 'quest-card history-forecast-card';
+
+  let selectedHorizon = 3;
+  let isRunning = false;
 
   const render = () => {
     const state = getState();
@@ -132,7 +146,6 @@ export const createHistoryScreen = () => {
     const recentForSpark = rows.slice(-12);
     const sparkValues = recentForSpark.map((row) => row.income - row.expense);
     const drift = state.observations.cashflowDriftLast;
-    const driftIndex = drift?.ym ? recentForSpark.findIndex((row) => row.ym === drift.ym) : -1;
     const driftAlert =
       drift?.detected
         ? `<div class="history-drift-alert"><strong>Смена режима net cashflow обнаружена.</strong><p>Месяц: ${drift.ym ?? '—'} · уровень: ${getDriftLevelLabel(
@@ -141,9 +154,44 @@ export const createHistoryScreen = () => {
         : '';
     summary.innerHTML = `
       <h3>Net за 12 месяцев</h3>
-      ${buildNetSparkline(sparkValues, driftIndex >= 0 ? driftIndex : null)}
+      ${buildNetSparkline(sparkValues, 'Динамика net за 12 месяцев')}
       ${driftAlert}
       <p class="muted">данных: ${rows.length} месяцев</p>
+    `;
+
+    const forecast = state.observations.cashflowForecastLast;
+    const netSeries = rows.slice(-24).map((row) => row.income - row.expense).filter((item) => Number.isFinite(item));
+    const enoughData = netSeries.length >= FORECAST_MIN_MONTHS;
+    const horizonControls = [3, 6, 12]
+      .map((value) => `<button type="button" class="button ghost small ${selectedHorizon === value ? 'is-selected' : ''}" data-horizon="${value}">${value}м</button>`)
+      .join('');
+    const forecastBody =
+      forecast && forecast.horizonMonths === selectedHorizon
+        ? `<p>Риск отрицательного net на горизонте: <strong>${(forecast.probNetNegative * 100).toFixed(1)}%</strong></p>
+           <p>p10/p50/p90: <strong>${formatSigned(forecast.quantiles.p10)} / ${formatSigned(forecast.quantiles.p50)} / ${formatSigned(forecast.quantiles.p90)}</strong></p>
+           <p>Uncertainty (p90-p10): <strong>${Math.round(forecast.uncertainty).toLocaleString('ru-RU')}</strong></p>
+           ${buildIntervalBar(forecast.quantiles.p10, forecast.quantiles.p50, forecast.quantiles.p90, 'history-interval')}
+           <div class="history-forecast-spark">${buildNetSparkline(
+             forecast.monthly.map((row) => row.p50),
+             'Медианный прогноз net по месяцам',
+             'history-sparkline history-sparkline--forecast'
+           )}</div>`
+        : `<p class="muted">${
+            enoughData
+              ? 'Запустите прогноз, чтобы получить p10/p50/p90.'
+              : 'Для прогноза нужно >=6 месяцев наблюдений.'
+          }</p>`;
+
+    forecastCard.innerHTML = `
+      <h3>Прогноз net cashflow</h3>
+      <div class="history-forecast-actions">
+        <div class="history-horizon-switch">${horizonControls}</div>
+        <button class="button" type="button" data-action="run-forecast" ${!enoughData || isRunning ? 'disabled' : ''}>${
+          isRunning ? 'Считаем…' : 'Запустить прогноз'
+        }</button>
+      </div>
+      ${forecastBody}
+      <p class="muted">Bootstrap sampling, ${FORECAST_ITERATIONS} траекторий.</p>
     `;
 
     const incomeEl = quickForm.querySelector<HTMLInputElement>('input[name="income"]');
@@ -172,6 +220,52 @@ export const createHistoryScreen = () => {
         render();
       });
     });
+
+    forecastCard.querySelectorAll<HTMLButtonElement>('[data-horizon]').forEach((button) => {
+      button.addEventListener('click', () => {
+        selectedHorizon = Number(button.dataset.horizon) || 3;
+        render();
+      });
+    });
+
+    forecastCard.querySelector<HTMLButtonElement>('[data-action="run-forecast"]')?.addEventListener('click', async () => {
+      const currentRows = getState().observations.cashflowMonthly;
+      const series = currentRows.slice(-24).map((row) => row.income - row.expense).filter((item) => Number.isFinite(item));
+      if (series.length < FORECAST_MIN_MONTHS) return;
+
+      isRunning = true;
+      render();
+
+      const worker = new Worker(new URL('../workers/cashflowForecast.worker.ts', import.meta.url), { type: 'module' });
+      const requestId = `${Date.now()}-${Math.random()}`;
+      const result = await new Promise<CashflowForecastResult>((resolve, reject) => {
+        worker.onmessage = (event: MessageEvent<CashflowForecastWorkerResponse>) => {
+          if (event.data.requestId !== requestId) return;
+          if (event.data.error || !event.data.result) {
+            reject(new Error(event.data.error ?? 'Не удалось построить прогноз.'));
+            return;
+          }
+          resolve(event.data.result);
+        };
+        worker.onerror = () => reject(new Error('Ошибка worker прогноза cashflow.'));
+        worker.postMessage({ requestId, input: { netSeries: series, horizonMonths: selectedHorizon, iterations: FORECAST_ITERATIONS, seed: FORECAST_SEED } });
+      }).finally(() => {
+        worker.terminate();
+      });
+
+      setCashflowForecastLast({
+        ts: new Date().toISOString(),
+        horizonMonths: result.horizonMonths,
+        paramsUsed: { iterations: result.iterations, seed: FORECAST_SEED, sourceMonths: result.sourceMonths },
+        probNetNegative: result.probNetNegative,
+        quantiles: result.quantiles,
+        uncertainty: result.uncertainty,
+        monthly: result.monthly
+      });
+
+      isRunning = false;
+      render();
+    });
   };
 
   quickForm.addEventListener('submit', (event) => {
@@ -188,6 +282,6 @@ export const createHistoryScreen = () => {
   });
 
   render();
-  container.append(header, quickForm, tableWrap, summary);
+  container.append(header, quickForm, tableWrap, summary, forecastCard);
   return container;
 };

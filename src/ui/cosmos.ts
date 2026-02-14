@@ -165,6 +165,7 @@ const formatEventAge = (ts: string) => {
 };
 
 const HISTORY_DRIFT_RISK_THRESHOLD = 0.5;
+const FORECAST_RISK_BADGE_THRESHOLD = 0.5;
 
 const formatMonths = (value: number) => `${value.toFixed(1)} мес`;
 
@@ -190,16 +191,19 @@ export const createCosmosScreen = () => {
     if (planet.id === 'history') {
       const count = state.observations.cashflowMonthly.length;
       const drift = state.observations.cashflowDriftLast;
+      const forecast = state.observations.cashflowForecastLast;
       const driftScore = drift?.score ?? 0;
+      const forecastRisk = forecast?.probNetNegative ?? 0;
       const hasRiskDrift = Boolean(drift?.detected && driftScore >= HISTORY_DRIFT_RISK_THRESHOLD);
+      const hasForecastRisk = forecastRisk >= FORECAST_RISK_BADGE_THRESHOLD;
       acc.set('history', {
         id: 'history',
-        badge: count === 0 ? 'none' : hasRiskDrift ? 'risk' : 'ok',
-        riskSeverity: driftScore,
+        badge: count === 0 ? 'none' : hasRiskDrift || hasForecastRisk ? 'risk' : 'ok',
+        riskSeverity: Math.max(driftScore, forecastRisk),
         confidence: count > 0 ? 100 : null,
         freshnessUrgency: count > 0 ? 0.2 : 1,
         proximityUrgency,
-        turbulence: count > 0 ? driftScore : null
+        turbulence: count > 0 ? Math.max(driftScore, forecastRisk * 0.9) : null
       });
       return acc;
     }
@@ -687,8 +691,8 @@ export const createCosmosScreen = () => {
   resetViewButton.addEventListener('click', resetView);
 
   let selectedPlanetId: PlanetRefId | null = null;
-  const planetGroups = new Map<IslandId, SVGGElement>();
-  const planetPoints = new Map<IslandId, { x: number; y: number }>();
+  const planetGroups = new Map<PlanetRefId, SVGGElement>();
+  const planetPoints = new Map<PlanetRefId, { x: number; y: number }>();
   const recentEventsByPlanet = new Map<PlanetRefId, CosmosActivityEvent[]>();
 
   const renderActivityPanel = () => {
@@ -734,16 +738,24 @@ export const createCosmosScreen = () => {
       selectedPlanetId === 'history'
         ? (() => {
             const drift = state.observations.cashflowDriftLast;
-            if (!drift) {
-              return '<section class="cosmos-forecast-block"><h4>Режим cashflow</h4><p class="muted">Сигнал появится после накопления наблюдений.</p></section>';
-            }
-            const status = drift.detected ? 'обнаружена смена режима' : 'режим без сигнала';
-            const meaning = drift.detected
-              ? 'Вероятно изменился финансовый режим: проверьте структуру доходов/расходов и причины сдвига.'
-              : 'Существенного сдвига net cashflow не найдено по последней истории.';
-            return `<section class="cosmos-forecast-block"><h4>Режим cashflow</h4><p>Статус: <strong>${status}</strong></p><p>Score: <strong>${(drift.score * 100).toFixed(
-              0
-            )}%</strong>${drift.ym ? ` · месяц ${drift.ym}` : ''}</p><p class="muted">${meaning}</p></section>`;
+            const forecast = state.observations.cashflowForecastLast;
+            const driftBlock = drift
+              ? `<p>Режим: <strong>${drift.detected ? 'обнаружена смена' : 'без сигнала'}</strong></p><p>Drift score: <strong>${(drift.score * 100).toFixed(
+                  0
+                )}%</strong>${drift.ym ? ` · месяц ${drift.ym}` : ''}</p>`
+              : '<p class="muted">Сигнал режима появится после накопления наблюдений.</p>';
+            const forecastBlock = forecast
+              ? (() => {
+                  const span = Math.max(1, forecast.quantiles.p90 - forecast.quantiles.p10);
+                  const medianPos = Math.max(0, Math.min(100, ((forecast.quantiles.p50 - forecast.quantiles.p10) / span) * 100));
+                  return `<p>Forecast risk: <strong>${(forecast.probNetNegative * 100).toFixed(1)}%</strong> (RISK от ${(FORECAST_RISK_BADGE_THRESHOLD * 100).toFixed(
+                    0
+                  )}%)</p><p>Net p10/p50/p90: ${Math.round(forecast.quantiles.p10).toLocaleString('ru-RU')} / ${Math.round(
+                    forecast.quantiles.p50
+                  ).toLocaleString('ru-RU')} / ${Math.round(forecast.quantiles.p90).toLocaleString('ru-RU')}</p><div class="cosmos-interval" role="img" aria-label="Интервал прогноза net cashflow p10-p90"><span class="cosmos-interval-range" style="left:0%;width:100%"></span><span class="cosmos-interval-median" style="left:${medianPos}%"></span></div>`;
+                })()
+              : '<p class="muted">Запусти прогноз в Истории (3/6/12 мес).</p>';
+            return `<section class="cosmos-forecast-block"><h4>History прогноз</h4>${driftBlock}${forecastBlock}</section>`;
           })()
         : '';
     activityPanel.innerHTML = `<h3>Последние действия · ${title}</h3>${list}${mcForecastBlock}${historyDriftBlock}`;

@@ -1,4 +1,9 @@
-import { CashflowDriftLastState, CashflowMonthlyEntry, ObservationsState } from './types';
+import {
+  CashflowDriftLastState,
+  CashflowForecastLastState,
+  CashflowMonthlyEntry,
+  ObservationsState
+} from './types';
 
 export const CASHFLOW_MONTHLY_CAP = 36;
 
@@ -20,6 +25,11 @@ const sanitizeAmount = (value: unknown): number => {
   return Math.max(0, numeric);
 };
 
+const clamp01 = (value: unknown): number => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return 0;
+  return Math.max(0, Math.min(1, numeric));
+};
 
 const sanitizeDriftParams = (value: unknown): CashflowDriftLastState['paramsUsed'] => {
   const source = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
@@ -50,6 +60,62 @@ const sanitizeCashflowDriftLast = (value: unknown): CashflowDriftLastState | und
     ym,
     ts,
     paramsUsed: sanitizeDriftParams(row.paramsUsed)
+  };
+};
+
+const sanitizeForecastMonthly = (
+  value: unknown
+): CashflowForecastLastState['monthly'] => {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item, index) => {
+      if (!item || typeof item !== 'object') return null;
+      const row = item as Record<string, unknown>;
+      const monthRaw = Number(row.month);
+      const month = Number.isFinite(monthRaw) ? Math.max(1, Math.floor(monthRaw)) : index + 1;
+      return {
+        month,
+        p10: Number.isFinite(Number(row.p10)) ? Number(row.p10) : 0,
+        p50: Number.isFinite(Number(row.p50)) ? Number(row.p50) : 0,
+        p90: Number.isFinite(Number(row.p90)) ? Number(row.p90) : 0
+      };
+    })
+    .filter((item): item is CashflowForecastLastState['monthly'][number] => Boolean(item));
+};
+
+const sanitizeCashflowForecastLast = (value: unknown): CashflowForecastLastState | undefined => {
+  if (!value || typeof value !== 'object') return undefined;
+  const row = value as Record<string, unknown>;
+  const ts = typeof row.ts === 'string' && row.ts.trim() ? row.ts : null;
+  if (!ts) return undefined;
+  const paramsUsed = row.paramsUsed && typeof row.paramsUsed === 'object'
+    ? (row.paramsUsed as Record<string, unknown>)
+    : {};
+  const quantiles = row.quantiles && typeof row.quantiles === 'object'
+    ? (row.quantiles as Record<string, unknown>)
+    : {};
+
+  const sourceMonthsRaw = Number(paramsUsed.sourceMonths);
+  const iterationsRaw = Number(paramsUsed.iterations);
+  const seedRaw = Number(paramsUsed.seed);
+  const horizonRaw = Number(row.horizonMonths);
+
+  return {
+    ts,
+    horizonMonths: Number.isFinite(horizonRaw) ? Math.max(1, Math.floor(horizonRaw)) : 3,
+    paramsUsed: {
+      iterations: Number.isFinite(iterationsRaw) ? Math.max(1, Math.floor(iterationsRaw)) : 2000,
+      sourceMonths: Number.isFinite(sourceMonthsRaw) ? Math.max(0, Math.floor(sourceMonthsRaw)) : 0,
+      ...(Number.isFinite(seedRaw) ? { seed: Math.floor(seedRaw) } : {})
+    },
+    probNetNegative: clamp01(row.probNetNegative),
+    quantiles: {
+      p10: Number.isFinite(Number(quantiles.p10)) ? Number(quantiles.p10) : 0,
+      p50: Number.isFinite(Number(quantiles.p50)) ? Number(quantiles.p50) : 0,
+      p90: Number.isFinite(Number(quantiles.p90)) ? Number(quantiles.p90) : 0
+    },
+    uncertainty: Number.isFinite(Number(row.uncertainty)) ? Math.max(0, Number(row.uncertainty)) : 0,
+    monthly: sanitizeForecastMonthly(row.monthly)
   };
 };
 
@@ -87,9 +153,11 @@ export const sanitizeCashflowMonthly = (
 export const sanitizeObservations = (value: unknown): ObservationsState => {
   const source = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
   const cashflowDriftLast = sanitizeCashflowDriftLast(source.cashflowDriftLast);
+  const cashflowForecastLast = sanitizeCashflowForecastLast(source.cashflowForecastLast);
   return {
     cashflowMonthly: sanitizeCashflowMonthly(source.cashflowMonthly),
-    ...(cashflowDriftLast ? { cashflowDriftLast } : {})
+    ...(cashflowDriftLast ? { cashflowDriftLast } : {}),
+    ...(cashflowForecastLast ? { cashflowForecastLast } : {})
   };
 };
 
