@@ -57,6 +57,8 @@ import {
   MonteCarloWorkerResponse,
   getDeterministicRunwayMonths
 } from '../islands/stressMonteCarlo';
+import { formatDateTime, formatNumber, formatPercent } from './format';
+import { getLang } from './i18n';
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
@@ -141,11 +143,11 @@ export const createIslandPage = (id: IslandId) => {
             <input name="shockSeverity" type="number" min="0" max="1" step="0.05" value="${initialInput.shockSeverity}" />
           </label>
           <label>
-            Income sd
+            СКО дохода
             <input name="incomeSd" type="number" min="0" step="1000" value="${initialInput.incomeSd}" />
           </label>
           <label>
-            Income distribution
+            Распределение дохода
             <select name="incomeDistribution">
               <option value="lognormal" ${
                 initialInput.incomeDistribution === 'lognormal' ? 'selected' : ''
@@ -156,11 +158,11 @@ export const createIslandPage = (id: IslandId) => {
             </select>
           </label>
           <label>
-            Expenses sd
+            СКО расходов
             <input name="expensesSd" type="number" min="0" step="1000" value="${initialInput.expensesSd}" />
           </label>
           <label>
-            Expenses distribution
+            Распределение расходов
             <select name="expensesDistribution">
               <option value="lognormal" ${
                 initialInput.expensesDistribution === 'lognormal' ? 'selected' : ''
@@ -171,11 +173,11 @@ export const createIslandPage = (id: IslandId) => {
             </select>
           </label>
           <label>
-            Prior a
+            Приор a
             <input name="priorA" type="number" min="0.1" step="0.1" value="${initialInput.priorA}" />
           </label>
           <label>
-            Prior b
+            Приор b
             <input name="priorB" type="number" min="0.1" step="0.1" value="${initialInput.priorB}" />
           </label>
           <label>
@@ -982,7 +984,7 @@ export const createIslandPage = (id: IslandId) => {
         details: [
           ...base.details,
           `Монте-Карло: считаю ${Math.min(20000, Math.max(200, Math.round(params.iterations)))} траекторий...`,
-          `Сверка sigma=0: детерминированный runway на горизонте = ${deterministicRunway} мес`
+          `Сверка sigma=0: детерминированный запас на горизонте = ${deterministicRunway} мес`
         ]
       };
       updateIslandReport(id, pending);
@@ -1335,9 +1337,9 @@ export const createIslandPage = (id: IslandId) => {
       outputBlock.innerHTML = `
         <div class="result-metrics">
           <div><span>Прогноз</span><strong>${forecastLabel}</strong></div>
-          <div><span>Metric</span><strong>${metricLabel}</strong></div>
-          <div><span>Trend</span><strong>${trendLabel}</strong></div>
-          <div><span>Volatility</span><strong>${volatilityLabel}</strong></div>
+          <div><span>Метрика</span><strong>${metricLabel}</strong></div>
+          <div><span>Тренд</span><strong>${trendLabel}</strong></div>
+          <div><span>Волатильность</span><strong>${volatilityLabel}</strong></div>
           <div><span>Доверие</span><strong>${confidenceLabel}</strong></div>
         </div>
       `;
@@ -1489,10 +1491,7 @@ export const createIslandPage = (id: IslandId) => {
         const date = new Date(entry.ts);
         const ts = Number.isNaN(date.getTime())
           ? '—'
-          : `${date.toLocaleDateString('ru-RU')} ${date.toLocaleTimeString('ru-RU', {
-              hour: '2-digit',
-              minute: '2-digit'
-            })}`;
+          : `${formatDateTime(date, { dateStyle: 'short' }, getLang())} ${formatDateTime(date, { timeStyle: 'short' }, getLang())}`;
         return `<li><span>${ts}</span><strong>${entry.ruinProb.toFixed(1)}%</strong><em>p50 ${entry.p50.toFixed(1)} мес</em></li>`;
       })
       .join('');
@@ -1519,7 +1518,7 @@ export const createIslandPage = (id: IslandId) => {
       ${historyHint}
       ${
         mc
-          ? `<section class="stress-mc-result"><h3>Монте-Карло</h3><p>Risk-of-ruin: <strong>${mc.ruinProb.toFixed(2)}%</strong> на горизонте ${mc.horizonMonths} мес (${mc.iterations} итераций)</p><p>Квантили запаса хода: p10 ${mc.quantiles.p10.toFixed(1)} мес / p50 ${mc.quantiles.p50.toFixed(1)} мес / p90 ${mc.quantiles.p90.toFixed(1)} мес</p>${renderHistogram()}${renderMcHistory()}</section>`
+          ? `<section class="stress-mc-result"><h3>Монте-Карло</h3><p>Риск разорения: <strong>${formatPercent(mc.ruinProb / 100, 2)}</strong> на горизонте ${mc.horizonMonths} мес (${mc.iterations} итераций)</p><p>Квантили запаса: p10 ${formatNumber(mc.quantiles.p10, { maximumFractionDigits: 1 })} мес / p50 ${formatNumber(mc.quantiles.p50, { maximumFractionDigits: 1 })} мес / p90 ${formatNumber(mc.quantiles.p90, { maximumFractionDigits: 1 })} мес</p>${renderHistogram()}${renderMcHistory()}</section>`
           : ''
       }
     `;

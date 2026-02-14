@@ -11,7 +11,7 @@ import {
   CashflowForecastWorkerResponse
 } from '../workers/cashflowForecast';
 import { computeTurbulence } from '../core/turbulence';
-import { formatNumber } from './i18n';
+import { formatNumber } from './format';
 
 const FORECAST_MIN_MONTHS = 6;
 const FORECAST_ITERATIONS = 2000;

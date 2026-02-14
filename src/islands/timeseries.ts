@@ -1,5 +1,6 @@
 import { ActionItem, Insight, IslandReport } from '../core/types';
 import { reportCaughtError } from '../core/reportError';
+import { formatNumber } from '../ui/format';
 
 export interface TimeseriesInput {
   series?: number[];
@@ -71,12 +72,7 @@ export interface TimeseriesAnalysisBundle {
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
 
-const formatNumber = (value: number) => {
-  const formatter = new Intl.NumberFormat('ru-RU', {
-    maximumFractionDigits: 2
-  });
-  return formatter.format(value);
-};
+import { formatNumber } from '../ui/format';
 
 const parseNumberList = (value: string) =>
   value
@@ -261,7 +257,7 @@ export const buildTimeseriesReport = (
       details: [
         'Формат JSON: { "series": [120, 130, 110], "horizon": 12 }',
         'Или текстом: horizon: 12, season: 12, затем значения по строкам.',
-        'Можно задать income и expenses для расчёта покрытия.'
+        'Можно задать доходы и расходы для расчёта покрытия.'
       ],
       actions: buildActions(null),
       insights: [{ title: 'Недостаточно данных', severity: 'warning' }]
@@ -272,7 +268,7 @@ export const buildTimeseriesReport = (
   const modelLabel = primary.model.auto ? 'AutoARIMA' : 'Grid-search ARIMA';
   const seasonalLabel = primary.model.s > 0 ? `SARIMA (s=${primary.model.s})` : 'ARIMA';
   details.push(`Модель: ${modelLabel}, ${seasonalLabel}.`);
-  details.push(`Горизонт: ${primary.horizon}, train: ${primary.trainSize}, test: ${primary.testSize}.`);
+  details.push(`Горизонт: ${primary.horizon}, обучение: ${primary.trainSize}, тест: ${primary.testSize}.`);
   const appendForecast = (label: string, analysis: TimeseriesAnalysis) => {
     details.push(`${label}: ${formatSeries(analysis.forecast)}.`);
     details.push(
@@ -295,7 +291,7 @@ export const buildTimeseriesReport = (
     appendForecast('Доходы', income);
     appendForecast('Расходы', expenses);
     details.push(
-      `Покрытие (income-expenses): ${formatNumber(coverage ?? 0)} на период.`
+      `Покрытие (доходы-расходы): ${formatNumber(coverage ?? 0)} на период.`
     );
   } else {
     appendForecast('Прогноз', primary);
@@ -329,7 +325,7 @@ export const getTimeseriesReport = (rawInput: string): IslandReport => {
   const details = [
     'Нажмите «Запустить», чтобы рассчитать прогноз в отдельном воркере.',
     'Формат JSON: { "series": [120, 130, 110], "horizon": 12 }',
-    'Можно указать income и expenses для оценки покрытия.'
+    'Можно указать доходы и расходы для оценки покрытия.'
   ];
 
   return {

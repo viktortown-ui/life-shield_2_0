@@ -1,6 +1,6 @@
 import { islandRegistry } from '../core/registry';
 import { AppState, IslandId, IslandReport, IslandRunHistoryEntry } from '../core/types';
-import { formatDateTime } from './i18n';
+import { formatDateTime } from './format';
 
 export const STALE_AFTER_DAYS = 7;
 

@@ -1,5 +1,8 @@
 import { ActionItem, IslandReport } from '../core/types';
 import { parseFinanceInput } from './finance';
+import { getMetricLabel } from '../i18n/glossary';
+import { getLang, getProTerms } from '../ui/i18n';
+import { formatNumber, formatPercent } from '../ui/format';
 
 const ratio = (a: number, b: number, fallback = 0) => (b > 0 ? a / b : fallback);
 const clamp = (value: number, min: number, max: number) =>
@@ -18,21 +21,21 @@ const resolveRiskZone = (
   const reasons: string[] = [];
 
   if (runwayMonths < 3) {
-    reasons.push(`runway ${runwayMonths.toFixed(1)} мес (<3)`);
+    reasons.push(`запас ${formatNumber(runwayMonths, { maximumFractionDigits: 1 })} мес (<3)`);
   } else if (runwayMonths < 6) {
-    reasons.push(`runway ${runwayMonths.toFixed(1)} мес (<6)`);
+    reasons.push(`запас ${formatNumber(runwayMonths, { maximumFractionDigits: 1 })} мес (<6)`);
   }
 
   if (coverage < 1) {
-    reasons.push(`покрытие ${coverage.toFixed(2)} (<1.0)`);
+    reasons.push(`покрытие ${formatNumber(coverage, { maximumFractionDigits: 2 })} (<1,0)`);
   } else if (coverage < 1.2) {
-    reasons.push(`покрытие ${coverage.toFixed(2)} (<1.2)`);
+    reasons.push(`покрытие ${formatNumber(coverage, { maximumFractionDigits: 2 })} (<1,2)`);
   }
 
   if (debtBurden > 0.45) {
-    reasons.push(`долг ${Math.round(debtBurden * 100)}% (>45%)`);
+    reasons.push(`долг ${formatPercent(debtBurden, 0)} (>45%)`);
   } else if (debtBurden > 0.3) {
-    reasons.push(`долг ${Math.round(debtBurden * 100)}% (>30%)`);
+    reasons.push(`долг ${formatPercent(debtBurden, 0)} (>30%)`);
   }
 
   const hardSignals =
@@ -56,7 +59,7 @@ const resolveRiskZone = (
 
   return {
     zone: 'зелёная',
-    why: 'runway, покрытие и долг в безопасных пределах'
+    why: 'запас, покрытие и долг в безопасных пределах'
   };
 };
 
@@ -77,6 +80,12 @@ export const getStressTestReport = (input: string): IslandReport => {
     0,
     100
   );
+
+  const lang = getLang();
+  const proTerms = getProTerms();
+  const runwayLabel = getMetricLabel('runway', { lang, proTerms }).label;
+  const debtBurdenLabel = getMetricLabel('debtBurden', { lang, proTerms }).label;
+  const coverageLabel = getMetricLabel('coverage', { lang, proTerms }).label;
 
   const hints: ActionItem[] = [];
   if (baseRunway < 6) {
@@ -112,9 +121,9 @@ export const getStressTestReport = (input: string): IslandReport => {
     summary: `Почему: ${zoneResult.why}. Что будет, если доход просядет или расходы вырастут.`,
     details: [
       `Почему зона: ${zoneResult.why}`,
-      `Если доход -30%: runway ${incomeDropRunway.toFixed(1)} мес, debt burden ${Math.round(incomeDropDebt * 100)}%`,
-      `Базовый сценарий: runway ${baseRunway.toFixed(1)} мес, coverage ${coverage.toFixed(2)}, debt burden ${Math.round(debtBurden * 100)}%`,
-      `Если расходы +20%: runway ${expensesRiseRunway.toFixed(1)} мес`
+      `Если доход -30%: ${runwayLabel.toLowerCase()} ${formatNumber(incomeDropRunway, { maximumFractionDigits: 1 })} мес, ${debtBurdenLabel.toLowerCase()} ${formatPercent(incomeDropDebt, 0)}`,
+      `Базовый сценарий: ${runwayLabel.toLowerCase()} ${formatNumber(baseRunway, { maximumFractionDigits: 1 })} мес, ${coverageLabel.toLowerCase()} ${formatNumber(coverage, { maximumFractionDigits: 2 })}, ${debtBurdenLabel.toLowerCase()} ${formatPercent(debtBurden, 0)}`,
+      `Если расходы +20%: ${runwayLabel.toLowerCase()} ${formatNumber(expensesRiseRunway, { maximumFractionDigits: 1 })} мес`
     ],
     actions: hints.slice(0, 3)
   };
