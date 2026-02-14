@@ -58,7 +58,9 @@ import {
   getDeterministicRunwayMonths
 } from '../islands/stressMonteCarlo';
 import { formatDateTime, formatNumber, formatPercent } from './format';
-import { getLang } from './i18n';
+import { createHelpIconButton, getHelpTopicByIslandId } from './help';
+import { getLang, getProTerms, t } from './i18n';
+import { getMetricLabel } from '../i18n/glossary';
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
@@ -75,6 +77,53 @@ const buildIslandErrorReport = (id: IslandId, error: unknown) => ({
   details: ['Попробуйте обновить страницу или повторить ввод.']
 });
 
+
+const sanitizeRuTerms = (text: string) => {
+  if (getLang() !== 'ru' || getProTerms()) return text;
+  return text
+    .replace(/Runway/gi, 'запас')
+    .replace(/HHI/gi, 'концентрация')
+    .replace(/Debt burden/gi, 'долговая нагрузка')
+    .replace(/Coverage/gi, 'покрытие')
+    .replace(/Burn-in/gi, 'прогрев')
+    .replace(/Step size/gi, 'шаг');
+};
+
+const getIslandTagline = (description: string) => {
+  if (getLang() !== 'ru') return description;
+  return description.replace(/\s+/g, ' ').trim();
+};
+
+const createIslandHeader = (id: IslandId, title: string, description: string) => {
+  const header = document.createElement('header');
+  header.className = 'screen-header island-screen-header';
+
+  const titleRow = document.createElement('div');
+  titleRow.className = 'island-screen-title-row';
+  const heading = document.createElement('h1');
+  heading.textContent = title;
+  titleRow.appendChild(heading);
+
+  const helpTopic = getHelpTopicByIslandId(id);
+  if (helpTopic) {
+    titleRow.appendChild(createHelpIconButton(helpTopic));
+  }
+
+  const tagline = document.createElement('p');
+  tagline.className = 'island-tagline';
+  tagline.textContent = sanitizeRuTerms(getIslandTagline(description));
+
+  const hint = document.createElement('p');
+  hint.className = 'island-help-hint';
+  hint.textContent =
+    getLang() === 'ru'
+      ? 'Подробности и примеры — в Справке по кнопке ?'
+      : 'Details and examples are available in Help via ?';
+
+  header.append(titleRow, tagline, hint);
+  return header;
+};
+
 export const createIslandPage = (id: IslandId) => {
   const island = findIsland(id);
   const state = getState();
@@ -88,14 +137,7 @@ export const createIslandPage = (id: IslandId) => {
     return container;
   }
 
-  const header = document.createElement('header');
-  header.className = 'screen-header';
-  header.innerHTML = `
-    <div>
-      <h1>${island.title}</h1>
-      <p>${island.description}</p>
-    </div>
-  `;
+  const header = createIslandHeader(id, island.title, island.description);
 
   const form = document.createElement('form');
   form.className = 'island-form';
@@ -1508,17 +1550,16 @@ export const createIslandPage = (id: IslandId) => {
         ? '<p class="muted">Можно будет строить прогнозы по истории.</p>'
         : '';
     result.innerHTML = `
-      <div class="result-metrics">
-        <div><span>Балл</span><strong>${report.score}</strong></div>
-        <div><span>Доверие</span><strong>${report.confidence}%</strong></div>
+      <div class="result-metrics compact">
+        <div><span>${t('score')}</span><strong>${formatNumber(report.score)}</strong></div>
+        <div><span>${t('confidence')}</span><strong>${formatPercent(report.confidence / 100, 0)}</strong></div>
+        <div><span>Статус</span><strong>${sanitizeRuTerms(report.headline)}</strong></div>
+        <div><span>Коротко</span><strong>${sanitizeRuTerms(report.summary)}</strong></div>
       </div>
-      <h2>${report.headline}</h2>
-      <div class="result-summary">${report.summary}</div>
-      <ul>${report.details.map((item) => `<li>${item}</li>`).join('')}</ul>
       ${historyHint}
       ${
         mc
-          ? `<section class="stress-mc-result"><h3>Монте-Карло</h3><p>Риск разорения: <strong>${formatPercent(mc.ruinProb / 100, 2)}</strong> на горизонте ${mc.horizonMonths} мес (${mc.iterations} итераций)</p><p>Квантили запаса: p10 ${formatNumber(mc.quantiles.p10, { maximumFractionDigits: 1 })} мес / p50 ${formatNumber(mc.quantiles.p50, { maximumFractionDigits: 1 })} мес / p90 ${formatNumber(mc.quantiles.p90, { maximumFractionDigits: 1 })} мес</p>${renderHistogram()}${renderMcHistory()}</section>`
+          ? `<section class="stress-mc-result"><h3>Монте-Карло</h3><div class="result-metrics compact"><div><span>Риск</span><strong>${formatPercent(mc.ruinProb / 100, 2)}</strong></div><div><span>${getMetricLabel('runway', { lang: getLang(), proTerms: getProTerms() }).label} p50</span><strong>${formatNumber(mc.quantiles.p50, { maximumFractionDigits: 1 })} мес</strong></div><div><span>p10</span><strong>${formatNumber(mc.quantiles.p10, { maximumFractionDigits: 1 })} мес</strong></div><div><span>p90</span><strong>${formatNumber(mc.quantiles.p90, { maximumFractionDigits: 1 })} мес</strong></div></div>${renderHistogram()}${renderMcHistory()}</section>`
           : ''
       }
     `;

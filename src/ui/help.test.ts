@@ -24,6 +24,8 @@ describe('help content', () => {
     expect(ariaLabel).toContain(':');
     expect(button.textContent).toContain('?');
     expect(describedBy).toContain('help-topic-desc-snapshot');
+    expect(button.getAttribute('role')).toBe('button');
+    expect(button.tabIndex).toBe(0);
     expect(button.querySelector(`#${describedBy}`)).not.toBeNull();
   });
 });

@@ -2,7 +2,7 @@ import { islandRegistry } from '../core/registry';
 import { getCatalogByGroup, getIslandCatalogItem } from '../core/islandsCatalog';
 import { getState } from '../core/store';
 import { t, tf } from './i18n';
-import { createHelpIconButton, HelpTopicId } from './help';
+import { createHelpIconButton, getHelpTopicByIslandId } from './help';
 import {
   buildSparklineSvg,
   formatLastRun,
@@ -11,18 +11,6 @@ import {
   getReportSummary
 } from './reportUtils';
 
-
-const islandHelpTopicMap: Partial<Record<string, HelpTopicId>> = {
-  snapshot: 'snapshot',
-  stressTest: 'stressTest',
-  incomePortfolio: 'incomePortfolio',
-  timeseries: 'timeseries',
-  bayes: 'bayes',
-  hmm: 'hmm',
-  optimization: 'optimization',
-  decisionTree: 'decisionTree',
-  causalDag: 'causalDag'
-};
 
 export const createIslandsHubScreen = () => {
   const state = getState();
@@ -73,7 +61,7 @@ export const createIslandsHubScreen = () => {
         Boolean(islandState.lastReport)
       );
       const trend = getHistoryTail(state, catalogItem.id).join(' → ') || '—';
-      const helpTopic = islandHelpTopicMap[catalogItem.id];
+      const helpTopic = getHelpTopicByIslandId(catalogItem.id);
 
       const badge = catalogItem.badge
         ? `<span class="islands-hub-badge status--fresh">${catalogItem.badge}</span>`
