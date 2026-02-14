@@ -11,13 +11,13 @@ export const getCashflowDriftSignal = (state: AppState): TurbulenceSignal | null
 
   return {
     id: 'cashflowDrift',
-    label: 'Cashflow drift',
+    label: 'Поток поменялся',
     score: clamp01(drift.score),
     confidence,
     ts: drift.ts,
     ym: drift.ym ?? undefined,
     explanation: drift.detected
-      ? `Обнаружена смена режима net cashflow (${Math.round(drift.score * 100)}%).`
+      ? `Обнаружена смена режима чистого потока (${Math.round(drift.score * 100)}%).`
       : `Явной смены режима нет (${Math.round(drift.score * 100)}%).`,
     evidence: {
       driftScore: drift.score,

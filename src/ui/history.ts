@@ -63,7 +63,7 @@ const buildNetSparkline = (values: number[], ariaLabel: string, className = 'his
 const buildIntervalBar = (p10: number, p50: number, p90: number, className = 'cosmos-interval') => {
   const span = Math.max(1, p90 - p10);
   const medianPos = Math.max(0, Math.min(100, ((p50 - p10) / span) * 100));
-  return `<div class="${className}" role="img" aria-label="Интервал p10-p90 и медиана p50"><span class="cosmos-interval-range" style="left:0%;width:100%"></span><span class="cosmos-interval-median" style="left:${medianPos}%"></span></div>`;
+  return `<div class="${className}" role="img" aria-label="Интервал p10-p90 и медиана p50"><span class="cosmos-interval-range" style="left:0%;width:100%"></span><span class="cosmos-interval-median" style="left:${medianPos}%"></span><p class="muted">Актуальность данных: чем свежее запускали расчёты, тем надёжнее индикатор.</p></div>`;
 };
 
 export const createHistoryScreen = () => {
@@ -115,7 +115,7 @@ export const createHistoryScreen = () => {
           <input name="expense" type="number" min="0" step="1000" value="${latest?.expense ?? 0}" />
         </label>
         <label>
-          Net
+          Итог
           <input name="net" type="number" value="${(latest?.income ?? 0) - (latest?.expense ?? 0)}" readonly />
         </label>
       </div>
@@ -130,7 +130,7 @@ export const createHistoryScreen = () => {
     tableWrap.innerHTML = `
       <table class="history-table">
         <thead>
-          <tr><th>Месяц</th><th>Доход</th><th>Расход</th><th>Net</th><th></th></tr>
+          <tr><th>Месяц</th><th>Доход</th><th>Расход</th><th>Итог</th><th></th></tr>
         </thead>
         <tbody>
           ${
@@ -166,17 +166,17 @@ export const createHistoryScreen = () => {
             .map((signal) => `<li>${signal.label}: ${(signal.score * 100).toFixed(0)}% — ${signal.explanation}</li>`)
             .join('')}</ul>`
         : '<p class="muted">Сигналы пока недоступны.</p>'
-    }</div>`;
+    }<p class="muted">Актуальность данных: чем свежее запускали расчёты, тем надёжнее индикатор.</p></div>`;
     const drift = state.observations.cashflowDriftLast;
     const driftAlert =
       drift?.detected
-        ? `<div class="history-drift-alert"><strong>Смена режима чистого потока обнаружена.</strong><p>Месяц: ${drift.ym ?? '—'} · уровень: ${getDriftLevelLabel(
+        ? `<div class="history-drift-alert"><strong>Поток поменялся.</strong><p>Месяц: ${drift.ym ?? '—'} · уровень: ${getDriftLevelLabel(
             drift.score
-          )} (${(drift.score * 100).toFixed(0)}%)</p></div>`
+          )} (${(drift.score * 100).toFixed(0)}%)</p><p class="muted">Смена режима потока: это может повлиять на прогноз.</p></div>`
         : '';
     summary.innerHTML = `
-      <h3>Net за 12 месяцев</h3>
-      ${buildNetSparkline(sparkValues, 'Динамика net за 12 месяцев')}
+      <h3>Итог за 12 месяцев</h3>
+      ${buildNetSparkline(sparkValues, 'Динамика итога за 12 месяцев')}
       ${driftAlert}
       ${turbulenceBlock}
       <p class="muted">данных: ${rows.length} месяцев</p>
@@ -196,7 +196,7 @@ export const createHistoryScreen = () => {
       .join('');
     const forecastBody =
       forecast && forecast.horizonMonths === selectedHorizon && (forecast.paramsUsed.mode ?? 'single') === forecastMode
-        ? `<p>Риск отрицательного net на горизонте: <strong>${(forecast.probNetNegative * 100).toFixed(1)}%</strong></p>
+        ? `<p>Риск отрицательного итога на горизонте: <strong>${(forecast.probNetNegative * 100).toFixed(1)}%</strong></p>
            <p>p10/p50/p90: <strong>${formatSigned(forecast.quantiles.p10)} / ${formatSigned(forecast.quantiles.p50)} / ${formatSigned(forecast.quantiles.p90)}</strong></p>
            <p>Uncertainty (норм.): <strong>${forecast.uncertainty.toFixed(2)}</strong></p>
            <p>Согласие моделей: <strong>${getDisagreementLabel(forecast.disagreementScore ?? 0)}</strong> (${Math.round((forecast.disagreementScore ?? 0) * 100)}%)</p>
@@ -204,7 +204,7 @@ export const createHistoryScreen = () => {
            ${buildIntervalBar(forecast.quantiles.p10, forecast.quantiles.p50, forecast.quantiles.p90, 'history-interval')}
            <div class="history-forecast-spark">${buildNetSparkline(
              forecast.monthly.map((row) => row.p50),
-             'Медианный прогноз net по месяцам',
+             'Медианный прогноз итога по месяцам',
              'history-sparkline history-sparkline--forecast'
            )}</div>`
         : `<p class="muted">${

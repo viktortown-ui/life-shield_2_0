@@ -164,7 +164,7 @@ export const computeDecisionTreeMetrics = (
     }, 0);
 
     return {
-      name: action.name || `Action ${index + 1}`,
+      name: action.name || `Ход ${index + 1}`,
       ev,
       variance,
       probLoss,
@@ -215,7 +215,7 @@ const buildActionItems = (options: {
 
   if (options.singleOutcome) {
     suggestions.push({
-      title: 'разбей payoff на диапазон',
+      title: 'разбей награду на диапазон',
       impact: 70,
       effort: 30,
       description: 'Добавьте вариативность исходов, чтобы учесть разброс.'
@@ -224,10 +224,10 @@ const buildActionItems = (options: {
 
   if (options.probabilityMismatch) {
     suggestions.push({
-      title: 'уточни вероятности так, чтобы сумма = 1',
+      title: 'уточни шансы так, чтобы сумма = 1',
       impact: 80,
       effort: 20,
-      description: 'Проверьте нормировку вероятностей по каждому действию.'
+      description: 'Проверьте, что сумма шансов у каждого хода равна 1.0.'
     });
   }
 
@@ -242,7 +242,7 @@ const buildActionItems = (options: {
 
   if (suggestions.length < 2) {
     suggestions.push({
-      title: 'разбей payoff на диапазон',
+      title: 'разбей награду на диапазон',
       impact: 70,
       effort: 30,
       description: 'Добавьте вариативность исходов, чтобы учесть разброс.'
@@ -302,24 +302,47 @@ export const getDecisionTreeReport = (rawInput: string): IslandReport => {
   );
   const score = clamp(evScore - downsidePenalty, 0, 100);
 
-  const details = summary.actions.map((action) =>
-    `${action.name}: EV=${formatNumber(action.ev)}, ` +
-    `σ²=${formatNumber(action.variance)}, ` +
-    `downside p=${formatNumber(action.probLoss, 2)}, ` +
-    `EL=${formatNumber(action.expectedLoss, 2)}, ` +
-    `min=${formatNumber(action.minPayoff, 2)}.`
+  const details = summary.actions.map(
+    (action) =>
+      `${action.name}: EV=${formatNumber(action.ev)}, ` +
+      `σ²=${formatNumber(action.variance)}, ` +
+      `downside p=${formatNumber(action.probLoss, 2)}, ` +
+      `EL=${formatNumber(action.expectedLoss, 2)}, ` +
+      `min=${formatNumber(action.minPayoff, 2)}.`
   );
 
   details.push(
     `Лучший по среднему результату: ${bestByEV.name}. Осторожный выбор: ${robustChoice.name}.`
   );
 
+  const why = probabilityMismatch
+    ? 'шансы сейчас не сходятся до 1.0, поэтому вывод ненадёжен'
+    : bestByEV.probLoss <= robustChoice.probLoss
+      ? 'у этого хода риск потери ниже при хорошем среднем результате'
+      : 'у этого хода выше средний результат';
+
+  const nextStep = probabilityMismatch
+    ? 'проверь и поправь шансы у каждого хода до суммы 1.0'
+    : `сравни его с ${robustChoice.name} на худший сценарий и размер потерь`;
+
   return {
     id: 'decisionTree',
     score: Math.round(score),
     confidence: Math.round(confidence * 100),
     headline: `Лучший ход: ${bestByEV.name}`,
-    summary: `Что выгоднее: ${bestByEV.name}. Риск потери: ${formatPercent(bestByEV.probLoss, 0)}. Что проверить: ${probabilityMismatch ? 'суммы вероятностей по действиям' : 'крайние исходы и размеры потерь'}.`,
+    summary: `Почему: ${why}. Что дальше: ${nextStep}.`,
+    reasons: [
+      `Шанс потери у ${bestByEV.name}: ${formatPercent(bestByEV.probLoss, 0)}.`,
+      probabilityMismatch
+        ? 'Сумма шансов в одном или нескольких ходах не равна 1.0.'
+        : `По среднему результату лидирует ${bestByEV.name}.`
+    ],
+    nextSteps: [
+      probabilityMismatch
+        ? 'Исправьте значения в «Шанс», чтобы у каждого хода сумма была 1.0.'
+        : `Проверьте худший исход для ${bestByEV.name} и ${robustChoice.name}.`,
+      `Проверьте ещё один запасной ход рядом с ${bestByEV.name}.`
+    ],
     details,
     actions: buildActionItems({ probabilityMismatch, singleOutcome }),
     insights: [

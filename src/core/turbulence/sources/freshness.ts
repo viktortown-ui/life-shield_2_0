@@ -28,7 +28,7 @@ export const getFreshnessSignal = (state: AppState): TurbulenceSignal | null => 
 
   return {
     id: 'freshness',
-    label: 'Data freshness',
+    label: 'Актуальность данных',
     score,
     confidence: 1,
     ts: new Date(latestTs).toISOString(),

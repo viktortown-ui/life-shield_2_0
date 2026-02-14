@@ -22,11 +22,11 @@ export const getCashflowForecastSignal = (state: AppState): TurbulenceSignal | n
 
   return {
     id: 'cashflowForecast',
-    label: 'Cashflow forecast',
+    label: 'Прогноз потока',
     score,
     confidence,
     ts: forecast.ts,
-    explanation: `Вероятность отрицательного net ${(forecast.probNetNegative * 100).toFixed(1)}%, disagreement ${Math.round(
+    explanation: `Вероятность отрицательного итога ${(forecast.probNetNegative * 100).toFixed(1)}%, расхождение моделей ${Math.round(
       disagreement * 100
     )}%.`,
     evidence: {

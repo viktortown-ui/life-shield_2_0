@@ -1,8 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-
-const forbidden = /Runway|HHI|EV|EL|Debt burden|Coverage|Burn-in|Step size|Actions?|Probability|Payoff|Risk tag|\bNet\b|Data freshness/i;
-
-
+import { forbiddenVisibleRuTerms } from './ruCopyGuard';
 
 class MockWorker {
   addEventListener() {}
@@ -13,8 +10,9 @@ class MockWorker {
 const loadModules = async () => {
   vi.resetModules();
   const { createIslandPage } = await import('./islandPage');
+  const { createHistoryScreen } = await import('./history');
   const { updateIslandInput } = await import('../core/store');
-  return { createIslandPage, updateIslandInput };
+  return { createIslandPage, createHistoryScreen, updateIslandInput };
 };
 
 describe('RU-first copy with pro terms off', () => {
@@ -26,8 +24,8 @@ describe('RU-first copy with pro terms off', () => {
     document.body.innerHTML = '';
   });
 
-  it('does not render forbidden pro english terms on visible RU screens when pro terms are off', async () => {
-    const { createIslandPage, updateIslandInput } = await loadModules();
+  it('does not render forbidden EN/jargon terms on visible RU screens', async () => {
+    const { createIslandPage, createHistoryScreen, updateIslandInput } = await loadModules();
 
     const financeInput = JSON.stringify({
       monthlyIncome: 200000,
@@ -43,15 +41,36 @@ describe('RU-first copy with pro terms off', () => {
     updateIslandInput('stressTest', financeInput);
     updateIslandInput('incomePortfolio', financeInput);
     updateIslandInput('timeseries', JSON.stringify({ series: [120, 125, 133], horizon: 3 }));
+    updateIslandInput(
+      'decisionTree',
+      JSON.stringify({
+        actions: [{ name: 'A', outcomes: [{ probability: 0.7, payoff: 10, riskTag: 'low' }] }]
+      })
+    );
 
     const screens = [
       createIslandPage('snapshot'),
       createIslandPage('stressTest'),
       createIslandPage('incomePortfolio'),
-      createIslandPage('timeseries')
+      createIslandPage('timeseries'),
+      createIslandPage('decisionTree'),
+      createHistoryScreen()
     ];
 
     document.body.append(...screens);
-    expect(document.body.textContent ?? '').not.toMatch(forbidden);
+    expect(document.body.textContent ?? '').not.toMatch(forbiddenVisibleRuTerms);
+  });
+
+  it('renders decision tree labels in simple RU', async () => {
+    const { createIslandPage } = await loadModules();
+    const screen = createIslandPage('decisionTree');
+    document.body.append(screen);
+
+    const text = screen.textContent ?? '';
+    expect(text).toContain('Ходы');
+    expect(text).toContain('Название хода');
+    expect(text).toContain('Шанс');
+    expect(text).toContain('Награда (баллы)');
+    expect(text).toContain('Сумма шансов должна быть 1.0');
   });
 });
