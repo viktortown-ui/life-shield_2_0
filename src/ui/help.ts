@@ -30,6 +30,18 @@ interface HelpTopic {
   href: string;
 }
 
+const islandHelpTopicMap: Partial<Record<IslandId, HelpTopicId>> = {
+  snapshot: 'snapshot',
+  stressTest: 'stressTest',
+  incomePortfolio: 'incomePortfolio',
+  timeseries: 'timeseries',
+  bayes: 'bayes',
+  hmm: 'hmm',
+  optimization: 'optimization',
+  decisionTree: 'decisionTree',
+  causalDag: 'causalDag'
+};
+
 const helpTopics: HelpTopic[] = [
   {
     id: 'islandsHub',
@@ -197,6 +209,9 @@ const textByLang = (value: LocaleText) => value[getLang()];
 
 export const getHelpTopics = () => helpTopics;
 
+export const getHelpTopicByIslandId = (moduleId: IslandId) =>
+  islandHelpTopicMap[moduleId];
+
 const getById = (id: HelpTopicId) => helpTopics.find((topic) => topic.id === id);
 
 const createHelpDetails = (topic: HelpTopic) => {
@@ -231,6 +246,7 @@ export const createHelpIconButton = (topicId: HelpTopicId) => {
 
   const button = document.createElement('button');
   button.type = 'button';
+  button.setAttribute('role', 'button');
   button.className = 'help-icon-button';
   button.textContent = '?';
   const descId = `help-topic-desc-${topicId}`;
