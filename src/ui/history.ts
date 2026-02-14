@@ -15,6 +15,12 @@ const FORECAST_MIN_MONTHS = 6;
 const FORECAST_ITERATIONS = 2000;
 const FORECAST_SEED = 42;
 
+const getDisagreementLabel = (score: number) => {
+  if (score >= 0.66) return 'низкое';
+  if (score >= 0.33) return 'среднее';
+  return 'высокое';
+};
+
 const toAmount = (value: string): number => {
   const num = Number(value);
   if (!Number.isFinite(num)) return 0;
@@ -84,6 +90,7 @@ export const createHistoryScreen = () => {
   forecastCard.className = 'quest-card history-forecast-card';
 
   let selectedHorizon = 3;
+  let forecastMode: 'single' | 'ensemble' = 'ensemble';
   let isRunning = false;
 
   const render = () => {
@@ -165,11 +172,19 @@ export const createHistoryScreen = () => {
     const horizonControls = [3, 6, 12]
       .map((value) => `<button type="button" class="button ghost small ${selectedHorizon === value ? 'is-selected' : ''}" data-horizon="${value}">${value}м</button>`)
       .join('');
+    const modeControls = [
+      { id: 'single', label: 'Быстрый (1 метод)' },
+      { id: 'ensemble', label: 'Надёжный (ансамбль)' }
+    ]
+      .map((item) => `<button type="button" class="button ghost small ${forecastMode === item.id ? 'is-selected' : ''}" data-mode="${item.id}">${item.label}</button>`)
+      .join('');
     const forecastBody =
-      forecast && forecast.horizonMonths === selectedHorizon
+      forecast && forecast.horizonMonths === selectedHorizon && (forecast.paramsUsed.mode ?? 'single') === forecastMode
         ? `<p>Риск отрицательного net на горизонте: <strong>${(forecast.probNetNegative * 100).toFixed(1)}%</strong></p>
            <p>p10/p50/p90: <strong>${formatSigned(forecast.quantiles.p10)} / ${formatSigned(forecast.quantiles.p50)} / ${formatSigned(forecast.quantiles.p90)}</strong></p>
-           <p>Uncertainty (p90-p10): <strong>${Math.round(forecast.uncertainty).toLocaleString('ru-RU')}</strong></p>
+           <p>Uncertainty (норм.): <strong>${forecast.uncertainty.toFixed(2)}</strong></p>
+           <p>Согласие моделей: <strong>${getDisagreementLabel(forecast.disagreementScore ?? 0)}</strong> (${Math.round((forecast.disagreementScore ?? 0) * 100)}%)</p>
+           <p class="muted">Когда модели спорят, доверие к медиане ниже.</p>
            ${buildIntervalBar(forecast.quantiles.p10, forecast.quantiles.p50, forecast.quantiles.p90, 'history-interval')}
            <div class="history-forecast-spark">${buildNetSparkline(
              forecast.monthly.map((row) => row.p50),
@@ -186,12 +201,13 @@ export const createHistoryScreen = () => {
       <h3>Прогноз net cashflow</h3>
       <div class="history-forecast-actions">
         <div class="history-horizon-switch">${horizonControls}</div>
+        <div class="history-horizon-switch">${modeControls}</div>
         <button class="button" type="button" data-action="run-forecast" ${!enoughData || isRunning ? 'disabled' : ''}>${
           isRunning ? 'Считаем…' : 'Запустить прогноз'
         }</button>
       </div>
       ${forecastBody}
-      <p class="muted">Bootstrap sampling, ${FORECAST_ITERATIONS} траекторий.</p>
+      <p class="muted">Bootstrap sampling, ${FORECAST_ITERATIONS} траекторий. Режим: ${forecastMode === 'ensemble' ? 'ensemble' : 'single'}.</p>
     `;
 
     const incomeEl = quickForm.querySelector<HTMLInputElement>('input[name="income"]');
@@ -228,6 +244,13 @@ export const createHistoryScreen = () => {
       });
     });
 
+    forecastCard.querySelectorAll<HTMLButtonElement>('[data-mode]').forEach((button) => {
+      button.addEventListener('click', () => {
+        forecastMode = (button.dataset.mode === 'single' ? 'single' : 'ensemble');
+        render();
+      });
+    });
+
     forecastCard.querySelector<HTMLButtonElement>('[data-action="run-forecast"]')?.addEventListener('click', async () => {
       const currentRows = getState().observations.cashflowMonthly;
       const series = currentRows.slice(-24).map((row) => row.income - row.expense).filter((item) => Number.isFinite(item));
@@ -248,7 +271,7 @@ export const createHistoryScreen = () => {
           resolve(event.data.result);
         };
         worker.onerror = () => reject(new Error('Ошибка worker прогноза cashflow.'));
-        worker.postMessage({ requestId, input: { netSeries: series, horizonMonths: selectedHorizon, iterations: FORECAST_ITERATIONS, seed: FORECAST_SEED } });
+        worker.postMessage({ requestId, input: { netSeries: series, horizonMonths: selectedHorizon, iterations: FORECAST_ITERATIONS, seed: FORECAST_SEED, mode: forecastMode } });
       }).finally(() => {
         worker.terminate();
       });
@@ -256,10 +279,13 @@ export const createHistoryScreen = () => {
       setCashflowForecastLast({
         ts: new Date().toISOString(),
         horizonMonths: result.horizonMonths,
-        paramsUsed: { iterations: result.iterations, seed: FORECAST_SEED, sourceMonths: result.sourceMonths },
+        paramsUsed: { iterations: result.iterations, seed: FORECAST_SEED, sourceMonths: result.sourceMonths, mode: forecastMode },
         probNetNegative: result.probNetNegative,
         quantiles: result.quantiles,
         uncertainty: result.uncertainty,
+        methodsUsed: result.methodsUsed,
+        disagreementScore: result.disagreementScore,
+        perMethodSummary: result.perMethodSummary,
         monthly: result.monthly
       });
 
