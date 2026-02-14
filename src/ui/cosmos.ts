@@ -4,6 +4,7 @@ import { deriveShieldTiles } from '../core/shieldModel';
 import { getState, recordCosmosEvent, setCosmosUiFlags } from '../core/store';
 import { CosmosActivityEvent, IslandId, IslandReport } from '../core/types';
 import { createCosmosSfxEngine } from './cosmosSfx';
+import { formatNumber, t } from './i18n';
 import { computeTurbulence } from '../core/turbulence';
 import {
   getTurbulenceScore,
@@ -262,7 +263,7 @@ export const createCosmosScreen = () => {
     onlyImportant: state.flags.cosmosOnlyImportant,
     showHalo: state.flags.cosmosShowHalo,
     soundFxEnabled: state.flags.cosmosSoundFxEnabled,
-    sfxVolume: state.flags.cosmosSfxVolume,
+    sfxГромкость: state.flags.cosmosSfxГромкость,
     reduceMotion
   };
   const sfx = createCosmosSfxEngine();
@@ -275,7 +276,7 @@ export const createCosmosScreen = () => {
   header.className = 'screen-header';
   header.innerHTML = `
     <div>
-      <h1>Cosmos</h1>
+      <h1>${t('cosmosTitle')}</h1>
       <p>Инструмент приоритетов: риск, свежесть данных и сигналы турбулентности.</p>
     </div>
   `;
@@ -286,17 +287,17 @@ export const createCosmosScreen = () => {
     <label><input type="checkbox" data-flag="showAllLabels" data-testid="cosmos-toggle-showAllLabels" aria-label="Показывать все подписи планет" ${uiFlags.showAllLabels ? 'checked' : ''}/> Показывать все подписи</label>
     <label><input type="checkbox" data-flag="onlyImportant" data-testid="cosmos-toggle-onlyImportant" aria-label="Показывать только важные планеты" ${uiFlags.onlyImportant ? 'checked' : ''}/> Показывать только важные</label>
     <label><input type="checkbox" data-flag="showHalo" data-testid="cosmos-toggle-showHalo" aria-label="Показывать halo планет" ${uiFlags.showHalo ? 'checked' : ''}/> Показывать halo (турбулентность)</label>
-    <label><input type="checkbox" data-flag="soundFx" data-testid="cosmos-toggle-soundFx" aria-label="Включить Sound FX в Cosmos" ${uiFlags.soundFxEnabled ? 'checked' : ''}/> Sound FX</label>
-    <label>Volume <input type="range" data-flag="sfxVolume" data-testid="cosmos-toggle-sfxVolume" min="0" max="1" step="0.05" aria-label="Громкость Sound FX в Cosmos" value="${uiFlags.sfxVolume}" /></label>
-    <label><input type="checkbox" data-flag="reduceMotion" data-testid="cosmos-toggle-reduceMotion" aria-label="Сократить анимации Cosmos" ${state.flags.cosmosReduceMotionOverride === true ? 'checked' : ''}/> Reduce motion (override)</label>
+    <label><input type="checkbox" data-flag="soundFx" data-testid="cosmos-toggle-soundFx" aria-label="Включить Звуковые эффекты в Cosmos" ${uiFlags.soundFxEnabled ? 'checked' : ''}/> Звуковые эффекты</label>
+    <label>Громкость <input type="range" data-flag="sfxГромкость" data-testid="cosmos-toggle-sfxГромкость" min="0" max="1" step="0.05" aria-label="Громкость Звуковые эффекты в Cosmos" value="${uiFlags.sfxГромкость}" /></label>
+    <label><input type="checkbox" data-flag="reduceMotion" data-testid="cosmos-toggle-reduceMotion" aria-label="Сократить анимации Cosmos" ${state.flags.cosmosReduceMotionOverride === true ? 'checked' : ''}/> ${t('reduceMotion')} (переопределение)</label>
   `;
 
   const legend = document.createElement('section');
   legend.className = 'cosmos-legend';
   legend.innerHTML = `<p>${
     hasMonteCarloStress
-      ? 'Halo = прогнозная турбулентность (Monte Carlo)'
-      : 'Halo = эвристика (нет Monte Carlo)'
+      ? 'Halo = прогнозная турбулентность (Монте-Карло)'
+      : 'Halo = эвристика (без Монте-Карло)'
   }</p>`;
 
   const mapWrap = document.createElement('section');
@@ -428,7 +429,7 @@ export const createCosmosScreen = () => {
 
   const playSfx = (tone: 'select' | 'menuOpen' | 'confirm' | 'cancel') => {
     if (!uiFlags.soundFxEnabled) return;
-    sfx.play(tone, uiFlags.sfxVolume);
+    sfx.play(tone, uiFlags.sfxГромкость);
   };
 
   const triggerSparkBurst = (x: number, y: number) => {
@@ -743,7 +744,7 @@ export const createCosmosScreen = () => {
       .join('');
     const signalsBlock = `<section class="cosmos-forecast-block"><h4>Сигналы турбулентности</h4><p>Индекс: <strong>${(
       turbulence.overallScore * 100
-    ).toFixed(0)}%</strong> · confidence ${(turbulence.overallConfidence * 100).toFixed(0)}%</p>${
+    ).toFixed(0)}%</strong> · доверие ${(turbulence.overallConfidence * 100).toFixed(0)}%</p>${
       signalsList ? `<ul>${signalsList}</ul>` : '<p class="muted">Сигналы появятся после накопления данных.</p>'
     }</section>`;
     const mcForecastBlock =
@@ -751,7 +752,7 @@ export const createCosmosScreen = () => {
         ? (() => {
             const mc = state.islands.stressTest.mcLast;
             if (!mc) {
-              return '<section class="cosmos-forecast-block"><h4>Прогноз Monte Carlo</h4><p class="muted">Запусти Monte Carlo в Стресс-тесте.</p></section>';
+              return '<section class="cosmos-forecast-block"><h4>Прогноз Монте-Карло</h4><p class="muted">Запусти Монте-Карло в Стресс-тесте.</p></section>';
             }
             const turbulence = getTurbulenceScore(mc, state.islands.stressTest.mcHistory ?? []);
             const uncertainty = turbulence?.uncertainty ?? 0;
@@ -765,11 +766,11 @@ export const createCosmosScreen = () => {
             const intervalStart = 0;
             const intervalWidth = 100;
             const medianPos = Math.max(0, Math.min(100, ((mc.quantiles.p50 - mc.quantiles.p10) / span) * 100));
-            return `<section class="cosmos-forecast-block"><h4>Прогноз Monte Carlo</h4><p>Вероятность провала: <strong>${mc.ruinProb.toFixed(
+            return `<section class="cosmos-forecast-block"><h4>Прогноз Монте-Карло</h4><p>Вероятность провала: <strong>${mc.ruinProb.toFixed(
               1
-            )}%</strong> (RISK от ${(MC_RISK_BADGE_THRESHOLD * 100).toFixed(0)}%)</p><p>Runway p10/p50/p90: ${formatMonths(
+            )}%</strong> (РИСК от ${(MC_RISK_BADGE_THRESHOLD * 100).toFixed(0)}%)</p><p>Запас хода p10/p50/p90: ${formatMonths(
               mc.quantiles.p10
-            )} / ${formatMonths(mc.quantiles.p50)} / ${formatMonths(mc.quantiles.p90)}</p><p>Неопределённость: <strong>${uncertaintyLabel}</strong></p>${driftMessage}<div class="cosmos-interval" role="img" aria-label="Интервал runway p10-p90 и медиана p50"><span class="cosmos-interval-range" style="left:${intervalStart}%;width:${intervalWidth}%"></span><span class="cosmos-interval-median" style="left:${medianPos}%"></span></div></section>`;
+            )} / ${formatMonths(mc.quantiles.p50)} / ${formatMonths(mc.quantiles.p90)}</p><p>Неопределённость: <strong>${uncertaintyLabel}</strong></p>${driftMessage}<div class="cosmos-interval" role="img" aria-label="Интервал запаса хода p10-p90 и медиана p50"><span class="cosmos-interval-range" style="left:${intervalStart}%;width:${intervalWidth}%"></span><span class="cosmos-interval-median" style="left:${medianPos}%"></span></div></section>`;
           })()
         : '';
     const historyDriftBlock =
@@ -778,7 +779,7 @@ export const createCosmosScreen = () => {
             const forecast = state.observations.cashflowForecastLast;
             const driftSignal = turbulenceSignalById.get('cashflowDrift');
             const driftBlock = driftSignal
-              ? `<p>Режим: <strong>${Boolean(driftSignal.evidence?.driftDetected) ? 'обнаружена смена' : 'без сигнала'}</strong></p><p>Drift score: <strong>${(
+              ? `<p>Режим: <strong>${Boolean(driftSignal.evidence?.driftDetected) ? 'обнаружена смена' : 'без сигнала'}</strong></p><p>Оценка дрейфа: <strong>${(
                   driftSignal.score * 100
                 ).toFixed(0)}%</strong>${driftSignal.ym ? ` · месяц ${driftSignal.ym}` : ''}</p>`
               : '<p class="muted">Сигнал режима появится после накопления наблюдений.</p>';
@@ -788,14 +789,14 @@ export const createCosmosScreen = () => {
                   const medianPos = Math.max(0, Math.min(100, ((forecast.quantiles.p50 - forecast.quantiles.p10) / span) * 100));
                   const disagreement = forecast.disagreementScore ?? 0;
                   const agreement = getDisagreementLabel(disagreement);
-                  return `<p>Forecast risk: <strong>${(forecast.probNetNegative * 100).toFixed(1)}%</strong> (RISK от ${(FORECAST_RISK_BADGE_THRESHOLD * 100).toFixed(
+                  return `<p>Риск прогноза: <strong>${(forecast.probNetNegative * 100).toFixed(1)}%</strong> (РИСК от ${(FORECAST_RISK_BADGE_THRESHOLD * 100).toFixed(
                     0
-                  )}%)</p><p>Согласие моделей: <strong>${agreement}</strong> (${Math.round(disagreement * 100)}%)</p><p class="muted">Почему: сравниваем p50 разных методов (IID/MBB/Trend). Чем больше разброс, тем выше турбулентность halo.</p><p>Net p10/p50/p90: ${Math.round(forecast.quantiles.p10).toLocaleString('ru-RU')} / ${Math.round(
+                  )}%)</p><p>Согласие моделей: <strong>${agreement}</strong> (${Math.round(disagreement * 100)}%)</p><p class="muted">Почему: сравниваем p50 разных методов (IID/MBB/Trend). Чем больше разброс, тем выше турбулентность halo.</p><p>Чистый поток p10/p50/p90: ${formatNumber(Math.round(forecast.quantiles.p10))} / ${formatNumber(Math.round(
                     forecast.quantiles.p50
-                  ).toLocaleString('ru-RU')} / ${Math.round(forecast.quantiles.p90).toLocaleString('ru-RU')}</p><div class="cosmos-interval" role="img" aria-label="Интервал прогноза net cashflow p10-p90"><span class="cosmos-interval-range" style="left:0%;width:100%"></span><span class="cosmos-interval-median" style="left:${medianPos}%"></span></div>`;
+                  ))} / ${formatNumber(Math.round(forecast.quantiles.p90))}</p><div class="cosmos-interval" role="img" aria-label="Интервал прогноза чистого потока p10-p90"><span class="cosmos-interval-range" style="left:0%;width:100%"></span><span class="cosmos-interval-median" style="left:${medianPos}%"></span></div>`;
                 })()
               : '<p class="muted">Запусти прогноз в Истории (3/6/12 мес).</p>';
-            return `<section class="cosmos-forecast-block"><h4>History прогноз</h4>${driftBlock}${forecastBlock}</section>`;
+            return `<section class="cosmos-forecast-block"><h4>Прогноз истории</h4>${driftBlock}${forecastBlock}</section>`;
           })()
         : '';
     activityPanel.innerHTML = `<h3>Последние действия · ${title}</h3>${list}${mcForecastBlock}${historyDriftBlock}${signalsBlock}`;
@@ -1106,10 +1107,10 @@ export const createCosmosScreen = () => {
         sfx.suspend().catch(() => undefined);
       }
     }
-    if (target.dataset.flag === 'sfxVolume') {
+    if (target.dataset.flag === 'sfxГромкость') {
       const volume = Number(target.value);
-      uiFlags.sfxVolume = Number.isFinite(volume) ? Math.max(0, Math.min(1, volume)) : uiFlags.sfxVolume;
-      setCosmosUiFlags({ cosmosSfxVolume: uiFlags.sfxVolume });
+      uiFlags.sfxГромкость = Number.isFinite(volume) ? Math.max(0, Math.min(1, volume)) : uiFlags.sfxГромкость;
+      setCosmosUiFlags({ cosmosSfxГромкость: uiFlags.sfxГромкость });
     }
     if (target.dataset.flag === 'reduceMotion') {
       const override = target.checked ? true : null;

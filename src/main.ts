@@ -360,7 +360,7 @@ const renderFatalError = (error: unknown) => {
     <div class="screen">
       <h1>Произошла ошибка</h1>
       <p>${message}</p>
-      <button class="button" data-reset>Reset app data</button>
+      <button class="button" data-reset>Сбросить данные приложения</button>
     </div>
   `;
   const resetButton = root.querySelector<HTMLButtonElement>('[data-reset]');

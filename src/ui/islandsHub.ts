@@ -1,6 +1,7 @@
 import { islandRegistry } from '../core/registry';
 import { getCatalogByGroup, getIslandCatalogItem } from '../core/islandsCatalog';
 import { getState } from '../core/store';
+import { t } from './i18n';
 import {
   buildSparklineSvg,
   formatLastRun,
@@ -20,7 +21,7 @@ export const createIslandsHubScreen = () => {
 
   const titleWrap = document.createElement('div');
   titleWrap.innerHTML = `
-    <h1>Острова</h1>
+    <h1>${t('navIslands')}</h1>
     <p>Выберите модуль и двигайтесь шаг за шагом.</p>
     <p class="hub-meta">Результатов: ${summary.total} · Ср. индекс: ${summary.avgScore} · Последний запуск: ${formatLastRun(summary.latestRun)}</p>
   `;

@@ -15,6 +15,7 @@ import {
 } from '../core/pwaUpdate';
 import { reportCaughtError } from '../core/reportError';
 import { safeClear } from '../core/storage';
+import { getLang, setLang, t } from './i18n';
 
 export const createSettingsScreen = () => {
   const container = document.createElement('div');
@@ -52,11 +53,11 @@ export const createSettingsScreen = () => {
     <div class="settings-home-switch" role="radiogroup" aria-label="Домашний экран">
       <label>
         <input type="radio" name="home-screen" value="shield" />
-        <span>Shield</span>
+        <span>${t('navHome')}</span>
       </label>
       <label>
         <input type="radio" name="home-screen" value="cosmos" />
-        <span>Cosmos</span>
+        <span>${t('cosmosTitle')}</span>
       </label>
     </div>
   `;
@@ -64,33 +65,51 @@ export const createSettingsScreen = () => {
   const cosmosFxSettings = document.createElement('section');
   cosmosFxSettings.className = 'settings-block';
   cosmosFxSettings.innerHTML = `
-    <h2>Cosmos FX</h2>
+    <h2>${t('cosmosTitle')} FX</h2>
     <div class="cosmos-controls">
       <label>
         <input type="checkbox" data-cosmos-fx="sound" aria-label="Включить звуковые эффекты Cosmos" />
-        Sound FX
+        Звуковые эффекты
       </label>
       <label>
-        Volume
+        Громкость
         <input type="range" min="0" max="1" step="0.05" data-cosmos-fx="volume" aria-label="Громкость звуковых эффектов Cosmos" />
       </label>
       <label>
         <input type="checkbox" data-cosmos-fx="reduceMotion" aria-label="Сократить анимации Cosmos" />
-        Reduce motion (override)
+        ${t('reduceMotion')} (переопределение)
       </label>
     </div>
     <p class="settings-hint">Системная настройка prefers-reduced-motion учитывается автоматически.</p>
   `;
 
+
+
+  const languageSettings = document.createElement('section');
+  languageSettings.className = 'settings-block';
+  languageSettings.innerHTML = `
+    <h2>${t('settingsLanguage')}</h2>
+    <div class="settings-home-switch" role="radiogroup" aria-label="${t('settingsLanguage')}">
+      <label>
+        <input type="radio" name="lang" value="ru" />
+        <span>${t('languageRu')}</span>
+      </label>
+      <label>
+        <input type="radio" name="lang" value="en" />
+        <span>${t('languageEn')}</span>
+      </label>
+    </div>
+  `;
+
   const maintenance = document.createElement('section');
   maintenance.className = 'settings-block';
   maintenance.innerHTML = `
-    <h2>Maintenance</h2>
+    <h2>Обслуживание</h2>
     <div class="settings-actions">
       <button class="button ghost" data-action="check-update">Проверить обновление</button>
       <button class="button" data-action="apply-update" disabled>Обновить сейчас</button>
       <button class="button ghost" data-action="restart">Перезапустить приложение</button>
-      <button class="button ghost" data-action="panic-reset">Panic reset cache</button>
+      <button class="button ghost" data-action="panic-reset">Аварийный сброс кэша</button>
       <button class="button ghost" data-action="reset">Сброс кэша/данных</button>
     </div>
     <p class="settings-hint">Обновление появится как только новая версия будет готова.</p>
@@ -256,14 +275,14 @@ export const createSettingsScreen = () => {
   const reduceMotionInput = cosmosFxSettings.querySelector<HTMLInputElement>('input[data-cosmos-fx="reduceMotion"]');
   if (soundInput && volumeInput && reduceMotionInput) {
     soundInput.checked = flags.cosmosSoundFxEnabled;
-    volumeInput.value = String(flags.cosmosSfxVolume);
+    volumeInput.value = String(flags.cosmosSfxГромкость);
     reduceMotionInput.checked = flags.cosmosReduceMotionOverride === true;
 
     soundInput.addEventListener('change', () => {
       setCosmosUiFlags({ cosmosSoundFxEnabled: soundInput.checked });
     });
     volumeInput.addEventListener('input', () => {
-      setCosmosUiFlags({ cosmosSfxVolume: Number(volumeInput.value) });
+      setCosmosUiFlags({ cosmosSfxГромкость: Number(volumeInput.value) });
     });
     reduceMotionInput.addEventListener('change', () => {
       setCosmosUiFlags({ cosmosReduceMotionOverride: reduceMotionInput.checked ? true : null });
@@ -292,6 +311,32 @@ export const createSettingsScreen = () => {
   actions.className = 'screen-actions';
   actions.innerHTML = '<a class="button ghost" href="#/">К щиту</a>';
 
-  container.append(header, homeSettings, cosmosFxSettings, exportBlock, maintenance, actions);
+    const lang = getLang();
+  const langInputs = languageSettings.querySelectorAll<HTMLInputElement>('input[name="lang"]');
+  langInputs.forEach((input) => {
+    input.checked = input.value === lang;
+    input.addEventListener('change', () => {
+      if (!input.checked) return;
+      setLang(input.value === 'en' ? 'en' : 'ru');
+    });
+  });
+
+  const glossary = document.createElement('section');
+  glossary.className = 'settings-block';
+  glossary.innerHTML = `
+    <h2>${t('glossaryTitle')}</h2>
+    <ul class="settings-glossary">
+      <li>${t('glossaryRunway')}</li>
+      <li>${t('glossaryConfidence')}</li>
+      <li>${t('glossaryScore')}</li>
+      <li>${t('glossaryBurnIn')}</li>
+      <li>${t('glossaryStepSize')}</li>
+      <li>${t('glossarySeasonLength')}</li>
+      <li>${t('glossaryTestSize')}</li>
+      <li>${t('glossaryReduceMotion')}</li>
+    </ul>
+  `;
+
+  container.append(header, languageSettings, homeSettings, cosmosFxSettings, exportBlock, maintenance, glossary, actions);
   return container;
 };
