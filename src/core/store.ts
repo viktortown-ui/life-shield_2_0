@@ -19,6 +19,7 @@ import {
 import { getSnapshotReport } from '../islands/snapshot';
 import { getStressTestReport } from '../islands/stressTest';
 import { getIncomePortfolioReport } from '../islands/incomePortfolio';
+import { getCurrentYm, getNextYm, sanitizeObservations } from './observations';
 
 const STORAGE_KEY = 'lifeShieldV2';
 const XP_PER_LEVEL = 120;
@@ -73,6 +74,9 @@ const makeEmptyState = (): AppState => ({
   },
   inputData: {
     finance: { ...defaultFinanceInput }
+  },
+  observations: {
+    cashflowMonthly: []
   },
   cosmosActivityLog: [],
   islands: {
@@ -173,6 +177,21 @@ const appendMcHistory = (
     return next;
   }
   return next.slice(next.length - MC_HISTORY_LIMIT);
+};
+
+const updateCashflowMonth = (
+  history: AppState['observations']['cashflowMonthly'],
+  ym: string,
+  income: number,
+  expense: number
+) => {
+  const byMonth = new Map(history.map((entry) => [entry.ym, entry]));
+  byMonth.set(ym, {
+    ym,
+    income: Math.max(0, Number.isFinite(income) ? income : 0),
+    expense: Math.max(0, Number.isFinite(expense) ? expense : 0)
+  });
+  return sanitizeObservations({ cashflowMonthly: [...byMonth.values()] }).cashflowMonthly;
 };
 
 
@@ -332,6 +351,7 @@ const mergeWithDefaults = (
           : {})
       }
     },
+    observations: sanitizeObservations((incoming as { observations?: unknown }).observations ?? base.observations),
     cosmosActivityLog: Array.isArray(incoming.cosmosActivityLog)
       ? (incoming.cosmosActivityLog
           .map(safeCosmosActivityEvent)
@@ -628,6 +648,59 @@ export const recordCosmosEvent = (
       action,
       ...(meta?.trim() ? { meta: meta.trim() } : {})
     })
+  });
+};
+
+
+export const upsertCashflowObservation = (value: { ym: string; income?: number; expense?: number }) => {
+  const state = getState();
+  const current = state.observations.cashflowMonthly.find((entry) => entry.ym === value.ym);
+  const income = Math.max(0, Number.isFinite(value.income) ? Number(value.income) : current?.income ?? 0);
+  const expense = Math.max(0, Number.isFinite(value.expense) ? Number(value.expense) : current?.expense ?? 0);
+
+  updateState({
+    ...state,
+    observations: {
+      cashflowMonthly: updateCashflowMonth(state.observations.cashflowMonthly, value.ym, income, expense)
+    }
+  });
+};
+
+export const addCashflowObservationMonth = () => {
+  const state = getState();
+  const history = state.observations.cashflowMonthly;
+  const lastYm = history.at(-1)?.ym;
+  const ym = lastYm ? getNextYm(lastYm) : getCurrentYm();
+  const existing = history.find((entry) => entry.ym === ym);
+
+  updateState({
+    ...state,
+    observations: {
+      cashflowMonthly: updateCashflowMonth(
+        history,
+        ym,
+        existing?.income ?? 0,
+        existing?.expense ?? 0
+      )
+    }
+  });
+};
+
+export const removeCashflowObservationMonth = (ym: string) => {
+  const state = getState();
+  updateState({
+    ...state,
+    observations: {
+      cashflowMonthly: state.observations.cashflowMonthly.filter((entry) => entry.ym !== ym)
+    }
+  });
+};
+
+export const clearCashflowObservations = () => {
+  const state = getState();
+  updateState({
+    ...state,
+    observations: { cashflowMonthly: [] }
   });
 };
 

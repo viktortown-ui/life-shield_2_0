@@ -1,6 +1,7 @@
 import { AppState, CosmosActivityEvent } from './types';
+import { sanitizeObservations } from './observations';
 
-export const schemaVersion = 8;
+export const schemaVersion = 9;
 
 export type Migration = (state: AppState) => AppState;
 
@@ -97,6 +98,11 @@ export const migrations: Migration[] = [
     cosmosActivityLog: Array.isArray((state as { cosmosActivityLog?: CosmosActivityEvent[] }).cosmosActivityLog)
       ? ((state as { cosmosActivityLog?: CosmosActivityEvent[] }).cosmosActivityLog as CosmosActivityEvent[]).slice(-200)
       : []
+  }),
+  (state) => ({
+    ...state,
+    schemaVersion: 9,
+    observations: sanitizeObservations((state as { observations?: unknown }).observations)
   })
 
 

@@ -27,6 +27,7 @@ const makeState = (): AppState => ({
     cosmosReduceMotionOverride: null
   },
   cosmosActivityLog: [],
+  observations: { cashflowMonthly: [] },
   inputData: {
     finance: {
       monthlyIncome: 180000,
