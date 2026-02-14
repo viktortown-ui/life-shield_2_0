@@ -60,23 +60,25 @@ const makeEmptyState = (): AppState => ({
   },
   cosmosActivityLog: [],
   islands: {
-    snapshot: { input: '', lastReport: null, progress: makeIslandProgress() },
-    stressTest: { input: '', lastReport: null, progress: makeIslandProgress() },
-    incomePortfolio: { input: '', lastReport: null, progress: makeIslandProgress() },
-    bayes: { input: '', lastReport: null, progress: makeIslandProgress() },
-    hmm: { input: '', lastReport: null, progress: makeIslandProgress() },
-    timeseries: { input: '', lastReport: null, progress: makeIslandProgress() },
+    snapshot: { input: '', lastReport: null, progress: makeIslandProgress(), mcLast: null },
+    stressTest: { input: '', lastReport: null, progress: makeIslandProgress(), mcLast: null },
+    incomePortfolio: { input: '', lastReport: null, progress: makeIslandProgress(), mcLast: null },
+    bayes: { input: '', lastReport: null, progress: makeIslandProgress(), mcLast: null },
+    hmm: { input: '', lastReport: null, progress: makeIslandProgress(), mcLast: null },
+    timeseries: { input: '', lastReport: null, progress: makeIslandProgress(), mcLast: null },
     optimization: {
       input: '',
       lastReport: null,
-      progress: makeIslandProgress()
+      progress: makeIslandProgress(),
+      mcLast: null
     },
     decisionTree: {
       input: '',
       lastReport: null,
-      progress: makeIslandProgress()
+      progress: makeIslandProgress(),
+      mcLast: null
     },
-    causalDag: { input: '', lastReport: null, progress: makeIslandProgress() }
+    causalDag: { input: '', lastReport: null, progress: makeIslandProgress(), mcLast: null }
   }
 });
 
@@ -203,7 +205,8 @@ const mergeIslandState = (
   return {
     input: safeString(incoming.input, base.input),
     lastReport: incoming.lastReport ?? base.lastReport,
-    progress: mergeProgress(base.progress, incoming.progress)
+    progress: mergeProgress(base.progress, incoming.progress),
+    mcLast: incoming.mcLast ?? base.mcLast ?? null
   };
 };
 
@@ -461,6 +464,24 @@ export const updateIslandReport = (id: IslandId, report: IslandReport) => {
         ...state.islands[id],
         lastReport: report,
         progress: nextProgress
+      }
+    }
+  });
+};
+
+
+export const updateIslandMonteCarlo = (
+  id: IslandId,
+  mcLast: AppState['islands'][IslandId]['mcLast']
+) => {
+  const state = getState();
+  updateState({
+    ...state,
+    islands: {
+      ...state.islands,
+      [id]: {
+        ...state.islands[id],
+        mcLast
       }
     }
   });
