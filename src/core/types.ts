@@ -45,9 +45,33 @@ export interface CashflowDriftLastState {
   paramsUsed: CashflowDriftParams;
 }
 
+export interface CashflowForecastLastState {
+  ts: string;
+  horizonMonths: number;
+  paramsUsed: {
+    iterations: number;
+    seed?: number;
+    sourceMonths: number;
+  };
+  probNetNegative: number;
+  quantiles: {
+    p10: number;
+    p50: number;
+    p90: number;
+  };
+  uncertainty: number;
+  monthly: Array<{
+    month: number;
+    p10: number;
+    p50: number;
+    p90: number;
+  }>;
+}
+
 export interface ObservationsState {
   cashflowMonthly: CashflowMonthlyEntry[];
   cashflowDriftLast?: CashflowDriftLastState;
+  cashflowForecastLast?: CashflowForecastLastState;
 }
 
 export interface IslandReport {

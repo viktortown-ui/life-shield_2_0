@@ -1,6 +1,7 @@
 import { migrate, schemaVersion } from './migrations';
 import {
   AppState,
+  CashflowForecastLastState,
   CosmosActivityAction,
   CosmosActivityEvent,
   FinanceInputData,
@@ -78,7 +79,8 @@ const makeEmptyState = (): AppState => ({
   },
   observations: {
     cashflowMonthly: [],
-    cashflowDriftLast: buildCashflowDriftLast([])
+    cashflowDriftLast: buildCashflowDriftLast([]),
+    cashflowForecastLast: undefined
   },
   cosmosActivityLog: [],
   islands: {
@@ -665,7 +667,8 @@ export const upsertCashflowObservation = (value: { ym: string; income?: number; 
     ...state,
     observations: {
       cashflowMonthly,
-      cashflowDriftLast: buildCashflowDriftLast(cashflowMonthly)
+      cashflowDriftLast: buildCashflowDriftLast(cashflowMonthly),
+      cashflowForecastLast: undefined
     }
   });
 };
@@ -688,7 +691,8 @@ export const addCashflowObservationMonth = () => {
     ...state,
     observations: {
       cashflowMonthly,
-      cashflowDriftLast: buildCashflowDriftLast(cashflowMonthly)
+      cashflowDriftLast: buildCashflowDriftLast(cashflowMonthly),
+      cashflowForecastLast: undefined
     }
   });
 };
@@ -700,7 +704,20 @@ export const removeCashflowObservationMonth = (ym: string) => {
     ...state,
     observations: {
       cashflowMonthly,
-      cashflowDriftLast: buildCashflowDriftLast(cashflowMonthly)
+      cashflowDriftLast: buildCashflowDriftLast(cashflowMonthly),
+      cashflowForecastLast: undefined
+    }
+  });
+};
+
+
+export const setCashflowForecastLast = (value: CashflowForecastLastState | undefined) => {
+  const state = getState();
+  updateState({
+    ...state,
+    observations: {
+      ...state.observations,
+      cashflowForecastLast: value
     }
   });
 };
@@ -711,7 +728,8 @@ export const clearCashflowObservations = () => {
     ...state,
     observations: {
       cashflowMonthly: [],
-      cashflowDriftLast: buildCashflowDriftLast([])
+      cashflowDriftLast: buildCashflowDriftLast([]),
+      cashflowForecastLast: undefined
     }
   });
 };
