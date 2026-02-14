@@ -46,9 +46,9 @@ describe('cosmos stress panel forecast', () => {
     planet?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
     const panel = screen.querySelector('.cosmos-activity-panel');
-    expect(panel?.textContent).toContain('Прогноз Monte Carlo');
+    expect(panel?.textContent).toContain('Прогноз Монте-Карло');
     expect(panel?.textContent).toContain('Вероятность провала');
-    expect(panel?.textContent).toContain('Runway p10/p50/p90');
+    expect(panel?.textContent).toContain('Запас хода p10/p50/p90');
     expect(panel?.textContent).toContain('Сигналы турбулентности');
   });
 });
@@ -78,9 +78,9 @@ describe('cosmos history forecast panel', () => {
     planet?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
     const panel = screen.querySelector('.cosmos-activity-panel');
-    expect(panel?.textContent).toContain('History прогноз');
-    expect(panel?.textContent).toContain('Forecast risk');
-    expect(panel?.textContent).toContain('Net p10/p50/p90');
+    expect(panel?.textContent).toContain('Прогноз истории');
+    expect(panel?.textContent).toContain('Риск прогноза');
+    expect(panel?.textContent).toContain('Чистый поток p10/p50/p90');
     expect(panel?.textContent).toContain('Согласие моделей');
     expect(panel?.textContent).toContain('Сигналы турбулентности');
   });

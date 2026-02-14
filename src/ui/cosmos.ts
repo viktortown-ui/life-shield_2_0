@@ -284,7 +284,7 @@ export const createCosmosScreen = () => {
   const viewSettingsToggle = document.createElement('button');
   viewSettingsToggle.type = 'button';
   viewSettingsToggle.className = 'button ghost small cosmos-view-toggle';
-  viewSettingsToggle.textContent = 'Настройки вида / View settings';
+  viewSettingsToggle.textContent = t('viewSettings');
   viewSettingsToggle.setAttribute('aria-expanded', 'false');
 
   const controls = document.createElement('section');
@@ -298,9 +298,9 @@ export const createCosmosScreen = () => {
     </section>
     <section class="cosmos-controls-group">
       <h3>Эффекты / Effects</h3>
-      <label><input type="checkbox" data-flag="soundFx" data-testid="cosmos-toggle-soundFx" aria-label="Включить Звуковые эффекты в Cosmos" ${uiFlags.soundFxEnabled ? 'checked' : ''}/> Sound FX / Звуковые эффекты</label>
-      <label>Volume / Громкость <input type="range" data-flag="sfxГромкость" data-testid="cosmos-toggle-sfxГромкость" min="0" max="1" step="0.05" aria-label="Громкость Звуковые эффекты в Cosmos" value="${uiFlags.sfxГромкость}" /></label>
-      <label><input type="checkbox" data-flag="reduceMotion" data-testid="cosmos-toggle-reduceMotion" aria-label="Сократить анимации Cosmos" ${state.flags.cosmosReduceMotionOverride === true ? 'checked' : ''}/> Reduce motion / Меньше анимации</label>
+      <label><input type="checkbox" data-flag="soundFx" data-testid="cosmos-toggle-soundFx" aria-label="Включить Звуковые эффекты в Cosmos" ${uiFlags.soundFxEnabled ? 'checked' : ''}/> ${t('soundFx')}</label>
+      <label>${t('volume')} <input type="range" data-flag="sfxГромкость" data-testid="cosmos-toggle-sfxГромкость" min="0" max="1" step="0.05" aria-label="Громкость Звуковые эффекты в Cosmos" value="${uiFlags.sfxГромкость}" /></label>
+      <label><input type="checkbox" data-flag="reduceMotion" data-testid="cosmos-toggle-reduceMotion" aria-label="Сократить анимации Cosmos" ${state.flags.cosmosReduceMotionOverride === true ? 'checked' : ''}/> ${t('reduceMotion')}</label>
       <p class="muted">prefers-reduced-motion учитывается автоматически / follows system setting.</p>
     </section>
   `;

@@ -3,17 +3,12 @@ export type Lang = 'ru' | 'en';
 const STORAGE_KEY = 'ls_lang';
 const CHANGE_EVENT = 'ls:lang-change';
 
-const detectLang = (): Lang => {
-  const raw = window.navigator.language.toLowerCase();
-  return raw.startsWith('en') ? 'en' : 'ru';
-};
-
 export const getLang = (): Lang => {
   const saved = window.localStorage.getItem(STORAGE_KEY);
   if (saved === 'ru' || saved === 'en') {
     return saved;
   }
-  return detectLang();
+  return 'ru';
 };
 
 export const setLang = (lang: Lang) => {
@@ -36,10 +31,12 @@ const dict = {
     navReport: 'Отчёт',
     navSettings: 'Настройки',
     navHelp: 'Справка',
+    bottomNav: 'Нижняя навигация',
+    buildLabel: 'Сборка',
     cosmosTitle: 'Космос',
     settingsLanguage: 'Язык',
-    languageRu: 'Русский',
-    languageEn: 'English',
+    languageRu: 'RU',
+    languageEn: 'EN',
     stop: 'Стоп',
     start: 'Запустить',
     save: 'Сохранить',
@@ -52,14 +49,14 @@ const dict = {
     testSize: 'Доля теста',
     reduceMotion: 'Меньше анимации',
     glossaryTitle: 'Глоссарий терминов',
-    glossaryRunway: 'Runway = Запас хода',
-    glossaryConfidence: 'Confidence = Доверие',
-    glossaryScore: 'Score = Балл',
-    glossaryBurnIn: 'Burn-in = Прогрев',
-    glossaryStepSize: 'Step size = Шаг',
-    glossarySeasonLength: 'Season length = Сезонность',
-    glossaryTestSize: 'Test size = Доля теста',
-    glossaryReduceMotion: 'Reduce motion = Меньше анимации',
+    glossaryRunway: 'Запас хода',
+    glossaryConfidence: 'Доверие',
+    glossaryScore: 'Балл',
+    glossaryBurnIn: 'Прогрев',
+    glossaryStepSize: 'Шаг',
+    glossarySeasonLength: 'Сезонность',
+    glossaryTestSize: 'Доля теста',
+    glossaryReduceMotion: 'Меньше анимации',
     helpLabelPrefix: 'Справка',
     helpClose: 'Закрыть справку',
     helpWhy: 'Зачем это',
@@ -67,7 +64,14 @@ const dict = {
     helpOutput: 'Что получишь',
     helpTerms: 'Простыми словами',
     helpOpenModule: 'Открыть модуль',
-    helpScreenIntro: 'Короткие и понятные пояснения по ключевым модулям.'
+    helpScreenIntro: 'Короткие и понятные пояснения по ключевым модулям.',
+    viewSettings: 'Настройки вида',
+    soundFx: 'Звуковые эффекты',
+    volume: 'Громкость',
+    autoMode: 'Авто',
+    horizon: 'Горизонт',
+    settingsTitle: 'Настройки',
+    settingsSubtitle: 'Экспорт, импорт и обслуживание приложения.'
   },
   en: {
     navHome: 'Shield',
@@ -77,10 +81,12 @@ const dict = {
     navReport: 'Report',
     navSettings: 'Settings',
     navHelp: 'Help',
+    bottomNav: 'Bottom navigation',
+    buildLabel: 'Build',
     cosmosTitle: 'Cosmos',
     settingsLanguage: 'Language',
-    languageRu: 'Русский',
-    languageEn: 'English',
+    languageRu: 'RU',
+    languageEn: 'EN',
     stop: 'Stop',
     start: 'Start',
     save: 'Save',
@@ -93,14 +99,14 @@ const dict = {
     testSize: 'Test size',
     reduceMotion: 'Reduce motion',
     glossaryTitle: 'Term glossary',
-    glossaryRunway: 'Runway = Runway',
-    glossaryConfidence: 'Confidence = Confidence',
-    glossaryScore: 'Score = Score',
-    glossaryBurnIn: 'Burn-in = Burn-in',
-    glossaryStepSize: 'Step size = Step size',
-    glossarySeasonLength: 'Season length = Season length',
-    glossaryTestSize: 'Test size = Test size',
-    glossaryReduceMotion: 'Reduce motion = Reduce motion',
+    glossaryRunway: 'Runway',
+    glossaryConfidence: 'Confidence',
+    glossaryScore: 'Score',
+    glossaryBurnIn: 'Burn-in',
+    glossaryStepSize: 'Step size',
+    glossarySeasonLength: 'Season length',
+    glossaryTestSize: 'Test size',
+    glossaryReduceMotion: 'Reduce motion',
     helpLabelPrefix: 'Help',
     helpClose: 'Close help',
     helpWhy: 'Why use it',
@@ -108,7 +114,14 @@ const dict = {
     helpOutput: 'What you get',
     helpTerms: 'In simple words',
     helpOpenModule: 'Open module',
-    helpScreenIntro: 'Short, plain-language guidance for key modules.'
+    helpScreenIntro: 'Short, plain-language guidance for key modules.',
+    viewSettings: 'View settings',
+    soundFx: 'Sound FX',
+    volume: 'Volume',
+    autoMode: 'Auto',
+    horizon: 'Horizon',
+    settingsTitle: 'Settings',
+    settingsSubtitle: 'Export, import, and app maintenance.'
   }
 } as const;
 
@@ -118,3 +131,18 @@ export const t = (key: I18nKey) => dict[getLang()][key];
 
 export const formatNumber = (value: number, options?: Intl.NumberFormatOptions) =>
   new Intl.NumberFormat(getLang(), options).format(value);
+
+export const formatPercent = (value: number, digits = 0) =>
+  new Intl.NumberFormat(getLang(), {
+    style: 'percent',
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits
+  }).format(value);
+
+export const formatDateTime = (
+  value: string | number | Date,
+  options?: Intl.DateTimeFormatOptions
+) =>
+  new Intl.DateTimeFormat(getLang(), options ?? { dateStyle: 'short', timeStyle: 'short' }).format(
+    new Date(value)
+  );
